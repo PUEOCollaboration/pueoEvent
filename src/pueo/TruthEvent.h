@@ -36,7 +36,7 @@ namespace pueo
   class TruthEvent : public TObject 
   {
     TruthEvent() { ; }
-    virtual ~TruthEvent(); 
+    virtual ~TruthEvent() {; }
 
     Int_t run = 0; //< Run number;
     UInt_t          realTime=0;               ///< unixTime of readout
@@ -48,32 +48,31 @@ namespace pueo
     TVector3        nuPos;                  ///< Neutrino position
     TVector3        nuDir;                  ///< Neutrino direction
     TVector3        rfExit;                 ///< Position of rf exit
-    Double_t        nuMom;                  ///< Neutrino momentum
-    Int_t           nu_pdg;                 ///< Neutrino PDG code
-    Double_t        e_component;            ///< E comp along polarization
-    Double_t        h_component;            ///< H comp along polarization
-    Double_t        n_component;            ///< Normal comp along polarization
-    Double_t        e_component_k;          ///< Component of e-field along the rx e-plane
-    Double_t        h_component_k;          ///< Component of the e-field along the rx h-plane
-    Double_t        n_component_k;          ///< Component of the e-field along the normal 
-    Double_t        vmmhz_max;              ///< Maximum signal at balloon (V/m/MHz)
-    Double_t        payloadPhi;             ///< Phi of signal in payload coordinates (degrees)
-    Double_t        payloadTheta;           ///< Theta of signal in payload coordinates (degrees)
-    Double_t        sourceLon;              ///< RF position when leaving the ice: Longitude (using icemc model)
-    Double_t        sourceLat;              ///< RF position when leaving the ice: Latitude  (using icemc model)
-    Double_t        sourceAlt;              ///< RF position when leaving the ice: Altitude  (using icemc model)
-    Double_t        weight;                 ///< Weight assigned by icemc
+    Double_t        nuMom = 0;              ///< Neutrino momentum
+    Int_t           nu_pdg = 0;             ///< Neutrino PDG code
+    Double_t        e_component = 0;            ///< E comp along polarization
+    Double_t        h_component = 0;            ///< H comp along polarization
+    Double_t        n_component = 0;            ///< Normal comp along polarization
+    Double_t        e_component_k = 0;          ///< Component of e-field along the rx e-plane
+    Double_t        h_component_k = 0;          ///< Component of the e-field along the rx h-plane
+    Double_t        n_component_k = 0;          ///< Component of the e-field along the normal 
+    Double_t        vmmhz_max = 0;              ///< Maximum signal at balloon (V/m/MHz)
+    Double_t        payloadPhi = -999;             ///< Phi of signal in payload coordinates (degrees)
+    Double_t        payloadTheta = -999;           ///< Theta of signal in payload coordinates (degrees)
+    Double_t        sourceLon = 0;              ///< RF position when leaving the ice: Longitude (using icemc model)
+    Double_t        sourceLat = 0;              ///< RF position when leaving the ice: Latitude  (using icemc model)
+    Double_t        sourceAlt = 0;              ///< RF position when leaving the ice: Altitude  (using icemc model)
+    Double_t        weight = 0;                 ///< Weight assigned by icemc
 
 
     std::vector<double> signal[k::NUM_DIGITZED_CHANNELS];  ///<Noise-less signal
     std::vector<double> noise[k::NUM_DIGITZED_CHANNELS];   ///<Signal-less noise
-    Double_t SNRAtTrigger[k::NUM_DIGITZED_CHANNELS];               ///< Array of SNR at trigger
-    Double_t maxSNRAtTriggerV;                                  ///< Max SNR at trigger V-POL
-    Double_t maxSNRAtTriggerH;                                  ///< Max SNR at trigger H-POL
-    Double_t SNRAtDigitizer[k::NUM_DIGITZED_CHANNELS];             ///< Array of SNR at digitizer
-    Double_t maxSNRAtDigitizerV;                                ///< Max SNR at digitizer V-POL
-    Double_t maxSNRAtDigitizerH;                                ///< Max SNR at digitizer H-POL
-    
+    Double_t SNRAtTrigger[k::NUM_DIGITZED_CHANNELS] = {0};               ///< Array of SNR at trigger
+    Double_t maxSNRAtTriggerV = 0;                                  ///< Max SNR at trigger V-POL
+    Double_t maxSNRAtTriggerH = 0;                                  ///< Max SNR at trigger H-POL
+    Double_t SNRAtDigitizer[k::NUM_DIGITZED_CHANNELS] = {0};             ///< Array of SNR at digitizer
+    Double_t maxSNRAtDigitizerV = 0;                                ///< Max SNR at digitizer V-POL
+    Double_t maxSNRAtDigitizerH = 0;                                ///< Max SNR at digitizer H-POL
    
 
     ClassDef(TruthEvent,1); 
