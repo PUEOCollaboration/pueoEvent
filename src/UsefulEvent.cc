@@ -44,10 +44,10 @@ pueo::UsefulEvent::UsefulEvent(const RawEvent & event, const RawHeader & header)
     {
       volts[ichan][i] = data[ichan][i] *1000/ 4096 ; // TODO: CALIBRATION
     }
+    t0[ichan] = 0;//TODO!!!  will likely depend on trigger type or something... 
+    dt[ichan] = GeomTool::getRingFromChanIndex(ichan) == ring::kLF ? 1./1.5 :  1./3; 
   }
 
-  t0 = 0;//TODO!!!  will likely depend on trigger type or something... 
-  dt = 1./3; 
 }
 
 TGraph * pueo::UsefulEvent::makeGraph(int ant, pol::pol_t pol) const
@@ -79,7 +79,7 @@ TGraph * pueo::UsefulEvent::makeGraph(size_t chanIndex) const
   for (size_t i = 0; i < volts[chanIndex].size(); i++) 
   {
     g->GetY()[i] = volts[chanIndex][i]; 
-    g->GetX()[i] = i * dt + t0; 
+    g->GetX()[i] = i * dt[chanIndex] + t0[chanIndex]; 
   }
   g->SetName(Form("ant%d%c", ant, pol::asChar(pol))); 
   g->SetTitle(Form("Antenna %d%c", ant, pol::asChar(pol))); 

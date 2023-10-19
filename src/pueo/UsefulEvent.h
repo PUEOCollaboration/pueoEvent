@@ -50,9 +50,8 @@ namespace pueo
       TGraph *makeGraph(int surf, int chan) const; 
 
       std::vector<double> volts[k::NUM_DIGITZED_CHANNELS];
-      double t0;
-      double dt; 
-
+      double t0[k::NUM_DIGITZED_CHANNELS];
+      double dt[k::NUM_DIGITZED_CHANNELS]; 
 
 
     ClassDef(UsefulEvent,1); 
