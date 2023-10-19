@@ -697,6 +697,12 @@ Int_t pueo::GeomTool::getAntFromPhiRing(Int_t phi, ring::ring_t ring)
 }
 
 
+pueo::ring::ring_t pueo::GeomTool::getRingFromChanIndex(Int_t idx) 
+{
+  int ant; pol::pol_t pol; 
+  getAntPolFromChanIndex(idx,ant,pol); 
+  return getRingFromAnt(ant); 
+}
 
 
 

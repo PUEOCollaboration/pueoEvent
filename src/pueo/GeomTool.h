@@ -121,6 +121,7 @@ namespace  pueo
     static Int_t getSurfChanFromAntPol(Int_t ant,pol::pol_t pol, Int_t & surf, Int_t & chan);
     static Int_t getAntPolFromSurfChan(Int_t surf, Int_t chan, Int_t & ant, pol::pol_t & pol); 
     static Int_t getAntPolFromChanIndex(Int_t chanIndex, Int_t & ant, pol::pol_t & pol); 
+    static pueo::ring::ring_t getRingFromChanIndex(Int_t chanIndex);
 
     static Int_t getSurfChanFromChanIndex(Int_t chanIndex, // input channel index
             Int_t &surf,Int_t &chan); ///< Convert logical index to  surf and channel
