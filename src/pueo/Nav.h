@@ -50,23 +50,23 @@ namespace pueo
        Position() {;}
        virtual ~Position() {;}
 
-       Int_t           run; 
-       UInt_t          realTime; ///<Time from the GPS unit
-       UInt_t          timeOfDay; ///<in ms since the start of the day
-       UInt_t          payloadTime;
-       UInt_t          payloadTimeUs;
-       UShort_t        nSatsVis; 
-       UShort_t        nSatsTracked; 
-       Float_t         latitude; ///< In degrees
-       Float_t         longitude; ///<In degrees
-       Float_t         altitude; ///<In metres, WGS84
-       Float_t         course; 
-       Float_t         groundVelocity; //m/s
-       Float_t         vertVelocity; //m/s
-       Float_t         pdop; //< 
-       Float_t         hdop; //< 
-       Float_t         tdop; //< 
-       Int_t           flag;
+       Int_t           run = 0; 
+       UInt_t          realTime = 0; ///<Time from the GPS unit
+       UInt_t          timeOfDay = 0; ///<in ms since the start of the day
+       UInt_t          payloadTime = 0;
+       UInt_t          payloadTimeUs = 0;
+       UShort_t        nSatsVis = 0; 
+       UShort_t        nSatsTracked = 0; 
+       Float_t         latitude = 0; ///< In degrees
+       Float_t         longitude = 0; ///<In degrees
+       Float_t         altitude = 0; ///<In metres, WGS84
+       Float_t         course = 0; 
+       Float_t         groundVelocity = 0; //m/s
+       Float_t         vertVelocity = 0; //m/s
+       Float_t         pdop = 0; //< 
+       Float_t         hdop = 0; //< 
+       Float_t         tdop = 0; //< 
+       Int_t           flag = 0;
        
       ClassDef(Position,1);
     };
@@ -78,45 +78,47 @@ namespace pueo
        Attitude() {;}
        virtual ~Attitude(){;}
 
-       Int_t           run; 
-       UInt_t          realTime; ///<Time from the GPS unit
-       UInt_t          timeOfDay; ///<in ms since the start of the day
-       UShort_t       nSatsVis; 
-       UShort_t        nSatsTracked; 
-       UInt_t          payloadTime;
-       UInt_t          payloadTimeUs;
-       Float_t         latitude; ///< In degrees
-       Float_t         longitude; ///<In degrees
-       Float_t         altitude; ///<In metres, WGS84
-       Float_t         heading; ///<In degrees
-       Float_t         pitch; ///<In degreess
-       Float_t         roll; ///<In degreess
-       Float_t         mrms; 
-       Float_t         brms; 
-       Int_t           flag; 
+       Int_t           run = 0; 
+       UInt_t          realTime = 0; ///<Time from the GPS unit
+       UInt_t          timeOfDay = 0; ///<in ms since the start of the day
+       UShort_t       nSatsVis = 0; 
+       UShort_t        nSatsTracked = 0; 
+       UInt_t          payloadTime = 0;
+       UInt_t          payloadTimeUs = 0;
+       Float_t         latitude = 0; ///< In degrees
+       Float_t         longitude = 0; ///<In degrees
+       Float_t         altitude = 0; ///<In metres, WGS84
+       Float_t         heading = 0; ///<In degrees
+       Float_t         pitch = 0; ///<In degreess
+       Float_t         roll = 0; ///<In degreess
+       Float_t         mrms = 0; 
+       Float_t         brms = 0; 
+       Int_t           flag = 0; 
        
       ClassDef(Attitude,1);
     };
 
     class Sat:  public TObject
     {
-      int id; // constellation + prn or soething
-      int8_t elevation;
-      uint8_t azimuth; 
-      uint8_t snr; 
-      uint8_t used : 1; 
-      ClassDef(Sat,1);
-    };
+      public: 
+        Sat() { used=0; } 
+        int id =-1; // constellation + prn or soething
+        int8_t elevation=0;
+        uint8_t azimuth=0; 
+        uint8_t snr=0; 
+        uint8_t used : 1; 
+        ClassDef(Sat,1);
+      };
 
     class Sats : public TObject
     {
       public:
         Sats() {; }
         virtual ~Sats() {;}
-        Int_t           run; 
-        UInt_t          realTime; ///<Time from the GPS unit
-        UInt_t          payloadTime;
-        UInt_t          payloadTimeUs;
+        Int_t           run = 0; 
+        UInt_t          realTime = 0; ///<Time from the GPS unit
+        UInt_t          payloadTime = 0;
+        UInt_t          payloadTimeUs = 0;
         std::vector<Sat> sats; 
 
        ClassDef(Sats,1); 
