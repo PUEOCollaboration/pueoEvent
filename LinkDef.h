@@ -29,6 +29,7 @@
 
 #pragma link C++ class pueo::GeomTool-;
 #pragma link C++ class pueo::RawEvent+;
+#pragma link C++ class pueo::TruthEvent+;
 #pragma link C++ class pueo::UsefulEvent+;
 #pragma link C++ class pueo::RawHeader+;
 #pragma link C++ namespace pueo::nav;

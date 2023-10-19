@@ -54,6 +54,7 @@ set(HEADER_FILES
   src/pueo/Nav.h
   src/pueo/RawEvent.h
   src/pueo/RawHeader.h
+  src/pueo/TruthEvent.h
   src/pueo/UsefulEvent.h
   src/pueo/Version.h
 )
@@ -64,6 +65,7 @@ set(SOURCE_FILES
   src/Nav.cc
   src/RawEvent.cc
   src/RawHeader.cc
+  src/TruthEvent.cc
   src/UsefulEvent.cc
   src/Version.cc
 )
