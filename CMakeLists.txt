@@ -46,7 +46,7 @@ include(${ROOT_USE_FILE})
 
 message("ROOT_INCLUDE_DIRS is set to ${ROOT_INCLUDE_DIRS}")
 include_directories(${PROJECT_SOURCE_DIR} ${ROOT_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/src/ ${FFTW_INCLUDES} ${ZLIB_INCLUDES} ${UTIL_INC_DIR})
-add_definitions(-DDEFAULT_ANITA_VERSION=${DEFAULT_ANITA_VERSION}) 
+add_definitions(-DDEFAULT_PUEO_VERSION=${DEFAULT_PUEO_VERSION}) 
 
 set(HEADER_FILES 
   src/pueo/Conventions.h   
