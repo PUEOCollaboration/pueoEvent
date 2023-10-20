@@ -48,14 +48,6 @@ namespace pueo
 
      Int_t runNumber = 0;   ///< Run number from software
     
-
-     // Summary data 
-     Short_t yMax[k::NUM_DIGITZED_CHANNELS] = {0}; ///< Maximum value in ADCs???
-     Short_t yMin[k::NUM_DIGITZED_CHANNELS] = {0}; ///< Minimum value in ADCs???
-     Float_t mean[k::NUM_DIGITZED_CHANNELS] = {0}; ///< Mean of the waveform
-     Float_t rms[k::NUM_DIGITZED_CHANNELS] = {0}; ///< RMS of the waveform
-
-
      std::vector<Short_t> data[k::NUM_DIGITZED_CHANNELS]; 
 
     ClassDef(RawEvent,1);
