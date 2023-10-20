@@ -277,7 +277,7 @@ Int_t pueo::GeomTool::getSurfChanAntFromRingPhiPol(ring::ring_t ring,Int_t phi, 
   if (ring == ring::kLF)
   {
     surf = 27; 
-    chan = phi/3; //figure tihs out later... 
+    chan = phi; //figure tihs out later... 
     ant = 108+chan; 
   }
   else if (ring == ring::kNadirRing) 
