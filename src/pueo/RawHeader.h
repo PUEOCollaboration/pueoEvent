@@ -57,7 +57,7 @@ namespace pueo
      UShort_t imagePeak;
      UShort_t coherentSumPeak;
 
-     trigger::type_t trigType; ///
+     UInt_t        trigType; /// set pueo::trigger namespace in Conventions
      UInt_t        trigNum; ///< Trigger number (since last clear all)
      UInt_t        trigTime; ///< Trigger time in TURF clock ticks
      UInt_t        c3poNum; ///< Number of TURF clock ticks between GPS pulse per seconds
