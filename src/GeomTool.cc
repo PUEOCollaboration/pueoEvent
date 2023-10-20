@@ -382,7 +382,7 @@ Int_t pueo::GeomTool::getSurfChanFromAntPol(Int_t ant, pol::pol_t pol, Int_t & s
   ring::ring_t ring = getRingFromAnt(ant); 
   Int_t phi = getPhiFromAnt(ant); 
   int new_ant; 
-  getSurfChanAntFromRingPhiPol(ring,phi,pol, new_ant, surf,chan); 
+  getSurfChanAntFromRingPhiPol(ring,phi,pol, surf,chan, new_ant); 
   assert(new_ant == ant); 
   return surf; 
 }
