@@ -43,7 +43,7 @@ pueo::UsefulEvent::UsefulEvent(const RawEvent & event, const RawHeader & header)
     volts[ichan].resize(data[ichan].size()); 
     for (size_t i = 0; i < volts[ichan].size(); i++) 
     {
-      volts[ichan][i] = data[ichan][i] *500/ 2048 ; // TODO: CALIBRATION
+      volts[ichan][i] = data[ichan][i] *500./2048 ; // TODO: CALIBRATION
     }
     t0[ichan] = 0;//TODO!!!  will likely depend on trigger type or something... 
     dt[ichan] = GeomTool::getRingFromChanIndex(ichan) == ring::kLF ? 1./1.5 :  1./3; 
