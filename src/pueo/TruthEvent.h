@@ -52,7 +52,7 @@ namespace pueo
       Double_t        nuMom = 0;              ///< Neutrino momentum
       Int_t           nu_pdg = 0;             ///< Neutrino PDG code
       TVector3        polarization;           ///< 
-      TVector3        pointing;               ///< 
+      TVector3        poynting;               ///< 
       Double_t        payloadPhi = -999;      ///< Phi of signal in payload coordinates (degrees)
       Double_t        payloadTheta = -999;    ///< Theta of signal in payload coordinates (degrees)
       Double_t        sourceLon = 0;              ///< RF position when leaving the ice: Longitude (using icemc model)
