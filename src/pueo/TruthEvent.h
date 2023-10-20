@@ -35,32 +35,33 @@ namespace pueo
 
   class TruthEvent : public TObject 
   {
-    TruthEvent() { ; }
-    virtual ~TruthEvent() {; }
+    public: 
+      TruthEvent() { ; }
+      virtual ~TruthEvent() {; }
 
-    Int_t run = 0; //< Run number;
-    UInt_t          realTime=0;               ///< unixTime of readout
-    UInt_t          eventNumber=0;            ///< Software event number
-
-
-    TVector3        balloonPos;             ///< Balloon position (icemc Cartesian coordinates) 
-    TVector3        balloonDir;             ///< Balloon direction (icemc Cartesian coordinateS)
-    TVector3        nuPos;                  ///< Neutrino position
-    TVector3        nuDir;                  ///< Neutrino direction
-    TVector3        rfExit;                 ///< Position of rf exit
-    Double_t        nuMom = 0;              ///< Neutrino momentum
-    Int_t           nu_pdg = 0;             ///< Neutrino PDG code
-    TVector3        polarization;           ///< 
-    TVector3        pointing;               ///< 
-    Double_t        payloadPhi = -999;      ///< Phi of signal in payload coordinates (degrees)
-    Double_t        payloadTheta = -999;    ///< Theta of signal in payload coordinates (degrees)
-    Double_t        sourceLon = 0;              ///< RF position when leaving the ice: Longitude (using icemc model)
-    Double_t        sourceLat = 0;          ///< RF position when leaving the ice: Latitude  (using icemc model)
-    Double_t        sourceAlt = 0;          ///< RF position when leaving the ice: Altitude  (using icemc model)
-    Double_t        weight = 0;             ///< Weight assigned by icemc
+      Int_t run = 0; //< Run number;
+      UInt_t          realTime=0;               ///< unixTime of readout
+      UInt_t          eventNumber=0;            ///< Software event number
 
 
-    std::vector<double> signal[k::NUM_DIGITZED_CHANNELS];  ///<Noise-less signal
+      TVector3        balloonPos;             ///< Balloon position (icemc Cartesian coordinates) 
+      TVector3        balloonDir;             ///< Balloon direction (icemc Cartesian coordinateS)
+      TVector3        nuPos;                  ///< Neutrino position
+      TVector3        nuDir;                  ///< Neutrino direction
+      TVector3        rfExit;                 ///< Position of rf exit
+      Double_t        nuMom = 0;              ///< Neutrino momentum
+      Int_t           nu_pdg = 0;             ///< Neutrino PDG code
+      TVector3        polarization;           ///< 
+      TVector3        pointing;               ///< 
+      Double_t        payloadPhi = -999;      ///< Phi of signal in payload coordinates (degrees)
+      Double_t        payloadTheta = -999;    ///< Theta of signal in payload coordinates (degrees)
+      Double_t        sourceLon = 0;              ///< RF position when leaving the ice: Longitude (using icemc model)
+      Double_t        sourceLat = 0;          ///< RF position when leaving the ice: Latitude  (using icemc model)
+      Double_t        sourceAlt = 0;          ///< RF position when leaving the ice: Altitude  (using icemc model)
+      Double_t        weight = 0;             ///< Weight assigned by icemc
+
+
+      std::vector<double> signal[k::NUM_DIGITZED_CHANNELS];  ///<Noise-less signal
 
     ClassDef(TruthEvent,1); 
   }; 
