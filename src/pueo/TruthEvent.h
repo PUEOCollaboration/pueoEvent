@@ -66,7 +66,6 @@ namespace pueo
 
 
     std::vector<double> signal[k::NUM_DIGITZED_CHANNELS];  ///<Noise-less signal
-    std::vector<double> noise[k::NUM_DIGITZED_CHANNELS];   ///<Signal-less noise
     Double_t SNRAtTrigger[k::NUM_DIGITZED_CHANNELS] = {0};               ///< Array of SNR at trigger
     Double_t maxSNRAtTriggerV = 0;                                  ///< Max SNR at trigger V-POL
     Double_t maxSNRAtTriggerH = 0;                                  ///< Max SNR at trigger H-POL
