@@ -36,6 +36,7 @@ ClassImp(pueo::UsefulEvent);
 pueo::UsefulEvent::UsefulEvent(const RawEvent & event, const RawHeader & header) 
   : RawEvent(event)
 {
+  (void) header; 
 
   for (size_t ichan = 0; ichan < k::NUM_DIGITZED_CHANNELS; ichan++) 
   {

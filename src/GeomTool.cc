@@ -39,6 +39,7 @@ Double_t deltaUD = 0.0;
 
 bool pueo::GeomTool::readPositions(int v, const std::string & thesrc) 
 {
+  (void) v; 
   TString calibDir; 
 
 

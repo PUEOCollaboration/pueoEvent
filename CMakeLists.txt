@@ -97,7 +97,7 @@ install (FILES ${PROJECT_BINARY_DIR}/${DICTNAME}_rdict.pcm DESTINATION ${UTIL_LI
 message (" Adding new build type") 
 
 set(CMAKE_CXX_FLAGS_DEFAULT 
-  "-Os -g -Wall" 
+  "-Os -g -Wall -Wextra" 
   CACHE STRING "c++ Flags used during default eventReaderRoot builds" 
   FORCE ) 
 
