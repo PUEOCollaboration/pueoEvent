@@ -283,13 +283,13 @@ Int_t pueo::GeomTool::getSurfChanAntFromRingPhiPol(ring::ring_t ring,Int_t phi, 
   else if (ring == ring::kNadirRing) 
   {
     surf = 24+ phi/ 8; 
-    chan = 192 + 8*surf + 4 * pol + phi /2; 
+    chan = 4 * pol + phi /2; 
     ant = 96 + phi /2; 
   }
   else if (ring < ring::kNadirRing) 
   {
     surf = 12 * pol  + phi/2 ;
-    chan = 8*surf + ring + 4 * (phi %2); 
+    chan = ring + 4 * (phi %2); 
     ant = phi * 4 + ring; 
   }
 
