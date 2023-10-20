@@ -91,7 +91,7 @@ namespace pol {
 
 namespace trigger
 {
-  typedef enum etype : uint8_t 
+  typedef enum etype : uint32_t 
   {
     kUnknown = 0,
     kRFMI = 1, 
@@ -105,7 +105,6 @@ namespace trigger
 
   } type_t; 
 
-  char* asString(pueo::trigger::type_t type); 
 }
 
 
