@@ -31,6 +31,14 @@
 #include "TMutex.h" 
 
 #define INCHTOMETER 0.0254
+#define R_EARTH 6.378137E6
+#define  GEOID_MAX 6.378137E6 // parameters of geoid model
+#define  GEOID_MIN 6.356752E6
+#define C_LIGHT 299792458 //meters
+#define FLATTENING_FACTOR (1./298.257223563)
+
+
+
 
 Double_t deltaRL = 0.0;
 Double_t deltaUD = 0.0;
@@ -703,6 +711,70 @@ pueo::ring::ring_t pueo::GeomTool::getRingFromChanIndex(Int_t idx)
   int ant; pol::pol_t pol; 
   getAntPolFromChanIndex(idx,ant,pol); 
   return getRingFromAnt(ant); 
+}
+
+void pueo::GeomTool::getCartesianCoords(Double_t lat, Double_t lon, Double_t alt, Double_t p[3])
+{
+  if(lat<0) lat*=-1;
+   //Note that x and y are switched to conform with previous standards
+   lat*=TMath::DegToRad();
+   lon*=TMath::DegToRad();
+   //calculate x,y,z coordinates
+   Double_t C2=pow(cos(lat)*cos(lat)+(1-FLATTENING_FACTOR)*(1-FLATTENING_FACTOR)*sin(lat)*sin(lat),-0.5);
+   Double_t Q2=(1-FLATTENING_FACTOR)*(1-FLATTENING_FACTOR)*C2;
+   p[1]=(R_EARTH*C2+alt)*TMath::Cos(lat)*TMath::Cos(lon);
+   p[0]=(R_EARTH*C2+alt)*TMath::Cos(lat)*TMath::Sin(lon);
+   p[2]=(R_EARTH*Q2+alt)*TMath::Sin(lat);
+}
+
+void pueo::GeomTool::getLatLonAltFromCartesian(Double_t p[3], Double_t &lat, Double_t &lon, Double_t &alt)
+{
+  //Here again x and y are flipped for confusions sake
+  Double_t xt=p[1];
+  Double_t yt=p[0];
+  Double_t zt=p[2]; //And flipped z for a test
+
+  static Double_t cosaeSq=(1-FLATTENING_FACTOR)*(1-FLATTENING_FACTOR);
+  Double_t lonVal=TMath::ATan2(yt,xt);
+  Double_t xySq=TMath::Sqrt(xt*xt+yt*yt);
+  Double_t tanPsit=zt/xySq;
+  Double_t latGuess=TMath::ATan(tanPsit/cosaeSq);
+  Double_t nextLat=latGuess;
+  Double_t geomBot=R_EARTH*R_EARTH*xySq;
+  do {
+    latGuess=nextLat;
+    Double_t N=R_EARTH/TMath::Sqrt(cos(latGuess)*cos(latGuess)+(1-FLATTENING_FACTOR)*(1-FLATTENING_FACTOR)*sin(latGuess)*sin(latGuess));
+    Double_t top=(R_EARTH*R_EARTH*zt + (1-cosaeSq)*cosaeSq*TMath::Power(N*TMath::Sin(latGuess),3));
+    Double_t bottom=geomBot-(1-cosaeSq)*TMath::Power(N*TMath::Cos(latGuess),3);        
+    nextLat=TMath::ATan(top/bottom);
+    //    std::cout << latGuess << "\t" << nextLat << "\n";
+    
+  } while(TMath::Abs(nextLat-latGuess)>0.0001);
+  latGuess=nextLat;
+  Double_t N=R_EARTH/TMath::Sqrt(cos(latGuess)*cos(latGuess)+(1-FLATTENING_FACTOR)*(1-FLATTENING_FACTOR)*sin(latGuess)*sin(latGuess));
+  Double_t height=(xySq/TMath::Cos(nextLat))-N;
+  
+  lat=latGuess*TMath::RadToDeg();
+  lon=lonVal*TMath::RadToDeg();
+  alt=height;
+  if(lat>0) lat*=-1;
+ 
+}
+
+Double_t pueo::GeomTool::getDistanceToCentreOfEarth(Double_t lat)
+{
+  Double_t pVec[3];
+  this->getCartesianCoords(lat,0,0,pVec);
+//   Double_t cosLat=TMath::Cos(lat);
+//   Double_t sinLat=TMath::Sin(lat);
+//   Double_t a=R_EARTH;
+//   Double_t b=a-FLATTENING_FACTOR*a;
+//   Double_t radSq=(a*a*cosLat)*(a*a*cosLat)+(b*b*sinLat)*(b*b*sinLat);
+//   radSq/=(a*cosLat)*(a*cosLat)+(b*sinLat)*(b*sinLat);
+ //  Double_t cosSqAe=(1-FLATTENING_FACTOR)*(1-FLATTENING_FACTOR);
+//   Double_t N=R_EARTH/TMath::Sqrt(cosLat*cosLat+cosSqAe*sinLat*sinLat);
+//   Double_t radSq=N*N*(cosLat*cosLat+cosSqAe*cosSqAe*sinLat*sinLat);
+  return TMath::Sqrt(pVec[0]*pVec[0]+pVec[1]*pVec[1]+pVec[2]*pVec[2]);
 }
 
 
