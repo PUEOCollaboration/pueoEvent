@@ -52,6 +52,7 @@ namespace pueo
       std::vector<double> volts[k::NUM_DIGITZED_CHANNELS];
       double t0[k::NUM_DIGITZED_CHANNELS];
       double dt[k::NUM_DIGITZED_CHANNELS]; 
+      double t(size_t chan, size_t i) const { return t0[chan] + i * dt[chan]; }
 
 
     ClassDef(UsefulEvent,1); 
