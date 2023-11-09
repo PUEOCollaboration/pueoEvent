@@ -764,7 +764,7 @@ void pueo::GeomTool::getLatLonAltFromCartesian(Double_t p[3], Double_t &lat, Dou
 Double_t pueo::GeomTool::getDistanceToCentreOfEarth(Double_t lat)
 {
   Double_t pVec[3];
-  this->getCartesianCoords(lat,0,0,pVec);
+  getCartesianCoords(lat,0,0,pVec);
 //   Double_t cosLat=TMath::Cos(lat);
 //   Double_t sinLat=TMath::Sin(lat);
 //   Double_t a=R_EARTH;

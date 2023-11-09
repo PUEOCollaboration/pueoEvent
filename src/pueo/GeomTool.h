@@ -212,9 +212,9 @@ namespace  pueo
     std::array<std::array<double,k::NUM_POLS>, k::NANTS_LF> rPhaseCenterLF = {}; 
     std::array<std::array<double,k::NUM_POLS>, k::NANTS_LF> azPhaseCenterLF {}; 
 
-    void getCartesianCoords(Double_t lat, Double_t lon, Double_t alt, Double_t p[3]);
-    void getLatLonAltFromCartesian(Double_t p[3], Double_t &lat, Double_t &lon, Double_t &alt);
-    Double_t getDistanceToCentreOfEarth(Double_t lat);
+    static void getCartesianCoords(Double_t lat, Double_t lon, Double_t alt, Double_t p[3]);
+    static void getLatLonAltFromCartesian(Double_t p[3], Double_t &lat, Double_t &lon, Double_t &alt);
+    static Double_t getDistanceToCentreOfEarth(Double_t lat);
 
 
 
