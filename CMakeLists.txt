@@ -50,6 +50,7 @@ add_definitions(-DDEFAULT_PUEO_VERSION=${DEFAULT_PUEO_VERSION})
 
 set(HEADER_FILES 
   src/pueo/Conventions.h   
+  src/pueo/Dataset.h
   src/pueo/GeomTool.h
   src/pueo/Nav.h
   src/pueo/RawEvent.h
@@ -61,6 +62,7 @@ set(HEADER_FILES
 
 set(SOURCE_FILES 
   src/Conventions.cc   
+  src/Dataset.cc   
   src/GeomTool.cc
   src/Nav.cc
   src/RawEvent.cc
