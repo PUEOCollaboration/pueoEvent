@@ -81,7 +81,7 @@ namespace pueo
        Int_t           run = 0; 
        UInt_t          realTime = 0; ///<Time from the GPS unit
        UInt_t          timeOfDay = 0; ///<in ms since the start of the day
-       UShort_t       nSatsVis = 0; 
+       UShort_t        nSatsVis = 0; 
        UShort_t        nSatsTracked = 0; 
        UInt_t          payloadTime = 0;
        UInt_t          payloadTimeUs = 0;
