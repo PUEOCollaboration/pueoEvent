@@ -105,11 +105,10 @@ namespace trigger
 
   } type_t; 
 
-  inline bool isRFTrigger( type_t t) 
+  inline bool isRFTrigger( uint32_t t) 
   {
-    uint32_t ut = (uint32_t) t; 
     uint32_t rf_trigger = kRFMI | kRFNadir | kRFLF; 
-    return  !!(ut & rf_trigger);
+    return  !!(t & rf_trigger);
   }
 }
 
