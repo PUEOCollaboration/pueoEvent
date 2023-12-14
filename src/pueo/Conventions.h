@@ -41,8 +41,9 @@ namespace  pueo
   namespace k
   {
     constexpr int NANTS_MI = 96; 
-    constexpr int NANTS_NADIR = 12; 
+    constexpr int NANTS_NADIR = 0; 
     constexpr int NANTS_LF = 8; 
+    constexpr int MULTIPLEX_LF = 0; 
     constexpr int NUM_HORNS = NANTS_MI + NANTS_NADIR; 
     constexpr int NUM_ANTS = NANTS_MI + NANTS_NADIR + NANTS_LF; 
     constexpr int NUM_POLS = 2;
