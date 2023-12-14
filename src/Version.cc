@@ -46,7 +46,7 @@
 /** These are the boundaries for setting the PUEO version based on timestamp */ 
 static const unsigned version_cutoffs[] = 
 { 
-  0,    //Just padding
+  0,0,    //Just padding
   INT_MAX // hopefully PUEO will fly by 2038 
 }; 
 
