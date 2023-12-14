@@ -568,17 +568,17 @@ bool  pueo::Dataset::loadRun(int run, bool dec,  DataDirectory dir)
   
   // For telemetered crap 
   TString fname0 = TString::Format("%s/run%d/eventHeadFile%d.root", data_dir, run, run);
-  TString fname1 = TString::Format("%s/run%d/timedHeadFile%dOfflineMask.root", data_dir, run, run);   
-  TString fname2 = TString::Format("%s/run%d/timedHeadFile%d.root", data_dir, run, run); 
-  TString fname3 = TString::Format("%s/run%d/headFile%d.root", data_dir, run, run); 
-  TString fname4 = TString::Format("%s/run%d/SimulatedHeadFile%d.root", data_dir, run, run);
+  TString fname1 = TString::Format("%s/run%d/timedHeadFile%d.root", data_dir, run, run); 
+  TString fname2 = TString::Format("%s/run%d/headFile%d.root", data_dir, run, run); 
+  TString fname3 = TString::Format("%s/run%d/SimulatedHeadFile%d.root", data_dir, run, run);
+  TString fname4 = TString::Format("%s/run%d/SimulatedPueoHeadFile%d.root", data_dir, run, run);
 
   bool simulated = false; 
 
   if (const char * the_right_file = checkIfFilesExist(5, fname0.Data(), fname1.Data(), fname2.Data(), fname3.Data(), fname4.Data()))
   {
 
-    if (strcasestr(the_right_file,"SimulatedHeadFile")) simulated = true; 
+    if (strcasestr(the_right_file,"Simulated")) simulated = true; 
 
     fprintf(stderr,"Using head file: %s\n",the_right_file); 
     TFile * f = new TFile(the_right_file); 
@@ -601,11 +601,12 @@ bool  pueo::Dataset::loadRun(int run, bool dec,  DataDirectory dir)
   //try to load gps event file  
   TString fname = TString::Format("%s/run%d/gpsEvent%d.root", data_dir, run, run);
   fname2 = TString::Format("%s/run%d/SimulatedGpsFile%d.root", data_dir, run, run); 
-  if (const char * the_right_file = checkIfFilesExist(2,fname.Data(),fname2.Data()))
+  fname3 = TString::Format("%s/run%d/SimulatedPueoGpsFile%d.root", data_dir, run, run); 
+  if (const char * the_right_file = checkIfFilesExist(3,fname.Data(),fname2.Data(), fname3.Data()))
   {
      TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
-     fGpsTree = (TTree*) f->Get("adu5PatTree"); 
+     fGpsTree = (TTree*) f->Get("gpsTree"); 
      fHaveGpsEvent = true; 
 
   }
@@ -617,7 +618,7 @@ bool  pueo::Dataset::loadRun(int run, bool dec,  DataDirectory dir)
     {
        TFile * f = new TFile(the_right_file); 
        filesToClose.push_back(f); 
-       fGpsTree = (TTree*) f->Get("adu5PatTree"); 
+       fGpsTree = (TTree*) f->Get("gpsTree"); 
        fGpsTree->BuildIndex("realTime"); 
        fHaveGpsEvent = false; 
     }
@@ -636,6 +637,7 @@ bool  pueo::Dataset::loadRun(int run, bool dec,  DataDirectory dir)
 
   fname = TString::Format("%s/run%d/usefulEventFile%d.root", data_dir, run, run);
   fname2 = TString::Format("%s/run%d/SimulatedEventFile%d.root", data_dir, run, run); 
+  fname3 = TString::Format("%s/run%d/SimulatedPueoEventFile%d.root", data_dir, run, run); 
   if (const char * the_right_file = checkIfFilesExist(2, fname.Data(), fname2.Data()))
   {
      TFile * f = new TFile(the_right_file); 
@@ -663,11 +665,12 @@ bool  pueo::Dataset::loadRun(int run, bool dec,  DataDirectory dir)
   if (simulated)
   {
     fname = TString::TString::Format("%s/run%d/SimulatedTruthFile%d.root",data_dir,run,run);
-    if (checkIfFileExists(fname.Data()))
+    fname2 = TString::TString::Format("%s/run%d/SimulatedPueoTruthFile%d.root",data_dir,run,run);
+    if ( const char * the_right_file = checkIfFilesExist(2, fname.Data(), fname2.Data()))
     {
-     TFile * f = new TFile(fname.Data()); 
+     TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
-     fTruthTree = (TTree*) f->Get("truthTree"); 
+     fTruthTree = (TTree*) f->Get("truthPueoTree"); 
      fTruthTree->SetBranchAddress("truth",&fTruth); 
     }
   }
