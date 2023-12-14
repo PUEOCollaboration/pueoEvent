@@ -630,7 +630,7 @@ bool  pueo::Dataset::loadRun(int run, bool dec,  DataDirectory dir)
     }
   }
 
-  fGpsTree->SetBranchAddress("pat",&fGps); 
+  fGpsTree->SetBranchAddress("gps",&fGps); 
 
 
   //try to load useful event file 
