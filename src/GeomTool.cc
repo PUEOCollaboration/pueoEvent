@@ -252,13 +252,13 @@ Int_t pueo::GeomTool::getPhiRingPolFromSurfChan(Int_t surf,Int_t chan, Int_t &ph
   if(chan<0 || chan>=k::NUM_CHANS_PER_SURF) return -1;
 
   // 
-  if (surf < 24) 
+  if (surf <  ( k::NANTS_MI / 4)) 
   {
     pol = pol::pol_t(surf / 12); 
     phi = 2*surf + (chan / 4); 
     ring =  ring::ring_t(chan % 4); 
   }
-  else if (surf < 27) 
+  else if (  surf < (k::NANTS_MI/ 4)  + (k::NANTS_NADIR/4)) 
   {
     ring = ring::kNadirRing; 
     pol = pol::pol_t(chan / 4); 
@@ -266,7 +266,7 @@ Int_t pueo::GeomTool::getPhiRingPolFromSurfChan(Int_t surf,Int_t chan, Int_t &ph
   }
   else
   {
-    pol = pol::kNotAPol; // multiplexed
+    pol =  k::MULTIPLEX_LF ?  pol::kNotAPol : pol::pol_t(surf % 2); 
     phi = chan; 
     ring = ring::kLF; 
   }
@@ -284,13 +284,14 @@ Int_t pueo::GeomTool::getSurfChanAntFromRingPhiPol(ring::ring_t ring,Int_t phi, 
 
   if (ring == ring::kLF)
   {
-    surf = 27; 
+    surf = k::NUM_HORNS / 4 + pol; 
     chan = phi; //figure tihs out later... 
-    ant = 108+chan; 
+    ant = k::NUM_HORNS+chan; 
   }
   else if (ring == ring::kNadirRing) 
   {
-    surf = 24+ phi/ 8; 
+    assert (k::NANTS_NADIR); 
+    surf = k::NANTS_MI / 4 + phi/ 8; 
     chan = 4 * pol + phi /2; 
     ant = 96 + phi /2; 
   }
@@ -681,12 +682,12 @@ Int_t pueo::GeomTool::getTopAntFaceNearestPhiWave(Double_t phiWave) const {
 
 Int_t pueo::GeomTool::getPhiFromAnt(Int_t ant)
 {
-  if(ant<96)
+  if(ant<k::NANTS_MI)
     return ant / 4; 
 
   //nadirs 
-  else if (ant < 108)
-    return 2*(ant-96); 
+  else if (ant < k::NANTS_MI + k::NANTS_NADIR)
+    return 2*(ant-k::NANTS_MI); 
 
   //just number like this 
   else return ant - (k::NUM_HORNS); 
@@ -701,7 +702,10 @@ Int_t pueo::GeomTool::getAntFromPhiRing(Int_t phi, ring::ring_t ring)
   }
 
   else if (ring == ring::kNadirRing)
+  {
+    assert(k::NANTS_NADIR); 
     return k::NANTS_MI + phi/2; 
+  }
   else return k::NUM_HORNS + phi; 
 }
 
