@@ -33,8 +33,12 @@ const char *pueo::ring::asString(pueo::ring::ring_t ring)
   switch(ring) {
   case kTopRing: return "Top";
   case kUpperMiddleRing: return "Upper Middle";
-  case kLowerMiddleRing: return "LowerMiddle";
+  case kLowerMiddleRing: return "Lower Middle";
   case kBottomRing: return "Bottom";
+  case kLFTopRing: return "LF Top";
+  case kLFUpperMiddleRing: return "LF Upper Middle";
+  case kLFLowerMiddleRing: return "LF Lower Middle";
+  case kLFBottomRing: return "LF Bottom";
   default:
     return "Unknown";
   }

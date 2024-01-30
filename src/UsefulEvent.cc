@@ -38,6 +38,7 @@ pueo::UsefulEvent::UsefulEvent(const RawEvent & event, const RawHeader & header)
 {
   (void) header; 
 
+  auto geom = GeomTool::Instance(); 
   for (size_t ichan = 0; ichan < k::NUM_DIGITZED_CHANNELS; ichan++) 
   {
     volts[ichan].resize(data[ichan].size()); 
@@ -46,24 +47,24 @@ pueo::UsefulEvent::UsefulEvent(const RawEvent & event, const RawHeader & header)
       volts[ichan][i] = data[ichan][i] *500./2048 ; // TODO: CALIBRATION
     }
     t0[ichan] = 0;//TODO!!!  will likely depend on trigger type or something... 
-    dt[ichan] = GeomTool::getRingFromChanIndex(ichan) == ring::kLF ? 1./1.5 :  1./3; 
+    dt[ichan] = ring::isLF(geom.getRingFromChanIndex(ichan)) ? 1./1.5 :  1./3; 
   }
 
 }
 
 TGraph * pueo::UsefulEvent::makeGraph(int ant, pol::pol_t pol) const
 {
-  return makeGraph(GeomTool::getChanIndexFromAntPol(ant,pol)); 
+  return makeGraph(GeomTool::Instance().getChanIndexFromAntPol(ant,pol)); 
 }
 
 TGraph * pueo::UsefulEvent::makeGraph(ring::ring_t ring, int phi, pol::pol_t pol) const
 {
-  return makeGraph(GeomTool::getChanIndexFromRingPhiPol(ring,phi,pol)); 
+  return makeGraph(GeomTool::Instance().getChanIndexFromRingPhiPol(ring,phi,pol)); 
 }
 
 TGraph * pueo::UsefulEvent::makeGraph(int surf, int chan) const
 {
-  return makeGraph(GeomTool::getChanIndex(surf,chan)); 
+  return makeGraph(GeomTool::Instance().getChanIndex(surf,chan)); 
 }
 
 
@@ -76,7 +77,7 @@ TGraph * pueo::UsefulEvent::makeGraph(size_t chanIndex) const
   int ant; 
   pol::pol_t pol; 
 
-  GeomTool::getAntPolFromChanIndex(chanIndex,ant,pol); 
+  GeomTool::Instance().getAntPolFromChanIndex(chanIndex,ant,pol); 
   for (size_t i = 0; i < volts[chanIndex].size(); i++) 
   {
     g->GetY()[i] = volts[chanIndex][i]; 

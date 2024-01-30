@@ -26,11 +26,11 @@
 #include <assert.h>
 #include <unordered_map>
 #include <sstream>
+#include <array> 
 #include <iostream>
 #include <fstream>
 #include "TMutex.h" 
 
-#define INCHTOMETER 0.0254
 #define R_EARTH 6.378137E6
 #define  GEOID_MAX 6.378137E6 // parameters of geoid model
 #define  GEOID_MIN 6.356752E6
@@ -45,197 +45,16 @@ Double_t deltaUD = 0.0;
 
 
 
-bool pueo::GeomTool::readPositions(int v, const std::string & thesrc) 
-{
-  (void) v; 
-  TString calibDir; 
 
-
-  const char * src = thesrc == "" ? "default" : thesrc.c_str(); 
-
-  char * calibEnv = getenv("PUEO_CALIB_DIR"); 
-  if (calibEnv) 
-  {
-    calibDir = calibEnv; 
- }
-
-  else 
-  {
-    char * utilEnv = getenv("PUEO_UTIL_INSTALL_DIR"); 
-    if (utilEnv) 
-    {
-      calibDir.Form("%s/share/pueoCalib", utilEnv); 
-    }
-    else
-    {
-      calibDir = "calib/";
-    }
-  }
-
-
-  //read in antenna positions, then we'll add in phase_centers
-  for (int inst = 0; inst < 2; inst++) 
-  {
-    TString fname;
-    fname.Form("%s/%s/%s_pos.csv", calibEnv, src, inst == 0 ? "horn" : "lf"); 
-
-    std::ifstream f(fname.Data());
-    if (!f.is_open()) 
-    {
-      if (inst == 0) 
-      {
-        std::cerr << "Could not open " << fname << ". Cannot construct GeomTool!" << std::endl; 
-        return false; 
-      }
-      else
-      {
-        std::cerr << "Could not open " << fname << " or it doesn't exist. Placing LF antennas at 0's" << std::endl; 
-        break; 
-      }
-    }
-
-    //skip first two lines 
-    
-    std::string line; 
-    getline(f,line); 
-    getline(f,line); 
-
-    size_t ant = 0; 
-    std::vector<double> vals; 
-    vals.reserve(10); 
-
-    while (getline(f,line))
-    {
-      std::string val; 
-      std::stringstream ss(line); 
-      vals.clear(); 
-      while (getline(ss,val,','))
-      {
-        vals.push_back(INCHTOMETER * atof(val.c_str())); 
-      }
-
-      if (inst==0) 
-      {
-        xAntHorns[ant] = vals[1]; 
-        yAntHorns[ant] = vals[2]; 
-        zAntHorns[ant] = vals[3]; 
-        rAntHorns[ant] = vals[4]; 
-        azCenterAntHorns[ant] = vals[5]; 
-        azApertureAntHorns[ant] = vals[6]; 
-        elAntHorns[ant] = vals[7]; 
-      }
-      else
-      {
-        xAntLF[ant] = vals[1]; 
-        yAntLF[ant] = vals[2]; 
-        zAntLF[ant] = vals[3]; 
-        zAntLF[ant] = vals[4]; 
-        azCenterAntLF[ant] = vals[5]; 
-        azApertureAntLF[ant] = vals[6]; 
-        elAntLF[ant] = vals[7]; 
-      }
-
-
-
-      for (int ipol = 0; ipol < pol::kNotAPol; ipol++)
-      {
-        if (inst == 0) 
-        {
-          xPhaseCenterHorns [ant][ipol] = xAntHorns[ant]; 
-          yPhaseCenterHorns [ant][ipol] = yAntHorns[ant]; 
-          zPhaseCenterHorns [ant][ipol] = zAntHorns[ant]; 
-          rPhaseCenterHorns [ant][ipol] = hypot(xAntHorns[ant], yAntHorns[ant]); 
-          azPhaseCenterHorns [ant][ipol] = atan2(yAntHorns[ant], xAntHorns[ant]); 
-        }
-        else
-        {
-          xPhaseCenterLF [ant][ipol] = xAntLF[ant]; 
-          yPhaseCenterLF [ant][ipol] = yAntLF[ant]; 
-          zPhaseCenterLF [ant][ipol] = zAntLF[ant]; 
-          rPhaseCenterLF [ant][ipol] = hypot(xAntLF[ant], yAntLF[ant]); 
-          azPhaseCenterLF [ant][ipol] = atan2(yAntLF[ant], xAntLF[ant]); 
-        }
- 
-      }
-
-      ant++; 
-    }
-    if (inst == 0 && ant < k::NUM_HORNS)
-    {
-      std::cerr << "WARNING: Only read in " << ant << " horn antennas!" << std::endl; 
-    }
-    if (inst == 1 && ant < k::NANTS_LF)
-    {
-      std::cerr << "WARNING: Only read in " << ant << " LF antennas!" << std::endl; 
-    }
-  }
-
-  // add in phase centers, if we have them 
-
-  for (int inst = 0; inst < 2; inst++) 
-  {
-    TString fname;
-    fname.Form("%s/%s/%s_relative_phase_centers.csv", calibEnv, src, inst == 0 ? "horn" : "lf"); 
-
-    std::ifstream f(fname.Data());
-    if (!f.is_open()) 
-    {
-        std::cerr << "Could not open " << fname << " or it doesn't exist. No phase center offsets will be loaded!" << std::endl; 
-        continue;
-    }
-
-    //skip first line
-    std::string line; 
-    getline(f,line); 
-
-    while (getline(f,line))
-    {
-      int ant,ipol; 
-      double dr,dphi,dz; 
-      sscanf(line.c_str(), "%d %d %lf %lf %lf", &ant,&ipol,&dr, &dphi, &dz); 
-      if (ant >=0 && ant < ( inst == 0 ? k::NUM_HORNS : k::NANTS_LF) && ipol >=0 && ipol < pol::kNotAPol)
-      {
-        double sinp,cosp; 
-        sincos(dphi * TMath::DegToRad(), &sinp,&cosp); 
-        double dx = dr*cosp;
-        double dy = dr*sinp; 
-
-        if (inst == 0) 
-        {
-          xPhaseCenterHorns[ant][ipol] +=  dx; 
-          yPhaseCenterHorns[ant][ipol] +=  dy; 
-          zPhaseCenterHorns[ant][ipol] +=  dz; 
-          rPhaseCenterHorns[ant][ipol] +=  dr; 
-          azPhaseCenterHorns[ant][ipol] +=  dphi;
-        }
-        else
-        {
-          xPhaseCenterLF[ant][ipol] +=  dx; 
-          yPhaseCenterLF[ant][ipol] +=  dy; 
-          zPhaseCenterLF[ant][ipol] +=  dz; 
-          rPhaseCenterLF[ant][ipol] +=  dr; 
-          azPhaseCenterLF[ant][ipol] +=  dphi ; 
-        }; 
-      }
-      else
-      {
-        std::cerr << "Invalid line \"" << line << "\" in " << fname << ". Skipping"; 
-      }
-
-    }
-  }
-
-  return true; 
-}
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 /// Default constructor: defines antenna phase centre locations.
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 pueo::GeomTool::GeomTool(int v, const std::string & src)
+  : r(src.c_str()) 
 {
-  valid = readPositions(v,src); 
-
+  (void) v; 
   fHeadingRotationAxis.SetXYZ(0.,0.,1.);
   fPitchRotationAxis.SetXYZ(0.,1.,0.);
   fRollRotationAxis=fPitchRotationAxis.Cross(fHeadingRotationAxis);
@@ -246,63 +65,27 @@ pueo::GeomTool::GeomTool(int v, const std::string & src)
 
 
 Int_t pueo::GeomTool::getPhiRingPolFromSurfChan(Int_t surf,Int_t chan, Int_t &phi,
-						      ring::ring_t &ring,pol::pol_t &pol)
+						      ring::ring_t &ring,pol::pol_t &pol) const
 {
-  if(surf<0 || surf>=k::ACTIVE_SURFS) return -1;
-  if(chan<0 || chan>=k::NUM_CHANS_PER_SURF) return -1;
+  auto ch = r.fromSurf(surf,chan); 
+  if (!ch) return -1; 
 
-  // 
-  if (surf <  ( k::NANTS_MI / 4)) 
-  {
-    pol = pol::pol_t(surf / 12); 
-    phi = 2*surf + (chan / 4); 
-    ring =  ring::ring_t(chan % 4); 
-  }
-  else if (  surf < (k::NANTS_MI/ 4)  + (k::NANTS_NADIR/4)) 
-  {
-    ring = ring::kNadirRing; 
-    pol = pol::pol_t(chan / 4); 
-    phi = 8*(surf-24) + 2 * ( chan %4); 
-  }
-  else
-  {
-    pol =  k::MULTIPLEX_LF ?  pol::kNotAPol : pol::pol_t(surf % 2); 
-    phi = chan; 
-    ring = ring::kLF; 
-  }
-
-
+  phi = ch->phiSector; 
+  ring = ring::ring_t(ch->ring); 
+  pol = pol::fromChar(ch->pol); 
   return phi;
 }
 
 
 
 
-Int_t pueo::GeomTool::getSurfChanAntFromRingPhiPol(ring::ring_t ring,Int_t phi, pol::pol_t pol ,Int_t &surf, Int_t &chan, Int_t &ant) {
-  if(phi<0 || phi>=k::NUM_PHI) return -1;
-  if (ring < 0 || ring >= ring::kNotARing) return -1; 
+Int_t pueo::GeomTool::getSurfChanAntFromRingPhiPol(ring::ring_t ring,Int_t phi, pol::pol_t pol ,Int_t &surf, Int_t &chan, Int_t &ant) const  {
 
-  if (ring == ring::kLF)
-  {
-    surf = k::NUM_HORNS / 4 + pol; 
-    chan = phi; //figure tihs out later... 
-    ant = k::NUM_HORNS+chan; 
-  }
-  else if (ring == ring::kNadirRing) 
-  {
-    assert (k::NANTS_NADIR); 
-    surf = k::NANTS_MI / 4 + phi/ 8; 
-    chan = 4 * pol + phi /2; 
-    ant = 96 + phi /2; 
-  }
-  else if (ring < ring::kNadirRing) 
-  {
-    surf = 12 * pol  + phi/2 ;
-    chan = ring + 4 * (phi %2); 
-    ant = phi * 4 + ring; 
-  }
-
-
+  auto ch = r.fromPhiRingPol(phi,ring, pol::asChar(pol)); 
+  if (!ch) return -1; 
+  chan = ch->surfChan; 
+  surf = ch->surfNum; 
+  ant = ch->antIdx; 
   return surf;
 }
 
@@ -312,6 +95,31 @@ Int_t pueo::GeomTool::getSurfChanAntFromRingPhiPol(ring::ring_t ring,Int_t phi, 
 
 
 
+static TMutex instance_lock; 
+static std::unordered_map<std::string,pueo::GeomTool*> instances[pueo::k::NUM_PUEO]; 
+static std::array<std::string, pueo::k::NUM_PUEO> default_sources = { "dec23" }; 
+static std::string empty (""); 
+void pueo::GeomTool::setDefaultGeometry(Int_t v, const std::string & src) 
+{
+  v = v ?: version::get(); 
+  if (v < k::NUM_PUEO) 
+  {
+    TLockGuard l(&instance_lock); 
+    default_sources[v-1] = src; 
+  }
+
+}
+
+const std::string & pueo::GeomTool::getDefaultGeometry(Int_t v) 
+{
+  
+  v = v ?: version::get(); 
+  if (v < k::NUM_PUEO) 
+  {
+    return default_sources[v-1]; 
+  }
+  return empty; 
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 /// Generates an instance of pueo::GeomTool, required for non-static functions.
@@ -323,11 +131,9 @@ const pueo::GeomTool&  pueo::GeomTool::Instance(Int_t v, const std::string &  ge
   if (v < 0 || v >= k::NUM_PUEO) v = 0; 
   if (!v) v = version::get(); 
 
-  static TMutex instance_lock; 
 
-  static const std::string defstring = "default";
+  static const std::string defstring = getDefaultGeometry(v);
   const std::string & p = geometry_source == "" ? defstring : geometry_source; 
-  static std::unordered_map<std::string,pueo::GeomTool*> instances[k::NUM_PUEO]; 
 
   if (!instances[v-1].count(p)) 
   {
@@ -345,8 +151,11 @@ const pueo::GeomTool&  pueo::GeomTool::Instance(Int_t v, const std::string &  ge
 
 
 
-Int_t pueo::GeomTool::getChanIndex(Int_t surf, Int_t chan){
-  return chan+(k::NUM_CHANS_PER_SURF*surf);
+Int_t pueo::GeomTool::getChanIndex(Int_t surf, Int_t chan) const{
+
+  auto ch =  r.fromSurf(surf,chan);
+  if (!ch) return -1;
+  return ch->globalChannel; 
 }
 
 
@@ -364,40 +173,41 @@ Double_t pueo::GeomTool::getPhiDiff(Double_t firstPhi, Double_t secondPhi)
 
 Int_t pueo::GeomTool::getChanIndexFromRingPhiPol(ring::ring_t ring,
 					      Int_t phi,
-					      pol::pol_t pol)
+					      pol::pol_t pol) const
 {
-  int surf,chan,ant; 
-  getSurfChanAntFromRingPhiPol(ring,phi,pol,surf,chan,ant); 
-  return getChanIndex(surf,chan); 
+  auto ch = r.fromPhiRingPol(phi,ring, pol::asChar(pol)); 
+  if (!ch) return -1; 
+  return ch->globalChannel; 
 }
 
 
 Int_t pueo::GeomTool::getChanIndexFromAntPol(Int_t ant,
-					  pol::pol_t pol)
+					  pol::pol_t pol) const
 {
-  int surf, chan; 
-  getSurfChanFromAntPol(ant,pol,surf,chan); 
-  return getChanIndex(surf,chan);
+
+  auto ch = r.fromAntIdxPol(ant, pol::asChar(pol)); 
+  if (!ch) return -1; 
+  return ch->globalChannel; 
 }
 
-Int_t pueo::GeomTool::getSurfFromAntPol(Int_t ant, pol::pol_t pol)
+Int_t pueo::GeomTool::getSurfFromAntPol(Int_t ant, pol::pol_t pol) const
 {
   int surf,chan;
   return getSurfChanFromAntPol(ant,pol,surf,chan); 
 }
 
-Int_t pueo::GeomTool::getSurfChanFromAntPol(Int_t ant, pol::pol_t pol, Int_t & surf, Int_t & chan)
+Int_t pueo::GeomTool::getSurfChanFromAntPol(Int_t ant, pol::pol_t pol, Int_t & surf, Int_t & chan) const
 {
-  ring::ring_t ring = getRingFromAnt(ant); 
-  Int_t phi = getPhiFromAnt(ant); 
-  int new_ant; 
-  getSurfChanAntFromRingPhiPol(ring,phi,pol, surf,chan, new_ant); 
-  assert(new_ant == ant); 
+
+  auto ch = r.fromAntIdxPol(ant, pol::asChar(pol)); 
+  if (!ch) return -1; 
+  surf = ch->surfNum;
+  chan = ch->surfChan; 
   return surf; 
 }
 
 
-Int_t pueo::GeomTool::getPhiSector(Int_t chanIndex)
+Int_t pueo::GeomTool::getPhiSector(Int_t chanIndex) const
 {
   int surf, chan; 
   getSurfChanFromChanIndex(chanIndex,surf,chan); 
@@ -433,55 +243,47 @@ Double_t pueo::GeomTool::getDirectionWrtNorth(Int_t phiSector, Double_t heading)
 
 
 Int_t pueo::GeomTool::getSurfChanFromChanIndex(Int_t chanIndex, // input channel index
-					    Int_t &surf,Int_t &chan) // output surf and channel
+					    Int_t &surf,Int_t &chan) const // output surf and channel
 {
-  if(chanIndex<0 || chanIndex>=k::NUM_DIGITZED_CHANNELS)
-    return -1;
-
-  //  std::cout << "chanIndex is " << chanIndex << "\n";
-  chan=chanIndex%k::NUM_CHANS_PER_SURF; // 0 to 8
-  surf=(chanIndex-chan)/k::NUM_CHANS_PER_SURF; // 0 to 8
-
+  auto ch = r.fromGlobal(chanIndex); 
+  if (!ch) return -1; 
+  chan = ch->surfChan; 
+  surf = ch->surfNum; 
   return surf;
 
 }
-Int_t pueo::GeomTool::getAntPolFromChanIndex(Int_t chanIndex,Int_t &ant, pol::pol_t &pol) 
+Int_t pueo::GeomTool::getAntPolFromChanIndex(Int_t chanIndex,Int_t &ant, pol::pol_t &pol) const
 {
 
-  int surf,chan;
-  getSurfChanFromChanIndex(chanIndex, surf,chan); 
-  int phi; 
-  ring::ring_t ring; 
-  getPhiRingPolFromSurfChan(surf,chan,phi,ring,pol); 
-  ant = getAntFromPhiRing(phi,ring); 
+  auto ch = r.fromGlobal(chanIndex); 
+  if (!ch) return -1; 
+
+  ant = ch->antIdx; 
+  pol = pol::fromChar(ch->pol); 
   return ant; 
 }
 
 
-Int_t pueo::GeomTool::getAntPolFromSurfChan(Int_t surf,Int_t chan,Int_t &ant, pol::pol_t &pol) 
+Int_t pueo::GeomTool::getAntPolFromSurfChan(Int_t surf,Int_t chan,Int_t &ant, pol::pol_t &pol) const
 {
+  auto ch = r.fromSurf(surf,chan); 
+  if (!ch) return -1; 
 
-  int phi; 
-  ring::ring_t ring; 
-  getPhiRingPolFromSurfChan(surf,chan,phi,ring,pol); 
-  ant = getAntFromPhiRing(phi,ring); 
+  ant = ch->antIdx; 
+  pol = pol::fromChar(ch->pol); 
   return ant; 
 }
 
-Int_t pueo::GeomTool::getAntOrientation(Int_t ant) {
+Int_t pueo::GeomTool::getAntOrientation(Int_t ant) const {
   (void) ant; return 1; 
 }
 
 
-pueo::ring::ring_t pueo::GeomTool::getRingFromAnt(Int_t ant) {
-  if (ant< k::NANTS_MI)
-    return ring::ring_t(ant % 4) ;
-  else if (ant < k::NANTS_MI + k::NANTS_NADIR) 
-    return ring::kNadirRing;
-  else if (ant < k::NUM_HORNS + k::NANTS_LF) 
-    return ring::kLF;
-  else return ring::kNotARing; 
+pueo::ring::ring_t pueo::GeomTool::getRingFromAnt(Int_t ant) const {
 
+  auto ch = r.fromAntIdxPol(ant); 
+  if (!ch) return ring::kNotARing; 
+  return ring::fromIdx(ch->ring); 
 
 }
 
@@ -489,11 +291,14 @@ pueo::ring::ring_t pueo::GeomTool::getRingAntPolPhiFromSurfChan(Int_t surf, Int_
 						 ring::ring_t &ring,
 						 Int_t &ant,
 						 pol::pol_t &pol,
-						 Int_t &phi)
+						 Int_t &phi) const
 {
-  pueo::GeomTool::getAntPolFromSurfChan(surf,chan,ant,pol);
-  ring=pueo::GeomTool::getRingFromAnt(ant);
-  phi=pueo::GeomTool::getPhiFromAnt(ant);
+  auto ch = r.fromSurf(surf,chan); 
+  if (!ch) return ring::kNotARing; 
+  ring = ring::fromIdx(ch->ring); 
+  ant = ch->antIdx; 
+  pol = pol::fromChar(ch->pol); 
+  phi = ch->phiSector; 
   return ring; 
 }
 
@@ -503,18 +308,10 @@ pueo::ring::ring_t pueo::GeomTool::getRingAntPolPhiFromSurfChan(Int_t surf, Int_
 //Non static thingies
 void pueo::GeomTool::getAntXYZ(Int_t ant, Double_t &x, Double_t &y, Double_t &z,pol::pol_t pol) const
 {
-  if(ant>=0 && ant<k::NUM_HORNS) {
-    x=xPhaseCenterHorns[ant][pol];
-    y=yPhaseCenterHorns[ant][pol];
-    z=zPhaseCenterHorns[ant][pol];
-    //std::cout << "ant " << x << " y " << y << " z " << std::endl;
-  }
-  else if (ant < k::NUM_HORNS + k::NANTS_LF) 
-  {
-    x = xPhaseCenterLF[ant-k::NUM_HORNS][pol]; 
-    y = yPhaseCenterLF[ant-k::NUM_HORNS][pol]; 
-    z = zPhaseCenterLF[ant-k::NUM_HORNS][pol]; 
-  }
+  auto ch = r.fromAntIdxPol(ant, pol::asChar(pol)); 
+  x = ch->geom.face_center.x; 
+  y = ch->geom.face_center.y; 
+  z = ch->geom.face_center.z; 
 }
 
 Double_t pueo::GeomTool::getAntZ(Int_t ant, pol::pol_t pol) const {
@@ -525,20 +322,15 @@ Double_t pueo::GeomTool::getAntZ(Int_t ant, pol::pol_t pol) const {
 
 Double_t pueo::GeomTool::getAntR(Int_t ant, pol::pol_t pol) const 
 {
-  if(ant>=0 && ant<k::NUM_HORNS) 
-    return rPhaseCenterHorns[ant][pol]; 
-  else if (ant < k::NUM_HORNS + k::NANTS_LF) 
-    return rPhaseCenterLF[ant-k::NUM_HORNS][pol]; 
- 
-  return -1; 
+  double x,y,z; 
+  getAntXYZ(ant,x,y,z,pol); 
+  return sqrt(x*x+y*y); 
 }
 
 Double_t pueo::GeomTool::getAntPhiPosition(Int_t ant, pol::pol_t pol) const{
-  if(ant>=0 && ant<k::NUM_HORNS) 
-    return azPhaseCenterHorns[ant][pol]; 
-  else if (ant < k::NUM_HORNS + k::NANTS_LF) 
-    return azPhaseCenterLF[ant-k::NUM_HORNS][pol]; 
-  return -1; 
+
+  auto ch = r.fromAntIdxPol(ant, pol::asChar(pol)); 
+  return ch->geom.phase_phi(); 
 }
 
 Double_t pueo::GeomTool::getAntPhiPositionRelToAftFore(Int_t ant, pol::pol_t pol) const {
@@ -680,37 +472,23 @@ Int_t pueo::GeomTool::getTopAntFaceNearestPhiWave(Double_t phiWave) const {
 
 
 
-Int_t pueo::GeomTool::getPhiFromAnt(Int_t ant)
+Int_t pueo::GeomTool::getPhiFromAnt(Int_t ant) const
 {
-  if(ant<k::NANTS_MI)
-    return ant / 4; 
-
-  //nadirs 
-  else if (ant < k::NANTS_MI + k::NANTS_NADIR)
-    return 2*(ant-k::NANTS_MI); 
-
-  //just number like this 
-  else return ant - (k::NUM_HORNS); 
+  auto ch = r.fromAntIdxPol(ant, pol::kHorizontal); 
+  if (!ch) return -1; 
+  return ch->phiSector; 
 }
 
 
-Int_t pueo::GeomTool::getAntFromPhiRing(Int_t phi, ring::ring_t ring)
+Int_t pueo::GeomTool::getAntFromPhiRing(Int_t phi, ring::ring_t ring) const
 {
-  if (ring < ring::kNadirRing) 
-  {
-    return ring + phi *4; 
-  }
-
-  else if (ring == ring::kNadirRing)
-  {
-    assert(k::NANTS_NADIR); 
-    return k::NANTS_MI + phi/2; 
-  }
-  else return k::NUM_HORNS + phi; 
+  auto ch = r.fromPhiRingPol(phi,ring,pol::kHorizontal); 
+  if (!ch) return -1; 
+  return ch->antIdx; 
 }
 
 
-pueo::ring::ring_t pueo::GeomTool::getRingFromChanIndex(Int_t idx) 
+pueo::ring::ring_t pueo::GeomTool::getRingFromChanIndex(Int_t idx)  const
 {
   int ant; pol::pol_t pol; 
   getAntPolFromChanIndex(idx,ant,pol); 

@@ -33,6 +33,7 @@
 #include <TMath.h>
 #include <TVector3.h>
 #include "pueo/Conventions.h"
+#include "pueo/GeometryReader.h" 
 
 #include <fstream>
 #include <cstring>
@@ -58,10 +59,10 @@ namespace  pueo
 //!  pueo::GeomTool -- The PUEO Geometry Tool
 /*!
   This is a utility class of useful thingies that can be used for some of the
-  standard conversions that are needed in PUEO analysis. Some of the functions
-  are static and can be called via pueo::GeomTool::functionName(), others
-  require the user to get an instance of the pueo::GeomTool first using e.g. 
-  auto geom = pueo::GeomTool::Instance(); 
+  standard conversions that are needed in PUEO analysis. 
+  Since we now always read the channel mapping, static usage is no longer really supported. You should always ask for an instance. 
+
+  WARNING: Currently ant is always an antenna index, NOT the antenna number for backwards compatibility reasons. 
   
   \ingroup rootclasses
 */
@@ -80,59 +81,61 @@ namespace  pueo
     ********************************************************************************************************/
     virtual ~GeomTool()  {;}
 
-    /********************************************************************************************************
-    Static member functions
-    ********************************************************************************************************/
 
     /** 
      * Instance generator. If version_number == 0, uses pueo::Version::get(); 
-     * If geometry_source is "", will use default geometry source (default.dat). 
+     * If geometry_source is "", will use default geometry source for that version. 
+     * The default can be cahnged with the helper function below. 
      */
-    static const GeomTool & Instance( Int_t pueo_version = 0, const std::string & geometry_source = "default" );
+    static const GeomTool & Instance( Int_t pueo_version = 0, const std::string & geometry_source = "" );
 
-    /** Get Ring from antenna numer */ 
-    static ring::ring_t getRingFromAnt(Int_t ant);
+    static void setDefaultGeometry(Int_t pueo_version, const std::string & default_source); 
+    static const std::string & getDefaultGeometry(Int_t pueo_version = 0); 
+
+
+    /** Get Ring from antenna index */ 
+    ring::ring_t getRingFromAnt(Int_t ant) const;
 
 
     //returns surf
-    static Int_t getSurfChanAntFromRingPhiPol(
+    Int_t getSurfChanAntFromRingPhiPol(
                pueo::ring::ring_t ring, Int_t phi, pueo::pol::pol_t pol,
-               Int_t &surf, Int_t &chan, Int_t &ant); ///< Convert ring-phi-pol to surf-chan-ant
+               Int_t &surf, Int_t &chan, Int_t &ant) const; ///< Convert ring-phi-pol to surf-chan-ant
 
     //returns ring
-    static ring::ring_t getRingAntPolPhiFromSurfChan(Int_t surf, Int_t chan,
+     ring::ring_t getRingAntPolPhiFromSurfChan(Int_t surf, Int_t chan,
                pueo::ring::ring_t &ring,
                Int_t &ant,
                pueo::pol::pol_t &pol,
-               Int_t &phi); ///< Convert surf-chan to ring-ant-pol-phi
+               Int_t &phi) const; ///< Convert surf-chan to ring-ant-pol-phi
 
     //returns phi
-    static Int_t getPhiRingPolFromSurfChan(Int_t surf, Int_t chan, Int_t & phi, ring::ring_t & ring, pol::pol_t & pol); 
+    Int_t getPhiRingPolFromSurfChan(Int_t surf, Int_t chan, Int_t & phi, ring::ring_t & ring, pol::pol_t & pol) const; 
 
-    static Int_t getChanIndex(Int_t surf, Int_t chan);///< Surf + channel to channel index
-    static Int_t getChanIndexFromRingPhiPol(pueo::ring::ring_t ring,
+    Int_t getChanIndex(Int_t surf, Int_t chan) const;///< Surf + channel to channel index
+    Int_t getChanIndexFromRingPhiPol(pueo::ring::ring_t ring,
               Int_t phi,
-              pueo::pol::pol_t pol); ///< Convert ring-phi-pol to logical index
+              pueo::pol::pol_t pol) const; ///< Convert ring-phi-pol to logical index
 
-    static Int_t getChanIndexFromAntPol(Int_t ant,
-                pueo::pol::pol_t pol); ///< Convert ant-pol to logical index
+    Int_t getChanIndexFromAntPol(Int_t ant,
+                pueo::pol::pol_t pol) const; ///< Convert ant-pol to logical index
 
-    static Int_t getSurfFromAntPol(Int_t ant,pol::pol_t pol);
-    static Int_t getSurfChanFromAntPol(Int_t ant,pol::pol_t pol, Int_t & surf, Int_t & chan);
-    static Int_t getAntPolFromSurfChan(Int_t surf, Int_t chan, Int_t & ant, pol::pol_t & pol); 
-    static Int_t getAntPolFromChanIndex(Int_t chanIndex, Int_t & ant, pol::pol_t & pol); 
-    static pueo::ring::ring_t getRingFromChanIndex(Int_t chanIndex);
+    Int_t getSurfFromAntPol(Int_t ant,pol::pol_t pol) const;
+    Int_t getSurfChanFromAntPol(Int_t ant,pol::pol_t pol, Int_t & surf, Int_t & chan) const;
+    Int_t getAntPolFromSurfChan(Int_t surf, Int_t chan, Int_t & ant, pol::pol_t & pol) const; 
+    Int_t getAntPolFromChanIndex(Int_t chanIndex, Int_t & ant, pol::pol_t & pol) const; 
+    pueo::ring::ring_t getRingFromChanIndex(Int_t chanIndex) const;
 
-    static Int_t getSurfChanFromChanIndex(Int_t chanIndex, // input channel index
-            Int_t &surf,Int_t &chan); ///< Convert logical index to  surf and channel
+    Int_t getSurfChanFromChanIndex(Int_t chanIndex, // input channel index
+            Int_t &surf,Int_t &chan) const; ///< Convert logical index to  surf and channel
 
-    static Int_t getPhiSector(Int_t chan_index); ///< phi sector of this channel.
+    Int_t getPhiSector(Int_t chan_index) const; ///< phi sector of this channel.
 
-    static Int_t getPhiFromAnt(Int_t ant); ///< get phi from ant
+    Int_t getPhiFromAnt(Int_t ant) const; ///< get phi from ant
 
-    static Int_t getAntFromPhiRing(Int_t phi, pueo::ring::ring_t ring); ///< get antenna number from phi and ring
+    Int_t getAntFromPhiRing(Int_t phi, pueo::ring::ring_t ring) const; ///< get antenna number from phi and ring
 
-    static Int_t getAntOrientation(Int_t ant); ///< Some of the antennas have their orientation reversed relative to nominal. The effect of this is to switch the sign the of the signal (as up is down and left is right). Returns 1 for nominal orientation and -1 for flipped.
+    Int_t getAntOrientation(Int_t ant) const; ///< Some of the antennas have their orientation reversed relative to nominal. The effect of this is to switch the sign the of the signal (as up is down and left is right). Returns 1 for nominal orientation and -1 for flipped.
 
     static Double_t getPhiDiff(Double_t firstPhi, Double_t secondPhi); 
 
@@ -223,6 +226,7 @@ namespace  pueo
     GeomTool(int v, const std::string & src);
     bool valid;
     bool readPositions(int v, const std::string &src);
+    pueo::data::GeometryReader r; 
 
 
   };

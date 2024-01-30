@@ -59,20 +59,26 @@ namespace  pueo
 
 //!  ring::ring_t -- Enumeration for the rings
 /*!
-  Really that's all there is to it.
+ * This matches the convention for map.dat
   \ingroup rootclasses
 */
   namespace ring {
-   typedef enum ering {
-     kTopRing  = 0, ///< The Top Ring,
-     kUpperMiddleRing  = 1, ///< The UIpper Middle Ring.
-     kLowerMiddleRing = 2,
-     kBottomRing = 3, ///< The Bottom Ring.
-     kNadirRing= 4,
-     kLF =5,
-     kNotARing ///< Useful in for loops.
-   } ring_t; ///< Ring enumeration
+    typedef enum ering {
+      kUnknown = 0,
+      kTopRing  = 1, ///< The Top Ring,
+      kUpperMiddleRing  = 2, ///< The UIpper Middle Ring.
+      kLowerMiddleRing = 3,
+      kBottomRing = 4, ///< The Bottom Ring.
+      kLFTopRing =5,
+      kLFUpperMiddleRing =6,
+      kLFLowerMiddleRing =7,
+      kLFBottomRing =8,
+      kNotARing ///< Useful in for loops.
+    } ring_t; ///< Ring enumeration
 
+    inline ring_t fromIndex(int idx) { return idx > kUnknown && idx < kNotARing ? ring_t(idx) : kUnknown; }
+    inline ring_t fromIdx(int idx) { return fromIndex(idx) ; }
+    inline bool isLF(ring_t ring) { return ring >=kTopRing && ring <= kLFBottomRing ; }
     const char *asString(pueo::ring::ring_t ring); ///< Returns the ring as a character string
   }
 
@@ -88,6 +94,7 @@ namespace pol {
      kNotAPol ///< USeful in for loops.
    } pol_t; ///< Polarisation enumeration.
    char asChar(pueo::pol::pol_t pol); ///< Returns the polarisation as a character string.
+   inline pol_t fromChar(char p) { return p == 'H' ? kHorizontal : p == 'V' ? kVertical : kNotAPol; }
 }
 
 namespace trigger
@@ -96,7 +103,7 @@ namespace trigger
   {
     kUnknown = 0,
     kRFMI = 1, 
-    kRFNadir = 2, 
+    kExt  = 2, //probably for debugging? 
     kRFLF = 4, 
     kPPS0 = 8 , 
     kPPS1 = 16, 
@@ -108,7 +115,7 @@ namespace trigger
 
   inline bool isRFTrigger( uint32_t t) 
   {
-    uint32_t rf_trigger = kRFMI | kRFNadir | kRFLF; 
+    uint32_t rf_trigger = kRFMI | kRFLF; 
     return  !!(t & rf_trigger);
   }
 }

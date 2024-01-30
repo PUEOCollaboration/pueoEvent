@@ -1263,20 +1263,20 @@ void pueo::Dataset::loadBlindTrees() {
 
     fBlindFile = NULL;
 
-    char calibDir[FILENAME_MAX];
+    char calibDir[FILENAME_MAX-64];
     char fileName[FILENAME_MAX];
     char *calibEnv=getenv("PUEO_CALIB_DIR");
     if(!calibEnv) {
       char *utilEnv=getenv("PUEO_UTIL_INSTALL_DIR");
       if(!utilEnv){
-	sprintf(calibDir,"calib");
+        sprintf(calibDir,"calib");
       }
       else{
-	snprintf(calibDir,sizeof(calibDir),"%s/share/pueoCalib",utilEnv);
+        snprintf(calibDir,sizeof(calibDir),"%s/share/pueoCalib",utilEnv);
       }
     }
     else {
-      strncpy(calibDir,calibEnv,FILENAME_MAX);
+      strncpy(calibDir,calibEnv,sizeof(calibDir));
     }
 
     // std::cout << __PRETTY_FUNCTION__ << ": here 2" << std::endl;
