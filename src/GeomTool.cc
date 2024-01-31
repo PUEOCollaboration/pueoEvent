@@ -97,12 +97,12 @@ Int_t pueo::GeomTool::getSurfChanAntFromRingPhiPol(ring::ring_t ring,Int_t phi, 
 
 static TMutex instance_lock; 
 static std::unordered_map<std::string,pueo::GeomTool*> instances[pueo::k::NUM_PUEO]; 
-static std::array<std::string, pueo::k::NUM_PUEO> default_sources = { "dec23" }; 
+static std::array<std::string, pueo::k::NUM_PUEO> default_sources = { "dec23", }; 
 static std::string empty (""); 
 void pueo::GeomTool::setDefaultGeometry(Int_t v, const std::string & src) 
 {
   v = v ?: version::get(); 
-  if (v < k::NUM_PUEO) 
+  if (v <= k::NUM_PUEO) 
   {
     TLockGuard l(&instance_lock); 
     default_sources[v-1] = src; 
@@ -114,7 +114,7 @@ const std::string & pueo::GeomTool::getDefaultGeometry(Int_t v)
 {
   
   v = v ?: version::get(); 
-  if (v < k::NUM_PUEO) 
+  if (v <= k::NUM_PUEO) 
   {
     return default_sources[v-1]; 
   }
@@ -128,12 +128,11 @@ const std::string & pueo::GeomTool::getDefaultGeometry(Int_t v)
 const pueo::GeomTool&  pueo::GeomTool::Instance(Int_t v, const std::string &  geometry_source )
 {
 
-  if (v < 0 || v >= k::NUM_PUEO) v = 0; 
+  if (v < 0 || v > k::NUM_PUEO) v = 0; 
   if (!v) v = version::get(); 
 
 
-  static const std::string defstring = getDefaultGeometry(v);
-  const std::string & p = geometry_source == "" ? defstring : geometry_source; 
+  const std::string & p = geometry_source == "" ? getDefaultGeometry(v) : geometry_source; 
 
   if (!instances[v-1].count(p)) 
   {
@@ -141,7 +140,8 @@ const pueo::GeomTool&  pueo::GeomTool::Instance(Int_t v, const std::string &  ge
     //check again while holding lock 
     if (!instances[v-1].count(p))
     {
-      instances[v-1][p] = new pueo::GeomTool(v, geometry_source); 
+      std::cout << "Generating instance with v= " << v << " source = " << p << std::endl; 
+      instances[v-1][p] = new pueo::GeomTool(v, p); 
     }
     instance_lock.UnLock(); 
   }
