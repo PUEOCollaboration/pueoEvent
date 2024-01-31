@@ -193,7 +193,7 @@ const char * pueo::Dataset::getDataDir(DataDirectory dir)
 }
 
 
-pueo::Dataset::Dataset(int run, bool decimated,  DataDirectory version, BlindingStrategy strategy)
+pueo::Dataset::Dataset(int run,  DataDirectory version, bool decimated, BlindingStrategy strategy)
   : 
   fHeadTree(0), fHeader(0), 
   fEventTree(0), fRawEvent(0), fUsefulEvent(0), 
@@ -204,7 +204,7 @@ pueo::Dataset::Dataset(int run, bool decimated,  DataDirectory version, Blinding
   fHaveUsefulFile = false;
   setStrategy(strategy); 
   currRun = run;
-  loadRun(run, decimated, version); 
+  loadRun(run, version, decimated); 
   loadedBlindTrees = false;
   zeroBlindPointers();
   loadBlindTrees(); // want this to come after opening the data files to try to have correct ANITA flight
@@ -439,7 +439,7 @@ int pueo::Dataset::getEvent(int eventNumber, bool quiet)
     int run = getRunContainingEventNumber(eventNumber);
     if(run > 0)
     {
-      loadRun(run, fDecimated,datadir);
+      loadRun(run, datadir, fDecimated);
       if (!quiet) fprintf(stderr, "changed run to %d\n", run);
       getEvent(eventNumber, quiet); 
     }
@@ -516,7 +516,7 @@ pueo::Dataset::~Dataset()
   
 }
 
-bool  pueo::Dataset::loadRun(int run, bool dec,  DataDirectory dir) 
+bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec) 
 {
 
   datadir = dir; 

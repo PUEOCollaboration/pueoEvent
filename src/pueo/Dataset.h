@@ -126,7 +126,7 @@ namespace pueo
        *  strat is the blinding strategy. 
        *
        * */
-      Dataset (int run, bool decimated = false, DataDirectory dir = PUEO_ROOT_DATA , BlindingStrategy strat = Dataset::kDefault);
+      Dataset (int run,  DataDirectory dir = PUEO_ROOT_DATA, bool decimated = false,  BlindingStrategy strat = Dataset::kDefault);
 
 
       /** Destructor */
@@ -138,7 +138,7 @@ namespace pueo
        *
        **/
 
-      bool loadRun(int run, bool decimated = false, DataDirectory dir  = PUEO_ROOT_DATA );
+      bool loadRun(int run,  DataDirectory dir  = PUEO_ROOT_DATA, bool decimated = false );
 
       /** loads the desired eventNumber and returns the current entry
        * If quiet is true, won't print out a warning about changing runs or missing events. 
