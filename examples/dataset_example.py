@@ -23,7 +23,7 @@ ROOT.gSystem.Load("libpueoEvent.so") # assume in LD_LIBRARY_PATH (or DYLD_LIBRAR
 # create a dataset using MC data
 
 pueo = ROOT.pueo # shortcut
-d = pueo.Dataset(2, pueo.Dataset.PUEO_MC_DATA)
+d = pueo.Dataset(run, pueo.Dataset.PUEO_MC_DATA)
 
 
 d.getEntry(entry) 
