@@ -316,6 +316,7 @@ pueo::RawHeader * pueo::Dataset::header(bool force_load)
 
 pueo::RawEvent * pueo::Dataset::raw(bool force_load) 
 {
+  if (!fEventTree) return nullptr; 
   if (fEventTree->GetReadEntry() != fWantedEntry || force_load) 
   {
     fEventTree->GetEntry(fWantedEntry); 
@@ -327,6 +328,8 @@ pueo::RawEvent * pueo::Dataset::raw(bool force_load)
 
 pueo::UsefulEvent * pueo::Dataset::useful(bool force_load) 
 {
+
+  if (!fEventTree) return nullptr; 
 
   if (fEventTree->GetReadEntry() != fWantedEntry || force_load) 
   {
@@ -414,8 +417,8 @@ int pueo::Dataset::getEntry(int entryNumber)
       fWantedEntry = fHeadTree->GetEntryNumberWithIndex(fHeader->eventNumber); 
 
     }
-    fUsefulDirty = true; 
-    fGpsDirty = true; 
+    if (!fHaveUsefulFile) fUsefulDirty = true; 
+    if (!fHaveGpsEvent) fGpsDirty = true; 
   }
 
 
@@ -638,7 +641,7 @@ bool  pueo::Dataset::loadRun(int run, bool dec,  DataDirectory dir)
   fname = TString::Format("%s/run%d/usefulEventFile%d.root", data_dir, run, run);
   fname2 = TString::Format("%s/run%d/SimulatedEventFile%d.root", data_dir, run, run); 
   fname3 = TString::Format("%s/run%d/SimulatedPueoEventFile%d.root", data_dir, run, run); 
-  if (const char * the_right_file = checkIfFilesExist(2, fname.Data(), fname2.Data()))
+  if (const char * the_right_file = checkIfFilesExist(3, fname.Data(), fname2.Data(), fname3.Data()))
   {
      TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
@@ -658,6 +661,12 @@ bool  pueo::Dataset::loadRun(int run, bool dec,  DataDirectory dir)
        fEventTree->SetBranchAddress("event",&fRawEvent); 
        
     }
+  }
+
+  if (!fEventTree) 
+  {
+    std::cerr << "WARNING: did not load an event tree for run " << run << " in " << data_dir << std::endl; 
+
   }
   
 
