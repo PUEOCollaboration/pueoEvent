@@ -1,3 +1,4 @@
+#! /usr/bin/env python3 
 # Dataset Example 
 # This assumes you have the environmental PUEO_MC_DATA pointing at some simulated output
 # Since no real PUEO data exists yet, I assume you don't have any 
