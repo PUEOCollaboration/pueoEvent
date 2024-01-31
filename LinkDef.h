@@ -15,13 +15,11 @@
 #pragma link C++ namespace     pueo::k;
 
 #pragma link C++ namespace     pueo::ring;
-#pragma link C++ enum          pueo::ring::ring;
-#pragma link C++ nestedtypedef pueo::ring::ring_t;
+#pragma link C++ enum          pueo::ring::ring_t;
 
 
 #pragma link C++ namespace     pueo::pol;
-#pragma link C++ enum          pueo::pol::epol;
-#pragma link C++ nestedtypedef pueo::pol::pol_t;
+#pragma link C++ enum          pueo::pol::pol_t;
 
 #pragma link C++ namespace     pueo::Locations;
 #pragma link C++ namespace pueo::version;

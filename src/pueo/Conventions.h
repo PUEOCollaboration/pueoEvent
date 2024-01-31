@@ -63,7 +63,7 @@ namespace  pueo
   \ingroup rootclasses
 */
   namespace ring {
-    typedef enum ering {
+    enum ring_t {
       kUnknown = 0,
       kTopRing  = 1, ///< The Top Ring,
       kUpperMiddleRing  = 2, ///< The UIpper Middle Ring.
@@ -74,7 +74,7 @@ namespace  pueo
       kLFLowerMiddleRing =7,
       kLFBottomRing =8,
       kNotARing ///< Useful in for loops.
-    } ring_t; ///< Ring enumeration
+    }; ///< Ring enumeration
 
     inline ring_t fromIndex(int idx) { return idx > kUnknown && idx < kNotARing ? ring_t(idx) : kUnknown; }
     inline ring_t fromIdx(int idx) { return fromIndex(idx) ; }
@@ -88,18 +88,18 @@ namespace  pueo
   \ingroup rootclasses
 */
 namespace pol {
-   typedef enum epol {
+   enum pol_t {
      kHorizontal = 0, ///< Horizontal Polarisation
      kVertical   = 1, ///< Vertical Polarisation
      kNotAPol ///< USeful in for loops.
-   } pol_t; ///< Polarisation enumeration.
+   }; ///< Polarisation enumeration.
    char asChar(pueo::pol::pol_t pol); ///< Returns the polarisation as a character string.
    inline pol_t fromChar(char p) { return p == 'H' ? kHorizontal : p == 'V' ? kVertical : kNotAPol; }
 }
 
 namespace trigger
 {
-  typedef enum etype : uint32_t 
+  enum type_t : uint32_t 
   {
     kUnknown = 0,
     kRFMI = 1, 
@@ -111,7 +111,7 @@ namespace trigger
     kVPol = 64, 
     kHPol = 128
 
-  } type_t; 
+  }; 
 
   inline bool isRFTrigger( uint32_t t) 
   {
