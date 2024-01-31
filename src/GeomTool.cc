@@ -336,11 +336,10 @@ Double_t pueo::GeomTool::getAntPhiPosition(Int_t ant, pol::pol_t pol) const{
 Double_t pueo::GeomTool::getAntPhiPositionRelToAftFore(Int_t ant, pol::pol_t pol) const {
 
   Double_t phi= getAntPhiPosition(ant,pol); 
-  if (phi < 0) return -1; 
   phi-=aftForeOffsetAngleVertical;
-  if(phi<0)
+  while(phi<0)
     phi+=TMath::TwoPi();
-  if(phi>TMath::TwoPi())
+  while(phi>TMath::TwoPi())
     phi-=TMath::TwoPi();
   return phi; 
 }
