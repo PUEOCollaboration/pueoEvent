@@ -44,15 +44,15 @@ namespace pueo
       UInt_t          eventNumber=0;            ///< Software event number
 
 
-      TVector3        balloonPos;             ///< Balloon position (icemc Cartesian coordinates) 
-      TVector3        balloonDir;             ///< Balloon direction (icemc Cartesian coordinateS)
-      TVector3        nuPos;                  ///< Neutrino position
-      TVector3        nuDir;                  ///< Neutrino direction
-      TVector3        rfExit;                 ///< Position of rf exit
+      TVector3        balloonPos{0,0,0};             ///< Balloon position (icemc Cartesian coordinates) 
+      TVector3        balloonDir{0,0,0};             ///< Balloon direction (icemc Cartesian coordinateS)
+      TVector3        nuPos{0,0,0};                  ///< Neutrino position
+      TVector3        nuDir{0,0,0};                  ///< Neutrino direction
+      TVector3        rfExit{0,0,0};                 ///< Position of rf exit
       Double_t        nuMom = 0;              ///< Neutrino momentum
       Int_t           nu_pdg = 0;             ///< Neutrino PDG code
-      TVector3        polarization;           ///< 
-      TVector3        poynting;               ///< 
+      TVector3        polarization{0,0,0};           ///< 
+      TVector3        poynting{0,0,0};               ///< 
       Double_t        payloadPhi = -999;      ///< Phi of signal in payload coordinates (degrees)
       Double_t        payloadTheta = -999;    ///< Theta of signal in payload coordinates (degrees)
       Double_t        sourceLon = 0;              ///< RF position when leaving the ice: Longitude (using icemc model)
