@@ -1,138 +1,61 @@
-# CMakeLists.txt for event package. It creates a library with dictionary and a main program
-cmake_minimum_required(VERSION 3.0.0)
-project(pueoEvent)
-set(libname "pueoEvent")
+cmake_minimum_required(VERSION 3.19.0)
+project(pueoEvent VERSION 1.0.0)
 
+#================================================================================================
+#                                       HOUSEKEEPING
+#================================================================================================
 
-# You need to tell CMake where to find the ROOT installation. This can be done in a number of ways:
-#   - ROOT built with classic configure/make use the provided $ROOTSYS/etc/cmake/FindROOT.cmake
-#   - ROOT built with CMake. Add in CMAKE_PREFIX_PATH the installation prefix for ROOT
-list(APPEND CMAKE_PREFIX_PATH $ENV{ROOTSYS})
+# note: This provides pueo-data_VERSION
+#       This also imports a custom variable: PUEO_GEOMETRY_DIR
+find_package(pueo-data 1.0.0 REQUIRED)  
 
+# TODO: compiled just fine without these 
+# find_package(ROOT REQUIRED COMPONENTS MathMore MathCore RIO Hist Tree Net)
+# find_package(FFTW REQUIRED)
+# find_package(ZLIB REQUIRED)
 
-if(DEFINED ENV{PUEO_UTIL_INSTALL_DIR})
-    message("PUEO_UTIL_INSTALL_DIR is set to $ENV{PUEO_UTIL_INSTALL_DIR}")
-    set(UTIL_LIB_DIR $ENV{PUEO_UTIL_INSTALL_DIR}/lib)
-    set(UTIL_INC_DIR $ENV{PUEO_UTIL_INSTALL_DIR}/include)
-    set(UTIL_BIN_DIR $ENV{PUEO_UTIL_INSTALL_DIR}/bin)
-    set(UTIL_SHARE_DIR $ENV{PUEO_UTIL_INSTALL_DIR}/share)
-    set(LD_UTIL $ENV{PUEO_UTIL_INSTALL_DIR}/lib)
-    set(INC_UTIL $ENV{PUEO_UTIL_INSTALL_DIR}/include)
-else()
-    message("Will install to /usr/local  PUEO_UTIL_INSTALL_DIR not set")
-    set(UTIL_LIB_DIR /usr/local/lib)
-    set(UTIL_INC_DIR /usr/local/include)
-    set(UTIL_BIN_DIR /usr/local/bin)
-    set(UTIL_SHARE_DIR /usr/local/share)
-    set(LD_UTIL /usr/local/lib)
-    set(INC_UTIL /usr/local/include)
-endif()
+file(GLOB HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/*.h")
+file(GLOB SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc")
 
-set (DEFAULT_PUEO_VERSION "1" CACHE STRING "Default PUEO Version" ) 
+add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
 
-
-
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${UTIL_SHARE_DIR}/cmake/modules/") 
-
-
-#---Locate the ROOT package and defines a number of variables (e.g. ROOT_INCLUDE_DIRS)
-find_package(ROOT REQUIRED COMPONENTS MathMore MathCore RIO Hist Tree Net)
-find_package(FFTW REQUIRED)
-find_package(ZLIB REQUIRED)
-
-
-#---Define useful ROOT functions and macros (e.g. ROOT_GENERATE_DICTIONARY)
-include(${ROOT_USE_FILE})
-
-message("ROOT_INCLUDE_DIRS is set to ${ROOT_INCLUDE_DIRS}")
-include_directories(${PROJECT_SOURCE_DIR} ${ROOT_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/src/ ${FFTW_INCLUDES} ${ZLIB_INCLUDES} ${UTIL_INC_DIR})
-add_definitions(-DDEFAULT_PUEO_VERSION=${DEFAULT_PUEO_VERSION}) 
-
-set(HEADER_FILES 
-  src/pueo/Conventions.h   
-  src/pueo/Dataset.h
-  src/pueo/GeomTool.h
-  src/pueo/Nav.h
-  src/pueo/RawEvent.h
-  src/pueo/RawHeader.h
-  src/pueo/TruthEvent.h
-  src/pueo/UsefulEvent.h
-  src/pueo/Version.h
+target_include_directories(${PROJECT_NAME}
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/>
+         $<INSTALL_INTERFACE:include/pueo>
 )
 
-set(SOURCE_FILES 
-  src/Conventions.cc   
-  src/Dataset.cc   
-  src/GeomTool.cc
-  src/Nav.cc
-  src/RawEvent.cc
-  src/RawHeader.cc
-  src/TruthEvent.cc
-  src/UsefulEvent.cc
-  src/Version.cc
+# Propagating PUEO's version to downstream projects when they link against the pueoEvent library
+target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PUEO_VERSION=${pueo-data_VERSION_MAJOR}) 
+
+# Propagating these C/C++ compiler flags to downstream projects when they link against the pueoEvent library
+target_compile_options(${PROJECT_NAME} PUBLIC "-Os" "-g" "-Wall" "-Wextra")
+
+# Propagating this linker option to downstream projects when they link against the pueoEvent library
+# TODO: Not sure if this is really needed, since "-g" is already set during compilation
+target_link_options(${PROJECT_NAME} PUBLIC "-g")
+                                                      # TODO: compiled just fine without these...
+target_link_libraries(${PROJECT_NAME} PUEO::pueo-data)# ${ZLIB_LIBRARIES} RootFftwWrapper ${ROOT_LIBRARIES} ${FFTW_LIBRARIES})
+
+# CERN ROOT dictionary generation
+find_package(ROOT CONFIG REQUIRED)
+set(DICTNAME G__${PROJECT_NAME})
+root_generate_dictionary(${DICTNAME} ${HEADER_FILES} MODULE ${PROJECT_NAME} LINKDEF LinkDef.h)
+
+#================================================================================================
+#                                       INSTALLING
+#================================================================================================
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo DESTINATION include) 
+
+# note: not installing the library to lib64 for backward compatibility
+install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}Targets LIBRARY DESTINATION lib )
+# TODO: not sure if ROOT .pcm files should still be installed (if so, then install to <prefix>/lib
+
+install(EXPORT ${PROJECT_NAME}Targets
+        NAMESPACE PUEO::
+        FILE ${PROJECT_NAME}Targets.cmake
+        DESTINATION lib/cmake/${PROJECT_NAME}
 )
-
-set(DICTNAME G__${libname})
-
-ROOT_GENERATE_DICTIONARY(${DICTNAME} ${HEADER_FILES} LINKDEF LinkDef.h)
-
-#---Create a shared library with geneated dictionary
-add_library(${libname} SHARED ${SOURCE_FILES} ${DICTNAME}.cxx)
-target_link_libraries(${libname} ${ZLIB_LIBRARIES} RootFftwWrapper ${ROOT_LIBRARIES} ${FFTW_LIBRARIES})
-
-add_custom_target(${DICTNAME}.pcm DEPENDS ${DICTNAME})
-
-
-message("UTIL_INC_DIR is set to ${UTIL_INC_DIR}")
-message("DICTNAME is set to ${DICTNAME}" )
-message("PROJECT_BINARY_DIR is set to ${PROJECT_BINARY_DIR}")
-
-install (FILES ${HEADER_FILES} DESTINATION ${UTIL_INC_DIR}/pueo)
-install (TARGETS ${libname}
-	ARCHIVE DESTINATION ${UTIL_LIB_DIR}
-	LIBRARY DESTINATION ${UTIL_LIB_DIR}
-	RUNTIME DESTINATION ${UTIL_BIN_DIR})
-      
-install (FILES ${PROJECT_BINARY_DIR}/${DICTNAME}_rdict.pcm DESTINATION ${UTIL_LIB_DIR})
-
-message (" Adding new build type") 
-
-set(CMAKE_CXX_FLAGS_DEFAULT 
-  "-Os -g -Wall -Wextra" 
-  CACHE STRING "c++ Flags used during default eventReaderRoot builds" 
-  FORCE ) 
-
-set(CMAKE_C_FLAGS_DEFAULT 
-  "-Os -g -Wall"
-  CACHE STRING "c Flags used during default eventReaderRoot builds" 
-  FORCE ) 
-
-set(CMAKE_EXE_LINKER_FLAGS_DEFAULT 
-  "-g"
-  CACHE STRING "ld Flags used during default eventReaderRoot builds" 
-  FORCE ) 
-
-set(CMAKE_SHARED_LINKER_FLAGS_DEFAULT 
-  "-g"
-  CACHE STRING "ld Flags used during default eventReaderRoot builds" 
-  FORCE ) 
-
-
-mark_as_advanced ( CMAKE_CXX_FLAGS_DEFAULT CMAKE_C_FLAGS_DEFAULT CMAKE_EXE_LINKER_FLAGS_DEFAULT CMAKE_SHARED_LINKER_FLAGS_DEFAULT) 
-
-if (NOT CMAKE_BUILD_TYPE) 
-  set (CMAKE_BUILD_TYPE Default
-    CACHE STRING "Choose tye type of build: None Debug Release RelWithDebInfo MinSizeRel Default"
-    FORCE ) 
-endif()
-
-set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin )
-
-set (BINSRCDIR test) 
-macro( do_binary binary_name ) 
-  add_executable(${binary_name} ${BINSRCDIR}/${binary_name}.cxx) 
-  target_link_libraries(${binary_name}  ${ZLIB_LIBRARIES} RootFftwWrapper ${ROOT_LIBRARIES} ${FFTW_LIBRARIES} ${libname})
-  INSTALL (PROGRAMS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${binary_name} DESTINATION ${UTIL_BIN_DIR})
-endmacro() 
-
-
