@@ -25,6 +25,7 @@ target_include_directories(${PROJECT_NAME}
 )
 
 # Propagating PUEO's version to downstream projects when they link against the pueoEvent library
+# TODO: should this be a definition or an option?
 target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PUEO_VERSION=${pueo-data_VERSION_MAJOR}) 
 
 # Propagating these C/C++ compiler flags to downstream projects when they link against the pueoEvent library
