@@ -33,7 +33,6 @@ target_compile_options(${PROJECT_NAME} PRIVATE
   $<$<CONFIG:Debug>:-Wall -Wextra>
 )
 
-# TODO: compiled just fine without linking
 target_link_libraries(${PROJECT_NAME} 
   PUBLIC  PUEO::pueo-data 
   PRIVATE ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
@@ -59,8 +58,8 @@ write_basic_package_version_file(
 )
 # Install the Config and ConfigVersion files
 install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}Config.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
     DESTINATION lib/cmake/${PROJECT_NAME}
 )
 
