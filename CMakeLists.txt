@@ -11,7 +11,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
 # note: * This provides pueo-data_VERSION and GeometryReader.h 
 find_package(pueo-data 1.0.0 REQUIRED)  
 
-find_package(ROOT REQUIRED COMPONENTS FitPanel MathMore) # TODO: Check pueoEvent ROOT::<targets>
+find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
 # find_package(FFTW REQUIRED) # TODO: Pretty sure there's no need for FFTW
 find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
@@ -36,7 +36,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE
 # TODO: compiled just fine without linking
 target_link_libraries(${PROJECT_NAME} 
   PUBLIC  PUEO::pueo-data 
-  PRIVATE ZLIB::ZLIB ROOT::FitPanel ROOT::MathMore
+  PRIVATE ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
 )
 
 # CERN ROOT dictionary generation
