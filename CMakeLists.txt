@@ -22,13 +22,8 @@ find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 target_include_directories(${PROJECT_NAME}
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/>
          $<INSTALL_INTERFACE:include/pueo>
+         $<INSTALL_INTERFACE:include>
 )
-
-# Transform ROOT_CXX_FLAGS into a list of individual flags, and add them to the compilation command
-separate_arguments( ROOT_CXX_FLAGS_LIST UNIX_COMMAND ${ROOT_CXX_FLAGS})
-# adding these flags privately, since downstream projects would have gotten these flags already from
-# RootFftwWrapper
-target_compile_options(${PROJECT_NAME} PRIVATE ${ROOT_CXX_FLAGS_LIST})
 
 # Propagating PUEO's version to downstream projects when they link against the pueoEvent library
 # TODO: let CMake communicate the version to the source code?
