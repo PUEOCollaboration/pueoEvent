@@ -16,6 +16,24 @@ find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
 find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
 #================================================================================================
+#                                       CERN ROOT FLAGS
+#================================================================================================
+# note: copied from RootFftwWrapper's CERN ROOT FLAGS but with PUBLIC->PRIVATE
+
+# obtain the C++ standard that ROOT is compiled with
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/getRootStandard.cmake)
+# setting C++ standard
+target_compile_features(${PROJECT_NAME} PRIVATE PUBLIC cxx_std_${ROOT_CXX_STANDARD})
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
+
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
+
+target_compile_options(${PROJECT_NAME} PRIVATE -pipe)
+target_compile_options(${PROJECT_NAME} PRIVATE -fsigned-char)
+
+#================================================================================================
 #                                       BUILDING
 #================================================================================================
 
