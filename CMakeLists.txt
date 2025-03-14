@@ -1,8 +1,29 @@
 cmake_minimum_required(VERSION 3.19.0)
 project(pueoEvent VERSION 1.0.0)
 
-file(GLOB SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc")
-add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
+# note: do not glob files with wildcards
+set(HEADER_FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/Conventions.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/Dataset.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/GeomTool.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/Nav.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/RawEvent.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/RawHeader.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/TruthEvent.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/UsefulEvent.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/Version.h
+)
+add_library(${PROJECT_NAME} SHARED 
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Conventions.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Dataset.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/GeomTool.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Nav.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/RawEvent.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/RawHeader.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/TruthEvent.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/UsefulEvent.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Version.cc
+)
 
 #================================================================================================
 #                                       HOUSEKEEPING
@@ -58,7 +79,6 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # CERN ROOT dictionary generation
-file(GLOB HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/*.h")
 set(DICTNAME G__${PROJECT_NAME})
 root_generate_dictionary(${DICTNAME} ${HEADER_FILES} MODULE ${PROJECT_NAME} LINKDEF LinkDef.h)
 
