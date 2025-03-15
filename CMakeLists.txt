@@ -28,6 +28,9 @@ add_library(${PROJECT_NAME} SHARED
 #================================================================================================
 #                                       HOUSEKEEPING
 #================================================================================================
+if(NOT CMAKE_BUILD_TYPE) 
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE) 
+endif()
 
 # note: * This provides pueo-data_VERSION and GeometryReader.h 
 find_package(pueo-data 1.0.0 REQUIRED)  
@@ -68,10 +71,8 @@ target_include_directories(${PROJECT_NAME}
 # TODO: let CMake communicate the version to the source code?
 target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PUEO_VERSION=${pueo-data_VERSION_MAJOR}) 
 
-# use warning flags only in debug mode
-target_compile_options(${PROJECT_NAME} PRIVATE
-  $<$<CONFIG:Debug>:-Wall -Wextra>
-)
+# use warning flags in RelWithDebInfo mode, which is set to be the default mode
+target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:RelWithDebInfo>:-Wall -Wextra>)
 
 target_link_libraries(${PROJECT_NAME} 
   PUBLIC  PUEO::pueo-data 
