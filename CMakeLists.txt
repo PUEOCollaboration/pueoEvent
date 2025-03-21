@@ -1,28 +1,28 @@
 cmake_minimum_required(VERSION 3.19.0)
 project(pueoEvent VERSION 1.0.0)
+add_library(${PROJECT_NAME} SHARED)
 
-# note: do not glob files with wildcards
 set(HEADER_FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/Conventions.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/Dataset.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/GeomTool.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/Nav.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/RawEvent.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/RawHeader.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/TruthEvent.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/UsefulEvent.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo/Version.h
+  src/pueo/Conventions.h
+  src/pueo/Dataset.h
+  src/pueo/GeomTool.h
+  src/pueo/Nav.h
+  src/pueo/RawEvent.h
+  src/pueo/RawHeader.h
+  src/pueo/TruthEvent.h
+  src/pueo/UsefulEvent.h
+  src/pueo/Version.h
 )
-add_library(${PROJECT_NAME} SHARED 
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Conventions.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Dataset.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/GeomTool.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Nav.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/RawEvent.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/RawHeader.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/TruthEvent.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/UsefulEvent.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Version.cc
+target_sources(${PROJECT_NAME} PRIVATE
+  src/Conventions.cc
+  src/Dataset.cc
+  src/GeomTool.cc
+  src/Nav.cc
+  src/RawEvent.cc
+  src/RawHeader.cc
+  src/TruthEvent.cc
+  src/UsefulEvent.cc
+  src/Version.cc
 )
 
 #================================================================================================
@@ -61,10 +61,10 @@ target_compile_options(${PROJECT_NAME} PRIVATE -fsigned-char)
 #                                       BUILDING
 #================================================================================================
 
-target_include_directories(${PROJECT_NAME}
-  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/>
-         $<INSTALL_INTERFACE:include/pueo>
-         $<INSTALL_INTERFACE:include>
+target_sources(${PROJECT_NAME} PUBLIC
+  FILE_SET HEADERS
+  BASE_DIRS src          # <-- Everything in BASE_DIRS is available during the build
+  FILES ${HEADER_FILES}  # <-- But only FILES will be installed, although these two are currently the same
 )
 
 # Propagating PUEO's version to downstream projects when they link against the pueoEvent library
@@ -87,36 +87,37 @@ root_generate_dictionary(${DICTNAME} ${HEADER_FILES} MODULE ${PROJECT_NAME} LINK
 #                                       INSTALLING
 #================================================================================================
 
-include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
-
 # Generate pueoEventConfigVersion.cmake
+include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY AnyNewerVersion
 )
 # Install the Config and ConfigVersion files
-install(FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    DESTINATION lib/cmake/${PROJECT_NAME}
+include(GNUInstallDirs)
+install(
+  FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
 )
 
-# Install the header files (ie. this copies ./src/pueo/* to <prefix>/include/pueo/*)
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/pueo DESTINATION include) 
+# Install the library and its header files
+install(
+  TARGETS ${PROJECT_NAME} 
+  EXPORT ${PROJECT_NAME}Targets 
+  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
+)
 
-# note: not installing the library to lib64 for backward compatibility
-install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}Targets LIBRARY DESTINATION lib )
+install(
+  EXPORT ${PROJECT_NAME}Targets
+  NAMESPACE PUEO::
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
+)
 
 # installing CERN ROOT's _rdict.pcm file
 install(
   FILES "${CMAKE_CURRENT_BINARY_DIR}/lib${PROJECT_NAME}_rdict.pcm"
-  DESTINATION DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-install(EXPORT ${PROJECT_NAME}Targets
-        NAMESPACE PUEO::
-        FILE ${PROJECT_NAME}Targets.cmake
-        DESTINATION lib/cmake/${PROJECT_NAME}
-)
