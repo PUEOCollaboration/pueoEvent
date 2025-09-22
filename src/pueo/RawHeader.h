@@ -72,7 +72,7 @@ namespace pueo
 
 
      // Trigger info
-     Int_t  triggeringSector = 0;  // for MI
+     UInt_t  triggeringSector = 0;  // for MI
      Int_t  triggeringBeam = 0; // for MI
      UInt_t beamPower = 0; // for MI
      UInt_t triggerPattern = 0; // for Nadir or LF
