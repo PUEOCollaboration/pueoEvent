@@ -35,7 +35,7 @@ int main(int nargs, char** args) {
     std::cout << "Converts raw PUEO data files into ROOT format. \n Required arguments:\n input directory\n output directory\n";
     return 1;
   }
-  const int surf_mapping[26] = {5, 4, 3, 2, 1, 0, 7, 8, 9, 10, 11, 12, 26, 25, 24, 23, 22, 21, 14, 15, 16, 17, 18, 19, 13, 6}; 
+  const int surf_mapping[28] = {5, 4, 3, 2, 1, 0, 25, 6, 7, 8, 9, 10, 11, 24, 18, 19, 20, 21, 22, 23, 26, 17, 16, 15, 14, 13, 12, 26}; 
   const int channel_mappings[8] = {4, 5, 6, 7, 0, 1, 2, 3};
   std::vector<id_pair> event_ids;
   std::vector<int> runs;
@@ -96,12 +96,12 @@ int main(int nargs, char** args) {
       int read = pueo_read_single_waveform(&pueo_handle, &wf);
       if ((wf.run == runs[i_run]) && (wf.wf.length > 0)) {
         // pueo_dump_single_waveform(stdout, &wf);
-        if (wf.wf.channel_id >= 208) {
+        int output_event_index = std::find(events.begin(), events.end(), wf.event) - events.begin();
+        int i_surf = surf_mapping[wf.wf.channel_id / 8];
+        if (i_surf > 25) {
           pueo_handle_close(&pueo_handle);
           continue;
         }          
-        int output_event_index = std::find(events.begin(), events.end(), wf.event) - events.begin();
-        int i_surf = surf_mapping[wf.wf.channel_id / 8];
         int i_surf_channel = channel_mappings[wf.wf.channel_id % 8];
         int i_channel = i_surf * 8 + i_surf_channel;
         for (unsigned int i_sample=0; i_sample<std::min(wf.wf.length,(u_int16_t) 1024); i_sample++) {
