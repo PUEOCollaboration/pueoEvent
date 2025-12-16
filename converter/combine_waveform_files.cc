@@ -12,6 +12,7 @@ extern "C" {
 #include "TTree.h"
 #include "TString.h"
 #include "pueo/RawEvent.h"
+#include "pueo/RawHeader.h"
 #include <filesystem>
 #include <vector>
 #include "converter_functions.h"
@@ -46,15 +47,13 @@ int main(int nargs, char** args) {
     if (!std::filesystem::exists(output_dir.str())) {
       std::filesystem::create_directory(output_dir.str());
     }
-    std::stringstream filename;
-    filename << output_dir.str() << "/" << "convertedEventFile" << runs[i_run] << ".root";
-    TString outputfile_name(filename.str().c_str());
-    TFile *outputFile = new TFile(outputfile_name, "RECREATE");
-    TTree *outputTree = new TTree("eventTree", "eventTree");
-
-    pueo::RawEvent dummy_event;
-    outputTree->Branch("event", &dummy_event);
     std::vector<pueo::RawEvent*> output_events;
+    std::vector<pueo::RawHeader*> output_headers;
+    converter::prepare_output_headers(
+      &output_headers,
+      &events,
+      runs[i_run]
+    );
     converter::prepare_output_events(
       &output_events,
       &events,
@@ -62,10 +61,34 @@ int main(int nargs, char** args) {
     );
     converter::fill_output_events(
       &output_events,
+      &output_headers,
       &source_dir,
       &events,
       runs[i_run]
     );
+
+    std::stringstream filename;
+    filename << output_dir.str() << "/" << "rootifiedEventFile" << runs[i_run] << ".root";
+    std::stringstream header_filename;
+    header_filename << output_dir.str() << "/" << "rootifiedHeadFile" << runs[i_run] << ".root";
+    TFile *headerFile = new TFile(TString(header_filename.str().c_str()), "RECREATE");
+    TTree *headerTree = new TTree("headTree", "headTree");
+    pueo::RawHeader dummy_header;
+    headerTree->Branch("header", &dummy_header);
+    for (unsigned int i=0; i<events.size(); i++) {
+      headerTree->SetBranchAddress("header", &(output_headers[i]));
+      headerTree->Fill();
+      delete output_headers[i];
+      output_headers[i] = NULL;
+    }
+    headerTree->Write();
+    headerFile->Close();
+    delete headerFile;
+
+    TFile *outputFile = new TFile(TString(filename.str().c_str()), "RECREATE");
+    TTree *outputTree = new TTree("eventTree", "eventTree");
+    pueo::RawEvent dummy_event;
+    outputTree->Branch("event", &dummy_event);
     for (unsigned int i=0; i<events.size(); i++) {
       outputTree->SetBranchAddress("event", &(output_events[i]));
       outputTree->Fill();

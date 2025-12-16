@@ -102,6 +102,7 @@ void prepare_output_events(
  */
 void fill_output_events(
   std::vector<pueo::RawEvent*> *output_events,
+  std::vector<pueo::RawHeader*> *output_headers,
   const std::filesystem::path *directory,
   const std::vector<int> *event_numbers,
   int run_id
@@ -113,24 +114,35 @@ void fill_output_events(
     pueo_handle_init(&pueo_handle, direntry.path().string().c_str(), "r");
     int read = pueo_read_single_waveform(&pueo_handle, &waveform);
     if ((waveform.run == run_id) && (waveform.wf.length > 0)) {
+
       int output_event_index = std::find(event_numbers->begin(), event_numbers->end(), waveform.event) - event_numbers->begin();
     
       int i_surf = surf_mapping[waveform.wf.channel_id / 8];
       if (i_surf > 25) {
         pueo_handle_close(&pueo_handle);
         continue;
-      }          
+      }
       int i_surf_channel = channel_mappings[waveform.wf.channel_id % 8];
       int i_channel = i_surf * 8 + i_surf_channel;
       for (unsigned int i_sample=0; i_sample<std::min(waveform.wf.length,(u_int16_t) 1024); i_sample++) {
-        output_events->at(output_event_index)->data[i_channel][i_sample] = waveform.wf.data[i_sample];
-        
-        }
+        output_events->at(output_event_index)->data[i_channel][i_sample] = waveform.wf.data[i_sample];        
+      }
+      //TODO: Fill event header
     }
     pueo_handle_close(&pueo_handle);
   }
+}
 
-
+void prepare_output_headers(
+  std::vector<pueo::RawHeader*> *output_headers,
+  const std::vector<int> *event_ids,
+  int run_id
+) {
+  for (unsigned int i=0; i<event_ids->size(); i++) {
+    output_headers->push_back(new pueo::RawHeader());
+    output_headers->at(i)->run = run_id;
+    output_headers->at(i)->eventNumber = event_ids->at(i);
+  }
 }
 }
 
