@@ -28,20 +28,20 @@
 #define PUEO_GEOMTOOL_H
 
 //Includes
-#include <iostream>
-#include <TObject.h>
-#include <TMath.h>
-#include <TVector3.h>
-#include "pueo/Conventions.h"
-#include "pueo/GeometryReader.h" 
+#include "Conventions.h"
+#include "GeometryReader.h" 
 
 #include <fstream>
 #include <cstring>
+#include <iostream>
 #include <string>
 
 #include "TString.h"
+#include "TObject.h"
 #include "TObjArray.h"
 #include "TObjString.h"
+#include "TVector3.h"
+#include "TMath.h"
 #include "TVector3.h"
 
 

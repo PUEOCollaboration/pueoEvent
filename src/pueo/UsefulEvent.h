@@ -27,8 +27,8 @@
 #define PUEO_USEFUL_EVENT_H
 
 #include <TObject.h>
-#include "pueo/RawEvent.h"
-#include "pueo/Conventions.h" 
+#include "RawEvent.h"
+#include "Conventions.h" 
 
 class TGraph; 
 

@@ -26,6 +26,7 @@
 #ifndef PUEO_CONVENTIONS_H
 #define PUEO_CONVENTIONS_H
 
+#include "Version.h"
 
 #ifndef ROOT_Rtypes
 #if !defined(__CINT__) || defined(__MAKECINT__)
@@ -33,7 +34,6 @@
 #endif
 #endif
 
-#include "pueo/Version.h"
 
 
 namespace  pueo 

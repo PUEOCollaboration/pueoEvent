@@ -28,7 +28,7 @@
 
 #include <TObject.h>
 #include <TVector3.h>
-#include "pueo/Conventions.h" 
+#include "Conventions.h" 
 
 namespace pueo 
 {
