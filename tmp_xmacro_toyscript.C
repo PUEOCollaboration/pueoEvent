@@ -3,10 +3,10 @@
 #define CONCAT(X,Y) _CONCAT(X,Y)
 #define _CONCAT(X,Y) X##Y
 
-#define PUEO_NCHAN 208
+#define PUEO_NCHAN 208 // only temporary!!!!
 
 #define ONEDIM  // empty string for one dimension
-#define FULLWAVEFORM_FIELDS(X)\
+#define FULLWAVEFORM_FIELDS(LiterallyAnX)\
 X(uint32_t,        ONEDIM,         run)\
 X(uint32_t,        ONEDIM,         event)\
 X(uint32_t,        ONEDIM,         event_second)\
@@ -26,7 +26,6 @@ X(pueo_waveform_t, [PUEO_NCHAN],   wfs)
 
 void tmp_xmacro_toyscript(){
 #define X(VARTYPE, VARDIM, VARNAME) VARTYPE VARNAME VARDIM; 
-
 FULLWAVEFORM_FIELDS(X)
 #undef X
 }
