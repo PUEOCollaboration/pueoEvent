@@ -14,12 +14,12 @@
 *  Foundation, either version 2 of the License, or (at your option) any later
 *  version.
 * 
-*  Foobar is distributed in the hope that it will be useful, but WITHOUT ANY
+*  pueoEvent is distributed in the hope that it will be useful, but WITHOUT ANY
 *  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 *  A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 * 
 *  You should have received a copy of the GNU General Public License along with
-*  Foobar. If not, see <https://www.gnu.org/licenses/
+*  pueoEvent. If not, see <https://www.gnu.org/licenses/
 *
 ****************************************************************************************/ 
 
@@ -34,25 +34,25 @@
 #endif
 
 #include "pueo/Version.h"
+#include <stdint.h>
 
 
-namespace  pueo 
+namespace  pueo
 {
   namespace k
   {
-    constexpr int NANTS_MI = 96; 
-    constexpr int NANTS_NADIR = 0; 
-    constexpr int NANTS_LF = 8; 
-    constexpr int MULTIPLEX_LF = 0; 
-    constexpr int NUM_HORNS = NANTS_MI + NANTS_NADIR; 
-    constexpr int NUM_ANTS = NANTS_MI + NANTS_NADIR + NANTS_LF; 
+    constexpr int NANTS_MI = 96;
+    constexpr int NANTS_NADIR = 0;
+    constexpr int NANTS_LF = 8;
+    constexpr int NUM_HORNS = NANTS_MI + NANTS_NADIR;
+    constexpr int NUM_ANTS = NANTS_MI + NANTS_NADIR + NANTS_LF;
     constexpr int NUM_POLS = 2;
-    constexpr int NUM_PUEO = 1; 
-    constexpr int NUM_PHI = 24; 
-    constexpr int NUM_CHANS_PER_SURF = 8; 
-    constexpr int ACTIVE_SURFS = 28; 
-    constexpr int NUM_DIGITZED_CHANNELS = NUM_ANTS*NUM_POLS; 
-    constexpr int MAX_NUMBER_SAMPLES = 4096; 
+    constexpr int NUM_PUEO = 1;
+    constexpr int NUM_PHI = 24;
+    constexpr int NUM_CHANS_PER_SURF = 8;
+    constexpr int ACTIVE_SURFS = 28;
+    constexpr int NUM_DIGITZED_CHANNELS = ACTIVE_SURFS * NUM_CHANS_PER_SURF;
+    constexpr int MAX_NUMBER_SAMPLES = 1024;
   }
 
 //Now some geometry and polarisation considerations
@@ -99,23 +99,22 @@ namespace pol {
 
 namespace trigger
 {
-  enum type_t : uint32_t 
+  enum type_t : uint32_t
   {
     kUnknown = 0,
-    kRFMI = 1, 
-    kExt  = 2, //probably for debugging? 
-    kRFLF = 4, 
-    kPPS0 = 8 , 
-    kPPS1 = 16, 
+    kRFMI = 1,
+    kExt  = 2, //probably for debugging? never used
+    kRFLF = 4,  // never used
+    kPPS0 = 8 ,
+    kPPS1 = 16, //never used
     kSoft = 32,
-    kVPol = 64, 
+    kVPol = 64,
     kHPol = 128
+  };
 
-  }; 
-
-  inline bool isRFTrigger( uint32_t t) 
+  inline bool isRFTrigger( uint32_t t)
   {
-    uint32_t rf_trigger = kRFMI | kRFLF; 
+    uint32_t rf_trigger = kRFMI | kRFLF;
     return  !!(t & rf_trigger);
   }
 }
