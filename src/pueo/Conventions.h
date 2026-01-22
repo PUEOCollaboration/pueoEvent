@@ -1,5 +1,5 @@
 /****************************************************************************************
-*  pueo/Conventions.h           PUEO Convenentions
+*  pueo/Conventions.h           PUEO Conventions (and constants)
 *  
 *  Constants and such
 * 
