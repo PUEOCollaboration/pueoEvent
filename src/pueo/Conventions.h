@@ -127,18 +127,20 @@ namespace trigger
   Things like the calibration antennas and pulsers etc.
   \ingroup rootclasses
 */
-namespace Locations {
+  namespace Locations {
 
+    enum loc_t {
 
-  Double_t getWaisLatitude();
-  Double_t getWaisLongitude();
-  Double_t getWaisAltitude();
+      WAIS,
+      LDB,
+      TAYLOR_DOME,
+      SOUTH_PLUS_200
+    };
 
-  Double_t getLDBLatitude();
-  Double_t getLDBLongitude();
-  Double_t getLDBAltitude();
-
-}
+    Double_t getLatitude(loc_t where);
+    Double_t getLongitude(loc_t where);
+    Double_t getAltitude(loc_t where);
+  }
 
 }
 
