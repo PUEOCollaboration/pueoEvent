@@ -39,6 +39,8 @@ find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
 # find_package(FFTW REQUIRED) # TODO: Pretty sure there's no need for FFTW
 find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "This creates compile_commands.json, useful for LSP" FORCE)
+
 #================================================================================================
 #                                       CERN ROOT FLAGS
 #================================================================================================
@@ -75,13 +77,17 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PUEO_VERSION=${pueo-da
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:RelWithDebInfo>:-Wall -Wextra>)
 
 target_link_libraries(${PROJECT_NAME} 
-  PUBLIC  PUEO::pueo-data 
-  PRIVATE ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
+  PUBLIC  PUEO::pueo-data ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
 )
 
 # CERN ROOT dictionary generation
 set(DICTNAME G__${PROJECT_NAME})
 root_generate_dictionary(${DICTNAME} ${HEADER_FILES} MODULE ${PROJECT_NAME} LINKDEF LinkDef.h)
+
+add_subdirectory(extern/PueoRawData EXCLUDE_FROM_ALL) # add but don't build
+add_executable(converter tmp_xmacro_toyscript.cc)
+target_link_libraries(converter PRIVATE pueorawdata ${PROJECT_NAME})
+# linking against libpueorawdata will then build the library (but not the other executables of the subdirectory)
 
 #================================================================================================
 #                                       INSTALLING
@@ -121,3 +127,9 @@ install(
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
+install(TARGETS converter RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# not exporting pueorawdata as targets b/c it's not expected that that any other project would
+# interact with this library; also not installing its headers cuz nothing else should be including those?
+# library is installed because the converter links against it.
+install(TARGETS pueorawdata)

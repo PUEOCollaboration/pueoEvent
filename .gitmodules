@@ -1,0 +1,3 @@
+[submodule "extern/PueoRawData"]
+	path = extern/PueoRawData
+	url = git@github.com:PUEOCollaboration/libpueorawdata

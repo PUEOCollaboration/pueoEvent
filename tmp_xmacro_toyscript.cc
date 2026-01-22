@@ -47,3 +47,7 @@ FULLWAVEFORM_FIELDS
 
   fwft->Print();
 }
+
+int main(){
+  return 0;
+}
