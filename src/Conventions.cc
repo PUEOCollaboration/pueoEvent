@@ -57,19 +57,18 @@ char pueo::pol::asChar(pueo::pol::pol_t pol)
   return 'U';
 }
 
-static const Double_t LATITUDE_WAIS_A4 = -79.468116; ///< Latitude of WAIS divide pulser
-static const Double_t LONGITUDE_WAIS_A4 = -112.059258; ///< Longitude of WAIS divide pulser
-static const Double_t ALTITUDE_WAIS_A4 = 1779.80;///< Altitude of WAIS divide pulser
-
-static const Double_t LATITUDE_LDB  = - (77 + (51.23017/60)); ///< Latitude at LDB
-static const Double_t LONGITUDE_LDB = + (167 + (12.16908/60)); ///< Longitude at LDB
-static const Double_t ALTITUDE_LDB  = 0.; ///< Altitude at LDB
+// abuse GCC/Clang extension here because it's way more convenient
 
 
-Double_t pueo::Locations::getWaisLatitude() {return LATITUDE_WAIS_A4;};
-Double_t pueo::Locations::getWaisLongitude() {return  LONGITUDE_WAIS_A4;};
-Double_t pueo::Locations::getWaisAltitude() {return ALTITUDE_WAIS_A4;};
+static const double locations[4][3] = 
+{
+  [pueo::Locations::WAIS] = { -79.468116, -112.059258, 1779.80},
+  [pueo::Locations::LDB] = {-(77 + (51.23017/60)), (167 + (12.16908/60)), 0},
+  [pueo::Locations::TAYLOR_DOME] = {  -77.78695, 158.66555, 2395 },
+  [pueo::Locations::SOUTH_PLUS_200] = { -81.9457,178.392, 0},
+};
 
-Double_t pueo::Locations::getLDBLatitude() {return LATITUDE_LDB;};
-Double_t pueo::Locations::getLDBLongitude() {return  LONGITUDE_LDB;};
-Double_t pueo::Locations::getLDBAltitude() {return ALTITUDE_LDB;};
+
+Double_t pueo::Locations::getLatitude(pueo::Locations::loc_t where) {return locations[where][0]; }
+Double_t pueo::Locations::getLongitude(pueo::Locations::loc_t where) {return locations[where][1]; }
+Double_t pueo::Locations::getAltitude(pueo::Locations::loc_t where) {return locations[where][2] ;}

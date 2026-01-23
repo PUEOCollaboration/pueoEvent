@@ -66,7 +66,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE -fsigned-char)
 
 target_sources(${PROJECT_NAME} PUBLIC
   FILE_SET HEADERS
-  BASE_DIRS src/pueo      # <-- Everything in BASE_DIRS is available during the build
+  BASE_DIRS src/         # <-- Everything in BASE_DIRS is available during the build
   FILES ${HEADER_FILES}  # <-- But only FILES will be installed, although these two are currently the same
 )
 
