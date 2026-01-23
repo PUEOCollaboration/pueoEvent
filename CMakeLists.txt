@@ -62,10 +62,11 @@ target_compile_options(${PROJECT_NAME} PRIVATE -fsigned-char)
 #================================================================================================
 #                                       BUILDING
 #================================================================================================
+# add_subdirectory(extern/PueoRawData EXCLUDE_FROM_ALL) # add but don't build, at least not yet
 
 target_sources(${PROJECT_NAME} PUBLIC
   FILE_SET HEADERS
-  BASE_DIRS src          # <-- Everything in BASE_DIRS is available during the build
+  BASE_DIRS src/pueo      # <-- Everything in BASE_DIRS is available during the build
   FILES ${HEADER_FILES}  # <-- But only FILES will be installed, although these two are currently the same
 )
 
@@ -77,17 +78,16 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PUEO_VERSION=${pueo-da
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:RelWithDebInfo>:-Wall -Wextra>)
 
 target_link_libraries(${PROJECT_NAME} 
-  PUBLIC  PUEO::pueo-data ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
+  PUBLIC PUEO::pueo-data ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
 )
+# linking against libpueorawdata will then build the library (but not the other executables of the subdirectory)
 
 # CERN ROOT dictionary generation
 set(DICTNAME G__${PROJECT_NAME})
 root_generate_dictionary(${DICTNAME} ${HEADER_FILES} MODULE ${PROJECT_NAME} LINKDEF LinkDef.h)
 
-add_subdirectory(extern/PueoRawData EXCLUDE_FROM_ALL) # add but don't build
-add_executable(converter tmp_xmacro_toyscript.cc)
-target_link_libraries(converter PRIVATE pueorawdata ${PROJECT_NAME})
-# linking against libpueorawdata will then build the library (but not the other executables of the subdirectory)
+# add_executable(converter tmp_xmacro_toyscript.cc)
+# target_link_libraries(converter PRIVATE ${PROJECT_NAME})
 
 #================================================================================================
 #                                       INSTALLING
@@ -112,7 +112,7 @@ install(
 install(
   TARGETS ${PROJECT_NAME} 
   EXPORT ${PROJECT_NAME}Targets 
-  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/pueo
 )
 
 install(
@@ -127,9 +127,9 @@ install(
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-install(TARGETS converter RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# install(TARGETS converter RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # not exporting pueorawdata as targets b/c it's not expected that that any other project would
-# interact with this library; also not installing its headers cuz nothing else should be including those?
-# library is installed because the converter links against it.
-install(TARGETS pueorawdata)
+# interact with this library, other than the raw data converter; The headers are installed though,
+# mainly so that the convention used by `pueo/pueo.h` is available.
+# install(TARGETS pueorawdata FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
