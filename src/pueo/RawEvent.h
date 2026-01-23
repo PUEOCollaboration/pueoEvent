@@ -29,6 +29,7 @@
 //Includes
 #include <TObject.h>
 #include "pueo/Conventions.h"
+#include "stdint.h"
 
 //!  pue::RawEevent -- The Raw PUEO Event Data
 /*!
@@ -37,21 +38,30 @@
 */
 namespace pueo
 {
+class pueo_waveform final: public TObject
+{
+public:
+   uint8_t  channel_id;
+   // uint8_t  surf_word; // wtf is a word?
+   // uint16_t length;    // probably not important for analysis purposes?
+   int16_t  data[k::MAX_NUMBER_SAMPLES];
 
-  class RawEvent: public TObject
-  {
-   public:
-     RawEvent(){;} ///< Default constructor
-     virtual ~RawEvent() {;} ///< Destructor
+};
 
-     ULong_t eventNumber = 0; ///< Event number from software
+class RawEvent: public TObject
+{
+public:
+  RawEvent(){;} ///< Default constructor
+  virtual ~RawEvent() {;} ///< Destructor
 
-     Int_t runNumber = 0;   ///< Run number from software
-    
-     std::vector<Short_t> data[k::NUM_DIGITZED_CHANNELS]; 
+  ULong_t eventNumber = 0; ///< Event number from software
 
-    ClassDef(RawEvent,1);
-  };
+  Int_t runNumber = 0;   ///< Run number from software
+
+  std::vector<Short_t> data[k::NUM_DIGITZED_CHANNELS]; 
+
+  ClassDef(RawEvent,1);
+};
 
 }
 
