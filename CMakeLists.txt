@@ -41,6 +41,8 @@ find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "This creates compile_commands.json, useful for LSP" FORCE)
 
+find_package(pueorawdata CONFIG)
+
 #================================================================================================
 #                                       CERN ROOT FLAGS
 #================================================================================================
@@ -49,7 +51,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "This creates compile_commands.j
 # obtain the C++ standard that ROOT is compiled with
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/getRootStandard.cmake)
 # setting C++ standard
-target_compile_features(${PROJECT_NAME} PRIVATE PUBLIC cxx_std_${ROOT_CXX_STANDARD})
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_${ROOT_CXX_STANDARD})
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -78,13 +80,18 @@ target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:RelWithDebInfo>:-Wall 
 
 target_link_libraries(${PROJECT_NAME} 
   PUBLIC  PUEO::pueo-data 
-  PRIVATE ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
+          ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
 )
 
 # CERN ROOT dictionary generation
 set(DICTNAME G__${PROJECT_NAME})
 root_generate_dictionary(${DICTNAME} ${HEADER_FILES} MODULE ${PROJECT_NAME} LINKDEF LinkDef.h)
 
+# todo: maybe make this explicit option instead of relying on the FOUND flag?
+if(pueorawdata_FOUND)
+  add_executable(converter tmp_xmacro_toyscript.cc)
+  target_link_libraries(converter PRIVATE PUEO::pueorawdata ${PROJECT_NAME})
+endif()
 #================================================================================================
 #                                       INSTALLING
 #================================================================================================
