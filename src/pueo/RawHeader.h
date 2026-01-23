@@ -26,6 +26,7 @@
 //Includes
 #include <TObject.h>
 #include "pueo/Conventions.h"
+#include "rawdata.h"
 
 //!  pueo::RawHeader -- The Raw PUEO Event Header
 /*!
@@ -39,6 +40,36 @@ class RawHeader: public TObject
 {
 public:
   RawHeader() {;} ///< Default constructor
+  RawHeader(const  pueo_full_waveforms_t * fwf) :
+  run(fwf->run),
+  realTime(fwf->readout_time.utc_secs),
+  payloadTime(fwf->readout_time.utc_secs), // note: actually not sure about this
+  payloadTimeUs(fwf->readout_time.utc_secs * 1e3), // nor this
+  gpsSubTime(),
+  eventNumber(),
+  priority(),
+  flags(),
+  peakThetaBin(),
+  imagePeak(),
+  coherentSumPeak(),
+  trigType(),
+  trigNum(),
+  trigTime(),
+  c3poNum(),
+  ppsNum(),
+  deadTime(),
+  bufferDepth(),
+  triggerTime(),
+  triggerTimeNs(),
+  goodTimeFlag(),
+  triggeringSector(),
+  triggeringBeam(),
+  beamPower(),
+  triggerPattern()
+  {
+    phiTrigMask[0] = 0;
+    phiTrigMask[1] = 0;
+  }
 
   Int_t           run = 0 ; ///< Run number, assigned on ground
   UInt_t          realTime = 0 ; ///< unixTime of readout
