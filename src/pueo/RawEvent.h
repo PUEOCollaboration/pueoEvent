@@ -39,7 +39,7 @@
 namespace pueo
 {
 
-class RawEvent final: public TObject
+class RawEvent: public TObject
 {
 public:
   RawEvent(){;} ///< Default constructor
