@@ -49,9 +49,9 @@ namespace pueo
       TGraph *makeGraph(ring::ring_t ring, int phi, pol::pol_t pol) const; 
       TGraph *makeGraph(int surf, int chan) const; 
 
-      std::vector<double> volts[k::NUM_DIGITZED_CHANNELS];
-      double t0[k::NUM_DIGITZED_CHANNELS];
-      double dt[k::NUM_DIGITZED_CHANNELS]; 
+      std::vector<double> volts[k::NUM_DIGITIZED_CHANNELS];
+      double t0[k::NUM_DIGITIZED_CHANNELS];
+      double dt[k::NUM_DIGITIZED_CHANNELS]; 
       double t(size_t chan, size_t i) const { return t0[chan] + i * dt[chan]; }
 
 

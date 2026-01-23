@@ -49,7 +49,7 @@ public:
 
   Int_t runNumber = 0;   ///< Run number from software
 
-  std::vector<Short_t> data[k::NUM_DIGITZED_CHANNELS]; 
+  std::vector<Short_t> data[k::NUM_DIGITIZED_CHANNELS]; 
 
   ClassDef(RawEvent,1);
 };

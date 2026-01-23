@@ -39,7 +39,7 @@ pueo::UsefulEvent::UsefulEvent(const RawEvent & event, const RawHeader & header)
   (void) header; 
 
   auto geom = GeomTool::Instance(); 
-  for (size_t ichan = 0; ichan < k::NUM_DIGITZED_CHANNELS; ichan++) 
+  for (size_t ichan = 0; ichan < k::NUM_DIGITIZED_CHANNELS; ichan++) 
   {
     volts[ichan].resize(data[ichan].size()); 
     for (size_t i = 0; i < volts[ichan].size(); i++) 
@@ -72,7 +72,7 @@ TGraph * pueo::UsefulEvent::makeGraph(int surf, int chan) const
 
 TGraph * pueo::UsefulEvent::makeGraph(size_t chanIndex) const
 {
-  if (chanIndex >= k::NUM_DIGITZED_CHANNELS) return 0; 
+  if (chanIndex >= k::NUM_DIGITIZED_CHANNELS) return 0; 
   TGraph * g = new TGraph(volts[chanIndex].size()); 
   int ant; 
   pol::pol_t pol; 
