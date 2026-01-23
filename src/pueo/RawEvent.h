@@ -38,17 +38,8 @@
 */
 namespace pueo
 {
-class pueo_waveform final: public TObject
-{
-public:
-   uint8_t  channel_id;
-   // uint8_t  surf_word; // wtf is a word?
-   // uint16_t length;    // probably not important for analysis purposes?
-   int16_t  data[k::MAX_NUMBER_SAMPLES];
 
-};
-
-class RawEvent: public TObject
+class RawEvent final: public TObject
 {
 public:
   RawEvent(){;} ///< Default constructor
