@@ -31,6 +31,7 @@
 #pragma link C++ class pueo::TruthEvent+;
 #pragma link C++ class pueo::UsefulEvent+;
 #pragma link C++ class pueo::RawHeader+;
+#pragma link C++ class pueo::RawEvent+;
 #pragma link C++ namespace pueo::nav;
 #pragma link C++ class pueo::nav::Position+;
 #pragma link C++ class pueo::nav::Attitude+;

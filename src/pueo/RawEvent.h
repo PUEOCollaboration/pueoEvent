@@ -30,6 +30,7 @@
 #include <TObject.h>
 #include "pueo/Conventions.h"
 #include "stdint.h"
+#include "pueo/rawdata.h"
 
 //!  pue::RawEevent -- The Raw PUEO Event Data
 /*!
@@ -43,6 +44,14 @@ class RawEvent: public TObject
 {
 public:
   RawEvent(){;} ///< Default constructor
+
+  RawEvent(const pueo_full_waveforms_t * fwf){
+    eventNumber = fwf->event;
+    runNumber = fwf->run;
+    for (std::size_t i_ch=0; i_ch<k::NUM_DIGITIZED_CHANNELS; ++i_ch){
+      data[i_ch].assign(fwf->wfs[i_ch].data, fwf->wfs[i_ch].data+fwf->wfs[i_ch].length);
+    }
+  }
   virtual ~RawEvent() {;} ///< Destructor
 
   ULong_t eventNumber = 0; ///< Event number from software
