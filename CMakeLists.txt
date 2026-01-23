@@ -4,6 +4,7 @@ add_library(${PROJECT_NAME} SHARED)
 
 set(HEADER_FILES
   src/pueo/Conventions.h
+  src/pueo/Converter.h
   src/pueo/Dataset.h
   src/pueo/GeomTool.h
   src/pueo/Nav.h
@@ -15,6 +16,7 @@ set(HEADER_FILES
 )
 target_sources(${PROJECT_NAME} PRIVATE
   src/Conventions.cc
+  src/Converter.cc
   src/Dataset.cc
   src/GeomTool.cc
   src/Nav.cc
@@ -25,12 +27,19 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/Version.cc
 )
 
+
+
+
 #================================================================================================
 #                                       HOUSEKEEPING
 #================================================================================================
 if(NOT CMAKE_BUILD_TYPE) 
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE) 
 endif()
+
+#look for libpueorawdata, and enable converting if it's found
+find_library(PUEORAWDATA NAMES pueorawdata libpueorawdata PATHS "$ENV{PUEO_UTIL_INSTALL_DIR}/lib")
+
 
 # note: * This provides pueo-data_VERSION and GeometryReader.h 
 find_package(pueo-data 1.0.0 REQUIRED)  
@@ -39,6 +48,16 @@ find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
 # find_package(FFTW REQUIRED) # TODO: Pretty sure there's no need for FFTW
 find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
+
+
+if (PUEORAWDATA)
+  target_compile_options(${PROJECT_NAME} PRIVATE -DHAVE_PUEORAW_DATA)
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${PUEORAWDATA})
+  message("Found libpueorawdata")
+else()
+  message("No libpueorawdata found, will not be able to convert")
+
+endif()
 #================================================================================================
 #                                       CERN ROOT FLAGS
 #================================================================================================
