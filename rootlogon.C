@@ -1,7 +1,7 @@
 {
-  gSystem->Load("${PUEO_UTIL_INSTALL_DIR}/lib/libRootFftwWrapper.so");
-  gSystem->Load("${PUEO_UTIL_INSTALL_DIR}/lib/libAntarcticaRoot.so"); 
-  gSystem->Load("${PUEO_UTIL_INSTALL_DIR}/lib/libpueoEvent.so"); 
+  gSystem->Load("${PUEO_UTIL_INSTALL_DIR}/lib64/libRootFftwWrapper.so");
+  gSystem->Load("${PUEO_UTIL_INSTALL_DIR}/lib64/libAntarcticaRoot.so"); 
+  gSystem->Load("${PUEO_UTIL_INSTALL_DIR}/lib64/libpueoEvent.so"); 
 
   gStyle->SetNumberContours(255);
   gStyle->SetPalette(kInvertedDarkBodyRadiator);
