@@ -53,6 +53,7 @@ namespace  pueo
     constexpr int ACTIVE_SURFS = 28;
     constexpr int NUM_DIGITZED_CHANNELS = ACTIVE_SURFS * NUM_CHANS_PER_SURF;
     constexpr int MAX_NUMBER_SAMPLES = 1024;
+    constexpr int SAMPLE_RATE = 3.0;
   }
 
 //Now some geometry and polarisation considerations

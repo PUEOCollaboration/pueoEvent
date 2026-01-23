@@ -39,6 +39,8 @@ find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
 # find_package(FFTW REQUIRED) # TODO: Pretty sure there's no need for FFTW
 find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "This creates compile_commands.json, useful for LSP" FORCE)
+
 #================================================================================================
 #                                       CERN ROOT FLAGS
 #================================================================================================
