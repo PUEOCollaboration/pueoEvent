@@ -89,8 +89,8 @@ root_generate_dictionary(${DICTNAME} ${HEADER_FILES} MODULE ${PROJECT_NAME} LINK
 
 # todo: maybe make this explicit option instead of relying on the FOUND flag?
 if(pueorawdata_FOUND)
-  add_executable(converter tmp_xmacro_toyscript.cc)
-  target_link_libraries(converter PRIVATE PUEO::pueorawdata ${PROJECT_NAME})
+  add_executable(convert toy_converter.cc)
+  target_link_libraries(convert PRIVATE PUEO::pueorawdata ${PROJECT_NAME})
 endif()
 #================================================================================================
 #                                       INSTALLING
