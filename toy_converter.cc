@@ -32,6 +32,62 @@
 
 namespace fs =std::filesystem;
 
+// this is just a  test
+void toy_converter()
+{
+  int runs[3] {1,2,1};
+  int r=-1;
+  std::unordered_map<UInt_t, TFile *> all_runs; // dictionary
+
+  TFile * current_file = nullptr;
+  TTree * current_tree = nullptr;
+
+  for (int i=0; i<std::size(runs); ++i) 
+  {
+    r = runs[i];
+
+    if ( all_runs.find(r) != all_runs.end() ) // run number exists in dictionary
+    {
+      current_file = all_runs.find(r)->second;
+      current_tree = current_file->Get<TTree>("runTree");
+      printf("found run%d\n",runs[i]);
+    } 
+    else
+    {
+      fs::exists(fs::path(Form("run%d", r))) ? : fs::create_directory(Form("run%d", r));
+      
+      // create a new TFile if file doesn't exist on disk already, update (retrieve) if it does
+      current_file = new TFile(Form("run%d/run%d.root", r, r),"update");
+
+      auto me_pair = std::make_pair( r, current_file);
+      all_runs.insert(me_pair);
+
+      // if the tree already exists, retrive it; else, create it
+      if (current_file->GetListOfKeys()->Contains("runTree")) 
+      {
+        current_tree = current_file->Get<TTree>("runTree");
+        current_tree->SetBranchAddress("run", &r);
+      } 
+      else 
+      {
+        current_tree = new TTree("runTree", "runTree"); // create a new tree and
+        current_tree->SetDirectory(current_file);       // explicitly set its associated TFile, 
+        current_tree->Branch("run", &r);                // lest ROOT does weird shit
+      }
+    }
+    current_tree->Fill();
+  }
+
+  for (auto& pair: all_runs)
+  {
+    printf("%s\n", pair.second->GetName());
+    pair.second->Write();
+    pair.second->Close();
+  }
+}
+
+
+
 int main(){
   pueo_handle_t hndl;
   if (pueo_handle_init(&hndl, "../2025-12-31-R005.wfs", "r") < 0 ) {
@@ -39,92 +95,75 @@ int main(){
     exit(1);
   }
 
-  std::unordered_set<UInt_t> all_runs;
-
+  std::unordered_map<UInt_t, TFile *> all_runs_found_thus_far; // dictionary
   TFile * current_file = nullptr;
-  // TFile event_file("eventFile.root", "RECREATE");
-  // TFile head_file ("headFile.root" , "RECREATE");
-  // TFile gps_file  ("gpsEvent.root" , "RECREATE");
-
   TTree * current_tree = nullptr;
-  // TTree * event_tree = new TTree("eventTree", "eventTree");
-  // TTree * head_tree  = new TTree("headTree",  "headTree");
-  // TTree * gps_tree   = new TTree("gpsTree",   "gpsTree");
+  pueo::RawEvent * raw_event = nullptr;
+  pueo_packet_t * pkt = nullptr; // TODO: do I need to free the packet?
 
-  pueo::RawEvent * raw_event;
-  // pueo::RawHeader raw_header;
-  // pueo::nav::Attitude attitude;
+  while(pueo_ll_read_realloc(&hndl, &pkt) > 0)
+  {
+    switch(pkt->head.type)
+    {
+      case PUEO_PACKET_INVALID:
+        {
+          break;
+        }
+      case PUEO_PACKET_HEAD:
+        {
+          break;
+        }
+      case PUEO_FULL_WAVEFORMS: 
+        {
+          const pueo_full_waveforms_t * fwf = (const pueo_full_waveforms_t *)(pkt->payload);
+          UInt_t run = fwf->run;
+          raw_event = new pueo::RawEvent(fwf);
 
-  // event_tree->Branch("event",  &raw_event);
-  // head_tree ->Branch("header", &raw_header);
-  // gps_tree  ->Branch("gps",    &attitude);
-
-  pueo_packet_t * pkt = nullptr;
-  while(pueo_ll_read_realloc(&hndl, &pkt) > 0 ) {
-
-    switch(pkt->head.type){
-      case PUEO_PACKET_INVALID:{
-        break;
-      }
-      case PUEO_PACKET_HEAD:{
-        break;
-      }
-      case PUEO_FULL_WAVEFORMS: {
-        const pueo_full_waveforms_t * fwf = (const pueo_full_waveforms_t *)(pkt->payload);
-        UInt_t run = fwf->run;
-
-        if (all_runs.insert(run).second) { // successful insert (ie a new run is found)
-          
-          if (current_file != nullptr){ // close currently opened file
-            puts("closing file");
-            current_file->Close();
-          }
-            
-          // check dir existence, since the directory might already exists via other means
-          if (!fs::exists(fs::path(Form("run%d", run)))) fs::create_directory(Form("run%d", run));
-
-          // create a new TFile if file doesn't exist on disk already, update if it does
-          current_file = TFile::Open(Form("run%d/eventFile%d.root", run, run), "update");
-          
-          // if the tree already exists, retrive it; else, create it
-          if (current_file->GetListOfKeys()->Contains("eventTree")) {
+          if ( all_runs_found_thus_far.find(run) != all_runs_found_thus_far.end() ) // ie. found
+          {
+            current_file = all_runs_found_thus_far.find(run)->second;
+            printf("found run%d, retrieved %s\n", run, current_file->GetName());
             current_tree = current_file->Get<TTree>("eventTree");
-            current_tree->SetBranchAddress("event", &raw_event);
-          } else {
-            current_tree = new TTree("eventTree", "eventTree");
-            current_tree -> Branch("event", &raw_event); // branch is retrieved if it exists
-          }
 
-        } 
-        raw_event = new pueo::RawEvent(fwf);
-        // raw_header = pueo::RawHeader(fwf);
-        // attitude = pueo::nav::Attitude(fwf);
-        break;
-      }
+          } else { 
+            // ie. never encounter this run before, but the run might already exist on disk
+            fs::exists(fs::path(Form("run%d", run))) ? : fs::create_directory(Form("run%d", run));
+
+            // create a new TFile if file doesn't exist on disk already, update (retrieve) if it does
+            current_file = new TFile(Form("run%d/eventFile%d.root", run, run),"update");
+
+            auto a_new_pair = std::make_pair(run, current_file);
+            all_runs_found_thus_far.insert(a_new_pair);
+
+            // if the tree already exists, retrive it; else, create it
+            if (current_file->GetListOfKeys()->Contains("eventTree")) 
+            {
+              current_tree = current_file->Get<TTree>("eventTree");
+              current_tree->SetBranchAddress("event", raw_event);
+            } else {
+              current_tree = new TTree("eventTree", "eventTree"); // create a new tree and
+              current_tree->SetDirectory(current_file);       // explicitly set its associated TFile, 
+              current_tree->Branch("event", &raw_event);      // lest ROOT does weird shit
+            }
+          }
+          current_tree->Fill();
+          delete raw_event;
+          raw_event=nullptr;
+          break;
+        }
       default: 
         break;
     }
-
-    current_tree->Fill();
-    // event_tree->Fill();
-    // head_tree->Fill();
-    // gps_tree->Fill();
-
-    delete raw_event;
-    raw_event=nullptr;
   }
 
-  if (current_file != nullptr){ // close currently opened file
-    puts("closing file");
-    // kOverwrite: repalces old metadata (ie don't make new cycles)
-    //   https://root-forum.cern.ch/t/adding-entries-to-a-ttree/9575/2
-    //   https://root.cern.ch/doc/master/classTObject.html#aeac9082ad114b6702cb070a8a9f8d2ed
-    current_file->Write(nullptr, TObject::kOverwrite);
-    current_file->Close();
+  // kOverwrite: repalces old metadata (ie don't make new cycles)
+  //   https://root-forum.cern.ch/t/adding-entries-to-a-ttree/9575/2
+  //   https://root.cern.ch/doc/master/classTObject.html#aeac9082ad114b6702cb070a8a9f8d2ed
+  for (auto & pair: all_runs_found_thus_far){
+    pair.second->Write(nullptr, TObject::kOverwrite);
+    printf("closing file %s", pair.second->GetName());
+    pair.second->Close();
   }
-  // event_file.Write();
-  // head_file.Write();
-  // gps_file.Close();
 }
 
 
@@ -132,18 +171,21 @@ int main(){
 
 
 
+  // TFile event_file("eventFile.root", "RECREATE");
+  // TFile head_file ("headFile.root" , "RECREATE");
+  // TFile gps_file  ("gpsEvent.root" , "RECREATE");
 
+  // TTree * event_tree = new TTree("eventTree", "eventTree");
+  // TTree * head_tree  = new TTree("headTree",  "headTree");
+  // TTree * gps_tree   = new TTree("gpsTree",   "gpsTree");
 
+  // pueo::RawEvent * raw_event;
+  // pueo::RawHeader raw_header;
+  // pueo::nav::Attitude attitude;
 
-
-
-
-
-
-
-
-
-
+  // event_tree->Branch("event",  &raw_event);
+  // head_tree ->Branch("header", &raw_header);
+  // gps_tree  ->Branch("gps",    &attitude);
 
 
       // case PUEO_SINGLE_WAVEFORM:{
