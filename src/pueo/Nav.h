@@ -29,6 +29,7 @@
 
 //Includes
 #include <TObject.h>
+#include "pueo/rawdata.h"
 
 namespace pueo 
 {
@@ -76,6 +77,26 @@ namespace pueo
     {
      public:
        Attitude() {;}
+
+       Attitude(const pueo_full_waveforms_t * fwf):
+       run(fwf->run),
+       realTime(),
+       timeOfDay(),
+       nSatsVis(),
+       nSatsTracked(),
+       payloadTime(),
+       payloadTimeUs(),
+       latitude(),
+       longitude(),
+       altitude(),
+       heading(),
+       pitch(),
+       roll(),
+       mrms(),
+       brms(),
+       flag()
+       {;}
+
        virtual ~Attitude(){;}
 
        Int_t           run = 0; 

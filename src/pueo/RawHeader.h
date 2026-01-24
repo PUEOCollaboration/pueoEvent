@@ -26,7 +26,7 @@
 //Includes
 #include <TObject.h>
 #include "pueo/Conventions.h"
-#include "rawdata.h"
+#include "pueo/rawdata.h"
 
 //!  pueo::RawHeader -- The Raw PUEO Event Header
 /*!
