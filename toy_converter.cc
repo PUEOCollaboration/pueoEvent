@@ -119,9 +119,10 @@ int main(){
           UInt_t run = fwf->run;
           raw_event = new pueo::RawEvent(fwf);
 
-          if ( all_runs_found_thus_far.find(run) != all_runs_found_thus_far.end() ) // ie. found
+          auto search_result = all_runs_found_thus_far.find(run);
+          if ( search_result != all_runs_found_thus_far.end() ) // ie. we've seen this run before
           {
-            current_file = all_runs_found_thus_far.find(run)->second;
+            current_file = search_result->second;
             printf("found run%d, retrieved %s\n", run, current_file->GetName());
             current_tree = current_file->Get<TTree>("eventTree");
 
