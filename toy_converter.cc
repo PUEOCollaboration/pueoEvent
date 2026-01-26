@@ -31,22 +31,21 @@
 #define  PUEO_SAVED_PRIORITIES 0x7135  
 
 namespace fs =std::filesystem;
+using namespace pueo;
+using namespace pueo::nav;
 
-  // TFile event_file("eventFile.root", "RECREATE");
-  // TFile head_file ("headFile.root" , "RECREATE");
-  // TFile gps_file  ("gpsEvent.root" , "RECREATE");
+#define STRINGIFY(X) _STRINGIFY(X)
+#define _STRINGIFY(X) #X
+#define CONCAT(X,Y) _CONCAT(X,Y)
+#define _CONCAT(X,Y) X##Y
 
-  // TTree * event_tree = new TTree("eventTree", "eventTree");
-  // TTree * head_tree  = new TTree("headTree",  "headTree");
-  // TTree * gps_tree   = new TTree("gpsTree",   "gpsTree");
-
-  // pueo::RawEvent * raw_event;
-  // pueo::RawHeader raw_header;
-  // pueo::nav::Attitude attitude;
-
-  // event_tree->Branch("event",  &raw_event);
-  // head_tree ->Branch("header", &raw_header);
-  // gps_tree  ->Branch("gps",    &attitude);
+// XMacro test
+// signature: FILETYPE, BRANCHNAME, TREENAME
+#define EMPTY
+#define FILES_TO_CREATE \
+X(RawEvent,  event,  eventTree, eventFile) \
+X(RawHeader, header, headTree , headFile) \
+X(Attitude,  gps,    gpsTree  , gpsFile)
 
 int main(){
   pueo_handle_t hndl;
@@ -55,10 +54,19 @@ int main(){
     exit(1);
   }
 
-  std::unordered_map<UInt_t, TFile *> all_runs_found_thus_far; // dictionary
-  TFile * eventFile = nullptr;
-  TTree * eventTree = nullptr;
-  pueo::RawEvent * event = nullptr;
+  // all runs (to be) encountered by this program (in the while loop)
+  std::unordered_map<UInt_t, std::unordered_map<std::string, TFile *>> all_runs_found_thus_far;
+  // okay maybe requiring to find 4 times to locate the pointer is not the best solution,
+  // but this is more scalable,
+  // and I think using string as key is less error prone than std::array<TFile *, 3>
+
+#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME)\
+  TFile * FILENAME = nullptr;\
+  TTree * TREENAME = nullptr;\
+  FILETYPE * BRANCHNAME = nullptr;
+  FILES_TO_CREATE
+  #undef X
+
   pueo_packet_t * pkt = nullptr; // TODO: do I need to free the packet?
 
   while(pueo_ll_read_realloc(&hndl, &pkt) > 0)
@@ -77,39 +85,57 @@ int main(){
         {
           const pueo_full_waveforms_t * fwf = (const pueo_full_waveforms_t *)(pkt->payload);
           UInt_t run = fwf->run;
-          event = new pueo::RawEvent(fwf);
+#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
+          BRANCHNAME = new FILETYPE(fwf);
+          FILES_TO_CREATE
+          #undef X
 
           auto search_result = all_runs_found_thus_far.find(run);
           if ( search_result != all_runs_found_thus_far.end() ) // ie. we've seen this run before
           {
-            eventFile = search_result->second;
-            printf("found run%d, retrieved %s\n", run, eventFile->GetName());
-            eventTree = eventFile->Get<TTree>("eventTree");
+#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
+            FILENAME = search_result->second.find(#FILENAME)->second; \
+            TREENAME = FILENAME->Get<TTree>(#TREENAME);
+            FILES_TO_CREATE
+            #undef X
 
           } else { 
             // ie. never encounter this run before, but the run might already exist on disk
             fs::exists(fs::path(Form("run%d", run))) ? : fs::create_directory(Form("run%d", run));
 
             // create a new TFile if file doesn't exist on disk already, update (retrieve) if it does
-            eventFile = new TFile(Form("run%d/eventFile%d.root", run, run),"update");
-
-            auto a_new_pair = std::make_pair(run, eventFile);
-            all_runs_found_thus_far.insert(a_new_pair);
+#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
+            FILENAME = new TFile(Form("run%d/" #FILENAME "%d.root", run, run),"update");
+            FILES_TO_CREATE
+            #undef X
+            // insert the new files into the dictionary
+#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
+            all_runs_found_thus_far[run][#FILENAME] = FILENAME;
+            FILES_TO_CREATE
+            #undef X
 
             // if the tree already exists, retrive it; else, create it
-            if (eventFile->GetListOfKeys()->Contains("eventTree")) 
-            {
-              eventTree = eventFile->Get<TTree>("eventTree");
-              eventTree->SetBranchAddress("event", event);
-            } else {
-              eventTree = new TTree("eventTree", "eventTree"); // create a new tree and
-              eventTree->SetDirectory(eventFile);       // explicitly set its associated TFile, 
-              eventTree->Branch("event", &event);      // lest ROOT does weird shit
+#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
+            if (FILENAME->GetListOfKeys()->Contains(#TREENAME)) \
+            {\
+              TREENAME = eventFile->Get<TTree>("eventTree");\
+              TREENAME->SetBranchAddress(#BRANCHNAME, &BRANCHNAME);\
+            } else {\
+              TREENAME = new TTree(#TREENAME, #TREENAME);\
+              TREENAME->SetDirectory(FILENAME);\
+              TREENAME->Branch(#BRANCHNAME, &BRANCHNAME);\
             }
-          }
-          eventTree->Fill();
-          delete event;
-          event=nullptr;
+          FILES_TO_CREATE
+          #undef X
+        }
+
+#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
+          TREENAME->Fill(); \
+          delete BRANCHNAME; \
+          BRANCHNAME=nullptr;
+          FILES_TO_CREATE
+          #undef X
+
           break;
         }
       default: 
@@ -120,7 +146,7 @@ int main(){
   // kOverwrite: repalces old metadata (ie don't make new cycles)
   //   https://root-forum.cern.ch/t/adding-entries-to-a-ttree/9575/2
   //   https://root.cern.ch/doc/master/classTObject.html#aeac9082ad114b6702cb070a8a9f8d2ed
-  for (auto & pair: all_runs_found_thus_far){
+  for (auto & pair: eventDict){
     pair.second->Write(nullptr, TObject::kOverwrite);
     printf("closing file %s", pair.second->GetName());
     pair.second->Close();
@@ -204,6 +230,7 @@ void dictionary_logic_test()
     } 
     else
     {
+      // ie. never encounter this run before, but the run might already exist on disk
       fs::exists(fs::path(Form("run%d", r))) ? : fs::create_directory(Form("run%d", r));
       
       // create a new TFile if file doesn't exist on disk already, update (retrieve) if it does
