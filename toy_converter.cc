@@ -34,14 +34,7 @@ namespace fs =std::filesystem;
 using namespace pueo;
 using namespace pueo::nav;
 
-#define STRINGIFY(X) _STRINGIFY(X)
-#define _STRINGIFY(X) #X
-#define CONCAT(X,Y) _CONCAT(X,Y)
-#define _CONCAT(X,Y) X##Y
-
-// XMacro test
-// signature: FILETYPE, BRANCHNAME, TREENAME
-#define EMPTY
+// signature: FILETYPE, BRANCHNAME, TREENAME, FILENAME (filename w/o <run>.root suffix)
 #define FILES_TO_CREATE \
 X(RawEvent,  event,  eventTree, eventFile) \
 X(RawHeader, header, headTree , headFile) \
@@ -105,7 +98,7 @@ int main(){
 
             // create a new TFile if file doesn't exist on disk already, update (retrieve) if it does
 #define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
-            FILENAME = new TFile(Form("run%d/" #FILENAME "%d.root", run, run),"update");
+            FILENAME = TFile::Open( Form("run%d/" #FILENAME "%d.root", run, run),"update" );
             FILES_TO_CREATE
             #undef X
             // insert the new files into the dictionary
@@ -151,7 +144,7 @@ int main(){
 #define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
     FILENAME = pair.second.find(#FILENAME)->second;\
     FILENAME->Write("", TObject::kOverwrite);\
-    printf("closing file %s", FILENAME->GetName());\
+    printf("closing file %s\n", FILENAME->GetName());\
     FILENAME->Close();
     FILES_TO_CREATE
     #undef X
