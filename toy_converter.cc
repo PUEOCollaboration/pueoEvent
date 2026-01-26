@@ -32,61 +32,21 @@
 
 namespace fs =std::filesystem;
 
-// this is just a  test
-void toy_converter()
-{
-  int runs[3] {1,2,1};
-  int r=-1;
-  std::unordered_map<UInt_t, TFile *> all_runs; // dictionary
+  // TFile event_file("eventFile.root", "RECREATE");
+  // TFile head_file ("headFile.root" , "RECREATE");
+  // TFile gps_file  ("gpsEvent.root" , "RECREATE");
 
-  TFile * current_file = nullptr;
-  TTree * current_tree = nullptr;
+  // TTree * event_tree = new TTree("eventTree", "eventTree");
+  // TTree * head_tree  = new TTree("headTree",  "headTree");
+  // TTree * gps_tree   = new TTree("gpsTree",   "gpsTree");
 
-  for (int i=0; i<std::size(runs); ++i) 
-  {
-    r = runs[i];
+  // pueo::RawEvent * raw_event;
+  // pueo::RawHeader raw_header;
+  // pueo::nav::Attitude attitude;
 
-    if ( all_runs.find(r) != all_runs.end() ) // run number exists in dictionary
-    {
-      current_file = all_runs.find(r)->second;
-      current_tree = current_file->Get<TTree>("runTree");
-      printf("found run%d\n",runs[i]);
-    } 
-    else
-    {
-      fs::exists(fs::path(Form("run%d", r))) ? : fs::create_directory(Form("run%d", r));
-      
-      // create a new TFile if file doesn't exist on disk already, update (retrieve) if it does
-      current_file = new TFile(Form("run%d/run%d.root", r, r),"update");
-
-      auto me_pair = std::make_pair( r, current_file);
-      all_runs.insert(me_pair);
-
-      // if the tree already exists, retrive it; else, create it
-      if (current_file->GetListOfKeys()->Contains("runTree")) 
-      {
-        current_tree = current_file->Get<TTree>("runTree");
-        current_tree->SetBranchAddress("run", &r);
-      } 
-      else 
-      {
-        current_tree = new TTree("runTree", "runTree"); // create a new tree and
-        current_tree->SetDirectory(current_file);       // explicitly set its associated TFile, 
-        current_tree->Branch("run", &r);                // lest ROOT does weird shit
-      }
-    }
-    current_tree->Fill();
-  }
-
-  for (auto& pair: all_runs)
-  {
-    printf("%s\n", pair.second->GetName());
-    pair.second->Write();
-    pair.second->Close();
-  }
-}
-
-
+  // event_tree->Branch("event",  &raw_event);
+  // head_tree ->Branch("header", &raw_header);
+  // gps_tree  ->Branch("gps",    &attitude);
 
 int main(){
   pueo_handle_t hndl;
@@ -167,28 +127,6 @@ int main(){
   }
 }
 
-
-
-
-
-
-  // TFile event_file("eventFile.root", "RECREATE");
-  // TFile head_file ("headFile.root" , "RECREATE");
-  // TFile gps_file  ("gpsEvent.root" , "RECREATE");
-
-  // TTree * event_tree = new TTree("eventTree", "eventTree");
-  // TTree * head_tree  = new TTree("headTree",  "headTree");
-  // TTree * gps_tree   = new TTree("gpsTree",   "gpsTree");
-
-  // pueo::RawEvent * raw_event;
-  // pueo::RawHeader raw_header;
-  // pueo::nav::Attitude attitude;
-
-  // event_tree->Branch("event",  &raw_event);
-  // head_tree ->Branch("header", &raw_header);
-  // gps_tree  ->Branch("gps",    &attitude);
-
-
       // case PUEO_SINGLE_WAVEFORM:{
       //   break;
       // }
@@ -243,3 +181,57 @@ int main(){
       // case PUEO_SAVED_PRIORITIES:{
       //   break;
       // }
+
+// Testing the behavior as described in the pull request.
+void dictionary_logic_test()
+{
+  int runs[3] {1,2,1};
+  int r=-1;
+  std::unordered_map<UInt_t, TFile *> all_runs; // dictionary
+
+  TFile * current_file = nullptr;
+  TTree * current_tree = nullptr;
+
+  for (int i=0; i<std::size(runs); ++i) 
+  {
+    r = runs[i];
+
+    if ( all_runs.find(r) != all_runs.end() ) // run number exists in dictionary
+    {
+      current_file = all_runs.find(r)->second;
+      current_tree = current_file->Get<TTree>("runTree");
+      printf("found run%d\n",runs[i]);
+    } 
+    else
+    {
+      fs::exists(fs::path(Form("run%d", r))) ? : fs::create_directory(Form("run%d", r));
+      
+      // create a new TFile if file doesn't exist on disk already, update (retrieve) if it does
+      current_file = new TFile(Form("run%d/run%d.root", r, r),"update");
+
+      auto me_pair = std::make_pair( r, current_file);
+      all_runs.insert(me_pair);
+
+      // if the tree already exists, retrive it; else, create it
+      if (current_file->GetListOfKeys()->Contains("runTree")) 
+      {
+        current_tree = current_file->Get<TTree>("runTree");
+        current_tree->SetBranchAddress("run", &r);
+      } 
+      else 
+      {
+        current_tree = new TTree("runTree", "runTree"); // create a new tree and
+        current_tree->SetDirectory(current_file);       // explicitly set its associated TFile, 
+        current_tree->Branch("run", &r);                // lest ROOT does weird shit
+      }
+    }
+    current_tree->Fill();
+  }
+
+  for (auto& pair: all_runs)
+  {
+    printf("%s\n", pair.second->GetName());
+    pair.second->Write();
+    pair.second->Close();
+  }
+}
