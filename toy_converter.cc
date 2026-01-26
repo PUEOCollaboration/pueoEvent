@@ -146,10 +146,15 @@ int main(){
   // kOverwrite: repalces old metadata (ie don't make new cycles)
   //   https://root-forum.cern.ch/t/adding-entries-to-a-ttree/9575/2
   //   https://root.cern.ch/doc/master/classTObject.html#aeac9082ad114b6702cb070a8a9f8d2ed
-  for (auto & pair: eventDict){
-    pair.second->Write(nullptr, TObject::kOverwrite);
-    printf("closing file %s", pair.second->GetName());
-    pair.second->Close();
+  for (auto & pair: all_runs_found_thus_far)
+  {
+#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
+    FILENAME = pair.second.find(#FILENAME)->second;\
+    FILENAME->Write("", TObject::kOverwrite);\
+    printf("closing file %s", FILENAME->GetName());\
+    FILENAME->Close();
+    FILES_TO_CREATE
+    #undef X
   }
 }
 
