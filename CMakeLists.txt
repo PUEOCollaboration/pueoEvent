@@ -51,7 +51,7 @@ find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
 
 if (PUEORAWDATA)
-  target_compile_options(${PROJECT_NAME} PRIVATE -DHAVE_PUEORAW_DATA)
+  target_compile_options(${PROJECT_NAME} PRIVATE -DHAVE_PUEORAWDATA)
   target_link_libraries(${PROJECT_NAME} PRIVATE ${PUEORAWDATA})
   message("Found libpueorawdata")
 else()
