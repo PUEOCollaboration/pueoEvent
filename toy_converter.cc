@@ -1,12 +1,17 @@
-#include "pueo/RawEvent.h"  // this repo
+// @file  toy_converter.cc
+// @brief converts pueo's raw data to the CERN ROOT format defined by this repo (pueoEvent)
+// @note  usage: ./convert <raw_file_path> <output_directory>
+
+#include "pueo/RawEvent.h"  // from this repo
 #include "pueo/RawHeader.h"
 #include "pueo/Nav.h"
-#include "pueo/rawio.h"     // pueorawdata
-#include "TTree.h"          // CERN ROOT
+#include "pueo/rawio.h"     // from pueorawdata
+#include "TTree.h"          // from CERN ROOT
 #include "TFile.h"
 #include <stdio.h>
 #include <filesystem>
 
+// basically copied from pueorawdata's rawdata.h (see definition of the enum pueo_datatype_t)
 #define  PUEO_PACKET_INVALID   0
 #define  PUEO_PACKET_HEAD      0x0ead
 #define  PUEO_FULL_WAVEFORMS   0xda7a
@@ -29,26 +34,34 @@
 #define  PUEO_PRIO_STATUS      0x5cad
 #define  PUEO_SAVED_PRIORITIES 0x7135  
 
-namespace fs =std::filesystem;
+namespace fs = std::filesystem;
 using namespace pueo;
 using namespace pueo::nav;
 
-// signature: FILETYPE, BRANCHNAME, TREENAME, FILENAME (filename w/o <run>.root suffix)
+// XMacro signature: FILETYPE, BRANCHNAME, TREENAME, FILENAME (filename w/o <run>.root suffix)
 #define FILES_TO_CREATE \
 X(RawEvent,  event,  eventTree, eventFile) \
 X(RawHeader, header, headTree , headFile) \
 X(Attitude,  gps,    gpsTree  , gpsFile)
 
-int main(){
+int main(int argc, char** argv){
+  if(argc != 3) {
+    fprintf(stderr, "\e[1;31mUsage: %s <raw_file_path> <output_dir>", argv[0]);
+    exit(1);
+  }
+  char * raw_file_path = argv[1];
+  char * target_dir = argv[2];
+
+
   pueo_handle_t hndl;
-  if (pueo_handle_init(&hndl, "../2025-12-31-R005.wfs", "r") < 0 ) {
+  if (pueo_handle_init(&hndl, Form("%s", raw_file_path), "r") < 0 ) {
     fprintf(stderr, "\e\[1;31mFile handle init failed (%s, line %d)\n",__PRETTY_FUNCTION__,__LINE__);
     exit(1);
   }
 
   // all runs (to be) encountered by this program (in the while loop)
   std::unordered_map<UInt_t, std::unordered_map<std::string, TFile *>> all_runs_found_thus_far;
-  // okay maybe requiring to find 4 times to locate the pointer is not the best solution,
+  // okay maybe `find()`ing 4 times to locate the pointers is not the best solution,
   // but this is more scalable,
   // and I think using string as key is less error prone than std::array<TFile *, 3>
 
@@ -91,13 +104,13 @@ int main(){
             FILES_TO_CREATE
             #undef X
 
-          } else { 
-            // ie. never encounter this run before, but the run might already exist on disk
-            fs::exists(fs::path(Form("run%d", run))) ? : fs::create_directory(Form("run%d", run));
+          } else { // ie. never encountered this run before, but the run might already exist on disk
+            fs::exists(fs::path(Form("%s/run%d", target_dir, run))) ? :
+              fs::create_directory(Form("%s/run%d", target_dir, run));
 
             // create a new TFile if file doesn't exist on disk already, update (retrieve) if it does
 #define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
-            FILENAME = TFile::Open( Form("run%d/" #FILENAME "%d.root", run, run),"update" );
+            FILENAME = TFile::Open( Form("%s/run%d/" #FILENAME "%d.root", target_dir, run, run),"update" );
             FILES_TO_CREATE
             #undef X
             // insert the new files into the dictionary
