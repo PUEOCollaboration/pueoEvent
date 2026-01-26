@@ -1,12 +1,11 @@
-#include "TTree.h"
-#include "TFile.h"
-#include "pueo/RawEvent.h"
+#include "pueo/RawEvent.h"  // this repo
 #include "pueo/RawHeader.h"
 #include "pueo/Nav.h"
-#include "pueo/rawio.h"
+#include "pueo/rawio.h"     // pueorawdata
+#include "TTree.h"          // CERN ROOT
+#include "TFile.h"
 #include <stdio.h>
 #include <filesystem>
-#include "ROOT/RDataFrame.hxx"
 
 #define  PUEO_PACKET_INVALID   0
 #define  PUEO_PACKET_HEAD      0x0ead
@@ -53,9 +52,9 @@ int main(){
   // but this is more scalable,
   // and I think using string as key is less error prone than std::array<TFile *, 3>
 
-#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME)\
-  TFile * FILENAME = nullptr;\
-  TTree * TREENAME = nullptr;\
+#define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
+  TFile * FILENAME = nullptr; \
+  TTree * TREENAME = nullptr; \
   FILETYPE * BRANCHNAME = nullptr;
   FILES_TO_CREATE
   #undef X
@@ -110,13 +109,13 @@ int main(){
             // if the tree already exists, retrive it; else, create it
 #define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
             if (FILENAME->GetListOfKeys()->Contains(#TREENAME)) \
-            {\
-              TREENAME = eventFile->Get<TTree>("eventTree");\
-              TREENAME->SetBranchAddress(#BRANCHNAME, &BRANCHNAME);\
-            } else {\
-              TREENAME = new TTree(#TREENAME, #TREENAME);\
-              TREENAME->SetDirectory(FILENAME);\
-              TREENAME->Branch(#BRANCHNAME, &BRANCHNAME);\
+            { \
+              TREENAME = eventFile->Get<TTree>("eventTree"); \
+              TREENAME->SetBranchAddress(#BRANCHNAME, &BRANCHNAME); \
+            } else { \
+              TREENAME = new TTree(#TREENAME, #TREENAME); \
+              TREENAME->SetDirectory(FILENAME); \
+              TREENAME->Branch(#BRANCHNAME, &BRANCHNAME); \
             }
           FILES_TO_CREATE
           #undef X
@@ -131,6 +130,60 @@ int main(){
 
           break;
         }
+      case PUEO_SINGLE_WAVEFORM:{
+        break;
+      }
+      case PUEO_ENCODED_WAVEFORM:{
+        break;
+      }
+      case PUEO_NAV_ATT:{
+        break;
+      }
+      case PUEO_NAV_SAT:{
+        break;
+      }
+      case PUEO_NAV_POS:{
+        break;
+      }
+      case PUEO_DAQ_HSK:{
+        break;
+      }
+      case PUEO_DAQ_HSK_SUMMARY:{
+        break;
+      }
+      case PUEO_SS:{
+        break;
+      }
+      case PUEO_SENSORS_TELEM:{
+        break;
+      }
+      case PUEO_SENSORS_DISK:{
+        break;
+      }
+      case PUEO_CMD_ECHO:{
+        break;
+      }
+      case PUEO_LOGS:{
+        break;
+      }
+      case PUEO_FILE_DOWNLOAD:{
+        break;
+      }
+      case PUEO_SLOW:{
+        break;
+      }
+      case PUEO_TIMEMARK:{
+        break;
+      }
+      case PUEO_STARTRACKER:{
+        break;
+      }
+      case PUEO_PRIO_STATUS:{
+        break;
+      }
+      case PUEO_SAVED_PRIORITIES:{
+        break;
+      }
       default: 
         break;
     }
@@ -142,69 +195,14 @@ int main(){
   for (auto & pair: all_runs_found_thus_far)
   {
 #define X(FILETYPE, BRANCHNAME, TREENAME, FILENAME) \
-    FILENAME = pair.second.find(#FILENAME)->second;\
-    FILENAME->Write("", TObject::kOverwrite);\
-    printf("closing file %s\n", FILENAME->GetName());\
+    FILENAME = pair.second.find(#FILENAME)->second; \
+    FILENAME->Write("", TObject::kOverwrite); \
+    printf("closing file %s\n", FILENAME->GetName()); \
     FILENAME->Close();
     FILES_TO_CREATE
     #undef X
   }
 }
-
-      // case PUEO_SINGLE_WAVEFORM:{
-      //   break;
-      // }
-      // case PUEO_ENCODED_WAVEFORM:{
-      //   break;
-      // }
-      // case PUEO_NAV_ATT:{
-      //   break;
-      // }
-      // case PUEO_NAV_SAT:{
-      //   break;
-      // }
-      // case PUEO_NAV_POS:{
-      //   break;
-      // }
-      // case PUEO_DAQ_HSK:{
-      //   break;
-      // }
-      // case PUEO_DAQ_HSK_SUMMARY:{
-      //   break;
-      // }
-      // case PUEO_SS:{
-      //   break;
-      // }
-      // case PUEO_SENSORS_TELEM:{
-      //   break;
-      // }
-      // case PUEO_SENSORS_DISK:{
-      //   break;
-      // }
-      // case PUEO_CMD_ECHO:{
-      //   break;
-      // }
-      // case PUEO_LOGS:{
-      //   break;
-      // }
-      // case PUEO_FILE_DOWNLOAD:{
-      //   break;
-      // }
-      // case PUEO_SLOW:{
-      //   break;
-      // }
-      // case PUEO_TIMEMARK:{
-      //   break;
-      // }
-      // case PUEO_STARTRACKER:{
-      //   break;
-      // }
-      // case PUEO_PRIO_STATUS:{
-      //   break;
-      // }
-      // case PUEO_SAVED_PRIORITIES:{
-      //   break;
-      // }
 
 // Testing the behavior as described in the pull request.
 void dictionary_logic_test()
