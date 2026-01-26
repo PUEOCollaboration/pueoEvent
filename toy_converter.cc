@@ -96,9 +96,9 @@ int main(){
   }
 
   std::unordered_map<UInt_t, TFile *> all_runs_found_thus_far; // dictionary
-  TFile * current_file = nullptr;
-  TTree * current_tree = nullptr;
-  pueo::RawEvent * raw_event = nullptr;
+  TFile * eventFile = nullptr;
+  TTree * eventTree = nullptr;
+  pueo::RawEvent * event = nullptr;
   pueo_packet_t * pkt = nullptr; // TODO: do I need to free the packet?
 
   while(pueo_ll_read_realloc(&hndl, &pkt) > 0)
@@ -117,39 +117,39 @@ int main(){
         {
           const pueo_full_waveforms_t * fwf = (const pueo_full_waveforms_t *)(pkt->payload);
           UInt_t run = fwf->run;
-          raw_event = new pueo::RawEvent(fwf);
+          event = new pueo::RawEvent(fwf);
 
           auto search_result = all_runs_found_thus_far.find(run);
           if ( search_result != all_runs_found_thus_far.end() ) // ie. we've seen this run before
           {
-            current_file = search_result->second;
-            printf("found run%d, retrieved %s\n", run, current_file->GetName());
-            current_tree = current_file->Get<TTree>("eventTree");
+            eventFile = search_result->second;
+            printf("found run%d, retrieved %s\n", run, eventFile->GetName());
+            eventTree = eventFile->Get<TTree>("eventTree");
 
           } else { 
             // ie. never encounter this run before, but the run might already exist on disk
             fs::exists(fs::path(Form("run%d", run))) ? : fs::create_directory(Form("run%d", run));
 
             // create a new TFile if file doesn't exist on disk already, update (retrieve) if it does
-            current_file = new TFile(Form("run%d/eventFile%d.root", run, run),"update");
+            eventFile = new TFile(Form("run%d/eventFile%d.root", run, run),"update");
 
-            auto a_new_pair = std::make_pair(run, current_file);
+            auto a_new_pair = std::make_pair(run, eventFile);
             all_runs_found_thus_far.insert(a_new_pair);
 
             // if the tree already exists, retrive it; else, create it
-            if (current_file->GetListOfKeys()->Contains("eventTree")) 
+            if (eventFile->GetListOfKeys()->Contains("eventTree")) 
             {
-              current_tree = current_file->Get<TTree>("eventTree");
-              current_tree->SetBranchAddress("event", raw_event);
+              eventTree = eventFile->Get<TTree>("eventTree");
+              eventTree->SetBranchAddress("event", event);
             } else {
-              current_tree = new TTree("eventTree", "eventTree"); // create a new tree and
-              current_tree->SetDirectory(current_file);       // explicitly set its associated TFile, 
-              current_tree->Branch("event", &raw_event);      // lest ROOT does weird shit
+              eventTree = new TTree("eventTree", "eventTree"); // create a new tree and
+              eventTree->SetDirectory(eventFile);       // explicitly set its associated TFile, 
+              eventTree->Branch("event", &event);      // lest ROOT does weird shit
             }
           }
-          current_tree->Fill();
-          delete raw_event;
-          raw_event=nullptr;
+          eventTree->Fill();
+          delete event;
+          event=nullptr;
           break;
         }
       default: 
