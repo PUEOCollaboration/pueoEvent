@@ -5,6 +5,7 @@
 #include "pueo/RawEvent.h"  // from this repo
 #include "pueo/RawHeader.h"
 #include "pueo/Nav.h"
+#include "pueo/Dataset.h"   // from this repo, included for testing purposes
 #include "pueo/rawio.h"     // from pueorawdata
 #include "TTree.h"          // from CERN ROOT
 #include "TFile.h"
@@ -42,7 +43,13 @@ using namespace pueo::nav;
 #define FILES_TO_CREATE \
 X(RawEvent,  event,  eventTree, eventFile) \
 X(RawHeader, header, headTree , headFile) \
-X(Attitude,  gps,    gpsTree  , gpsFile)
+X(Attitude,  gps,    gpsTree  , gpsEvent)
+
+// Quick and dirty test; remember to define environment variable PUEO_ROOT_DATA
+void toy_converter(int run){
+  pueo::Dataset d(run);
+  printf("The Dataset has been loaded with run: %d", d.getCurrRun());
+}
 
 int main(int argc, char** argv){
   if(argc != 3) {

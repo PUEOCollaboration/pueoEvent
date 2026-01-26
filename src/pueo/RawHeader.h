@@ -46,7 +46,7 @@ public:
   payloadTime(fwf->readout_time.utc_secs), // note: actually not sure about this
   payloadTimeUs(fwf->readout_time.utc_secs * 1e3), // nor this
   gpsSubTime(),
-  eventNumber(),
+  eventNumber(fwf->event),
   priority(),
   flags(),
   peakThetaBin(),
