@@ -1,4 +1,7 @@
-// Implementation of the Dataset class, essentially a subset of `Dataset.cc`
+// Alternative implementation of the Dataset class;
+// Essentially this just moves the original `Dataset.cc`'s function definitions into isolated
+// compilation units so that things are grouped together better
+// Maybe one day we'd break the class down into smaller units and hopefully this helps with that?
 
 #include "pueo/Dataset.h"
 #include "pueo/UsefulEvent.h"
@@ -7,9 +10,7 @@
 #include "pueo/TruthEvent.h" 
 #include "pueo/Version.h" 
 #include "pueo/Conventions.h"
-
 #include <math.h>
-#include "TFile.h" 
 #include "TTree.h" 
 #include <stdlib.h>
 #include "TEventList.h" 
@@ -441,7 +442,6 @@ int pueo::Dataset::previousInPlaylist()
 
 pueo::TruthEvent * pueo::Dataset::truth(bool force_reload) 
 {
-
   if (!fTruthTree) return 0; 
   if (fTruthTree->GetReadEntry() != fWantedEntry || force_reload) 
   {
