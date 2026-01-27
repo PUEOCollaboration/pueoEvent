@@ -1,6 +1,12 @@
 // Implementation of the core of the Dataset class (ie the constructor and its helpers)
 #include "pueo/Dataset.h"
 #include "pueo/Version.h"
+#include "pueo/RawEvent.h"
+#include "pueo/UsefulEvent.h"
+#include "pueo/Nav.h"
+#include "pueo/TruthEvent.h"
+#include "pueo/RawHeader.h"
+#include "TEventList.h"
 #include "TFile.h"
 #include "TTree.h"
 #include "TTreeIndex.h"
@@ -23,15 +29,6 @@ pueo::Dataset::Dataset(int run,  DataDirectory version, bool decimated, Blinding
   loadedBlindTrees = false;
   zeroBlindPointers();
   loadBlindTrees(); // want this to come after opening the data files to try to have correct ANITA flight
-}
-
-const char * pueo::Dataset::checkIfFilesExist(const std::vector<const char *>& files)
-{
-  for (const char * f: files) 
-  {
-    if(checkIfFileExists(f)) return f;
-  }
-  return nullptr; 
 }
 
 bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec) 
@@ -214,57 +211,41 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   return true; 
 }
 
-namespace {
-  const char  pueo_root_data_dir_env[]  = "PUEO_ROOT_DATA"; 
-  const char  pueo_versioned_root_data_dir_env[]  = "PUEO%d_ROOT_DATA"; 
-  const char  mc_root_data_dir[] = "PUEO_MC_DATA"; 
-}
-const char * pueo::Dataset::getDataDir(DataDirectory dir) 
+pueo::Dataset::~Dataset() 
 {
-  int version = (int) dir; 
+  unloadRun(); 
+  if (fHeader) delete fHeader;
+  if (fUsefulEvent) delete fUsefulEvent;
+  if (fRawEvent) delete fRawEvent;
+  if (fGps) delete fGps; 
+  if (fTruth) delete fTruth; 
+  if (fCutList) delete fCutList;
 
-  //if anita version number is defined in argument
-  if (version > 0) 
-  {
-    char env_string[sizeof(pueo_versioned_root_data_dir_env)+20]; 
-    sprintf(env_string,pueo_versioned_root_data_dir_env, version); 
-    const char * tryme = getenv(env_string); 
-    if (!tryme)
-    {
-      fprintf(stderr,"%s, not defined, will try %s\n",env_string, pueo_root_data_dir_env); 
-    }
-    else return tryme; 
-  }
-  
-  if (version == 0) //if monte carlo
-  {
-    const char * tryme = getenv(mc_root_data_dir); 
-    if (!tryme)
-    {
-      fprintf(stderr,"%s, not defined, will try %s\n",mc_root_data_dir, pueo_root_data_dir_env); 
-    }
-    else return tryme; 
-  }
+  // // Since we've set the directory to 0 for these,
+  // // ROOT won't delete them when the fBlindFile is closed
+  // // So we need to do it here.
+  // for(int pol=0; pol < AnitaPol::kNotAPol; pol++){
+  //   if(fBlindHeadTree[pol]){
+  //     delete fBlindHeadTree[pol];
+  //     fBlindHeadTree[pol] = NULL;
+  //   }
+  //   if(fBlindEventTree[pol]){
+  //     delete fBlindEventTree[pol];
+  //     fBlindEventTree[pol] = NULL;
+  //   }
+  //   if(fBlindHeader[pol]){
+  //     delete fBlindHeader[pol];
+  //     fBlindHeader[pol] = NULL;
+  //   }
+  //   if(fBlindEvent[pol]){
+  //     delete fBlindEvent[pol];
+  //     fBlindEvent[pol] = NULL;
+  //   }
+  // }
 
-  //if version argument is default (-1)
-  //if PUEO_ROOT_DATA exists return that, otherwise return what AnitaVersion thinks it should be
-  if (const char * tryme = getenv(pueo_root_data_dir_env))
-  {
-    return tryme; 
-  }
-  else
-  {
-    char env_string[sizeof(pueo_versioned_root_data_dir_env)+20]; 
-    sprintf(env_string,pueo_versioned_root_data_dir_env, version::get());
-    if (const char *tryme = getenv(env_string)) 
-    {
-      return tryme;
-    } 
-    else 
-    {
-      fprintf(stderr,"%s, not defined, please define it!", pueo_root_data_dir_env); 
-      return 0;
-    }
+  if(fBlindFile){
+    fBlindFile->Close();
+    delete fBlindFile;
   }
 }
 

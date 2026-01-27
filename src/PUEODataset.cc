@@ -15,7 +15,6 @@
 #include "TEventList.h" 
 #include "TCut.h" 
 #include <iostream>
-#include <fstream>
 
 void  pueo::Dataset::unloadRun() 
 {
@@ -228,93 +227,6 @@ int pueo::Dataset::getEntry(int entryNumber)
   version::setVersionFromUnixTime(header()->realTime); 
 
   return fDecimated ? fDecimatedEntry : fWantedEntry; 
-}
-
-int pueo::Dataset::getEvent(int eventNumber, bool quiet)
-{
-
-  int entry  =  (fDecimated ? fDecimatedHeadTree : fHeadTree)->GetEntryNumberWithIndex(eventNumber); 
-
-  if (entry < 0 && (eventNumber < fHeadTree->GetMinimum("eventNumber") || eventNumber > fHeadTree->GetMaximum("eventNumber")))
-  {
-    int run = getRunContainingEventNumber(eventNumber);
-    if(run > 0)
-    {
-      loadRun(run, datadir, fDecimated);
-      if (!quiet) fprintf(stderr, "changed run to %d\n", run);
-      getEvent(eventNumber, quiet); 
-    }
-  }
-  else if (entry < 0 ) 
-  {
-      if (!quiet) fprintf(stderr,"WARNING: event %lld not found in header tree\n", fWantedEntry); 
-      if (fDecimated) 
-      {
-        if (!quiet) fprintf(stderr,"\tWe are using decimated tree, so maybe that's why?\n"); 
-      }
-      return -1; 
-   }
-
-  getEntry(entry);
-  return fDecimated ? fDecimatedEntry : fWantedEntry; 
-}
-  
-pueo::Dataset::~Dataset() 
-{
-
-  unloadRun(); 
-
-
-
-  if (fHeader) 
-    delete fHeader; 
-
-  if (fUsefulEvent) 
-  {
-    delete fUsefulEvent; 
-  }
-
-  if (fRawEvent) 
-    delete fRawEvent; 
-
-  if (fGps) 
-    delete fGps; 
-
-
-  if (fTruth) 
-    delete fTruth; 
-
-  if (fCutList) 
-    delete fCutList;
-
-  // // Since we've set the directory to 0 for these,
-  // // ROOT won't delete them when the fBlindFile is closed
-  // // So we need to do it here.
-  // for(int pol=0; pol < AnitaPol::kNotAPol; pol++){
-  //   if(fBlindHeadTree[pol]){
-  //     delete fBlindHeadTree[pol];
-  //     fBlindHeadTree[pol] = NULL;
-  //   }
-  //   if(fBlindEventTree[pol]){
-  //     delete fBlindEventTree[pol];
-  //     fBlindEventTree[pol] = NULL;
-  //   }
-  //   if(fBlindHeader[pol]){
-  //     delete fBlindHeader[pol];
-  //     fBlindHeader[pol] = NULL;
-  //   }
-  //   if(fBlindEvent[pol]){
-  //     delete fBlindEvent[pol];
-  //     fBlindEvent[pol] = NULL;
-  //   }
-  // }
-
-  if(fBlindFile){
-    fBlindFile->Close();
-    delete fBlindFile;
-  }
-
-  
 }
 
 int pueo::Dataset::previousEvent() 
@@ -551,84 +463,6 @@ int pueo::Dataset::previousInPlaylist()
 
 }
 
-int pueo::Dataset::loadPlaylist(const char* playlist)
-{
-  std::vector<std::vector<long> > runEv;
-  int rN;
-  int evN;
-  std::ifstream pl(playlist);
-  pl >> evN;
-  
-  // Simulated events
-  // As iceMC generates random eventNumbers, simulated data event numbers aren't linked to actual event numbers, so ignore evN restrictions
-  Bool_t simulatedData = false; // must be set to false for non-simulated data
-  if(simulatedData == true)
-    {
-      std::cout << "Using simulated data! Turn off the simulatedData variable if you are working with real data." << std::endl;
-      rN = evN;
-      pl >> evN;
-      std::vector<long> Row;
-      Row.push_back(rN);
-      Row.push_back(evN);
-      runEv.push_back(Row);
-      while(pl >> rN >> evN)
-	{
-	  std::vector<long> newRow;
-	  newRow.push_back(rN);
-	  newRow.push_back(evN);
-	  runEv.push_back(newRow);
-	}
-
-    }
-  else
-    {	
-      if(evN < 400)
-	{
-	  rN = evN;
-	  pl >> evN;
-	  std::vector<long> Row;
-	  Row.push_back(rN);
-	  Row.push_back(evN);
-	  runEv.push_back(Row);
-	  while(pl >> rN >> evN)
-	    {
-	      std::vector<long> newRow;
-	      newRow.push_back(rN);
-	      newRow.push_back(evN);
-	      runEv.push_back(newRow);
-	    }
-	}
-      else
-	{
-	  rN = getRunContainingEventNumber(evN);
-	  if(rN == -1)
-	    {
-	      fprintf(stderr, "Something is wrong with your playlist\n");
-	      return -1;
-	    }
-	  std::vector<long> Row;
-	  Row.push_back(rN);
-	  Row.push_back(evN);
-	  runEv.push_back(Row);
-	  while(pl >> evN)
-	    {
-	      rN = getRunContainingEventNumber(evN);
-	      if(rN == -1)
-		{
-		  fprintf(stderr, "Something is wrong with your playlist\n");
-		  return -1;
-		}
-	      std::vector<long> newRow;
-	      newRow.push_back(rN);
-	      newRow.push_back(evN);
-	      runEv.push_back(newRow);
-	    }
-	}
-    }
-  fPlaylist = runEv;
-  return runEv.size();
-}
-
 pueo::TruthEvent * pueo::Dataset::truth(bool force_reload) 
 {
 
@@ -640,8 +474,6 @@ pueo::TruthEvent * pueo::Dataset::truth(bool force_reload)
 
   return fTruth; 
 }
-
-
 
 /**
  * Loop through list of events to overwrite for a given polarisation and return the fakeTreeEntry we need to overwrite

@@ -33,6 +33,69 @@ TString pueo::Dataset::getDescription(BlindingStrategy strat){
   return description;
 }
 
+const char * pueo::Dataset::checkIfFilesExist(const std::vector<const char *>& files)
+{
+  for (const char * f: files) 
+  {
+    if(checkIfFileExists(f)) return f;
+  }
+  return nullptr; 
+}
+
+namespace {
+  const char  pueo_root_data_dir_env[]  = "PUEO_ROOT_DATA"; 
+  const char  pueo_versioned_root_data_dir_env[]  = "PUEO%d_ROOT_DATA"; 
+  const char  mc_root_data_dir[] = "PUEO_MC_DATA"; 
+}
+const char * pueo::Dataset::getDataDir(DataDirectory dir) 
+{
+  int version = (int) dir; 
+
+  //if anita version number is defined in argument
+  if (version > 0) 
+  {
+    char env_string[sizeof(pueo_versioned_root_data_dir_env)+20]; 
+    sprintf(env_string,pueo_versioned_root_data_dir_env, version); 
+    const char * tryme = getenv(env_string); 
+    if (!tryme)
+    {
+      fprintf(stderr,"%s, not defined, will try %s\n",env_string, pueo_root_data_dir_env); 
+    }
+    else return tryme; 
+  }
+  
+  if (version == 0) //if monte carlo
+  {
+    const char * tryme = getenv(mc_root_data_dir); 
+    if (!tryme)
+    {
+      fprintf(stderr,"%s, not defined, will try %s\n",mc_root_data_dir, pueo_root_data_dir_env); 
+    }
+    else return tryme; 
+  }
+
+  //if version argument is default (-1)
+  //if PUEO_ROOT_DATA exists return that, otherwise return what AnitaVersion thinks it should be
+  if (const char * tryme = getenv(pueo_root_data_dir_env))
+  {
+    return tryme; 
+  }
+  else
+  {
+    char env_string[sizeof(pueo_versioned_root_data_dir_env)+20]; 
+    sprintf(env_string,pueo_versioned_root_data_dir_env, version::get());
+    if (const char *tryme = getenv(env_string)) 
+    {
+      return tryme;
+    } 
+    else 
+    {
+      fprintf(stderr,"%s, not defined, please define it!", pueo_root_data_dir_env); 
+      return 0;
+    }
+  }
+}
+
 namespace {
   TMutex run_at_time_mutex; 
   struct run_info
