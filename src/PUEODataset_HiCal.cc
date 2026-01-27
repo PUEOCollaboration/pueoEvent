@@ -1,5 +1,6 @@
 // Implementation of the HiCal portion of the Dataset class.
 // Created for organization purposes.
+// Self-contained, as in no functions in this unit calls functions defined elsewhere and vice-verse.
 // Mayhap we should just have a HiCal class?
 
 #include "pueo/Dataset.h"

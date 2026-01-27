@@ -14,6 +14,7 @@
  **/
 
 #include <vector>
+#include <unistd.h>
 #include "pueo/Conventions.h"
 #include "TString.h"
 #include "TRandom3.h"
@@ -355,6 +356,9 @@ namespace pueo
 
       DataDirectory datadir; 
 
+    private:
+      static bool checkIfFileExists(const char * file) {return access(file, R_OK) == 0;}
+      static const char * checkIfFilesExist(const std::vector<const char *>& files);
     
   };
 

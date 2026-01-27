@@ -1,4 +1,5 @@
 // Implementation of the legacy (ANITA) portion of the Dataset class
+// self-contained, as in no functions in this unit calls functions defined elsewhere and vice-verse
 
 #include "pueo/Dataset.h"
 #include "pueo/Conventions.h"
