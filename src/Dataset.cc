@@ -57,55 +57,15 @@
 #include <sstream>
 
 
-// from runToEvP*.txt
-static std::vector<UInt_t> firstEvents[pueo::k::NUM_PUEO+1];
-static std::vector<UInt_t> lastEvents[pueo::k::NUM_PUEO+1];
-static std::vector<Int_t> runs[pueo::k::NUM_PUEO+1];
+
+static TFile* fHiCalGpsFile[2];
+static TTree* fHiCalGpsTree[2];
+static Double_t fHiCalLon[2];
+static Double_t fHiCalLat[2];
+static Double_t fHiCalAlt[2];
+static Int_t fHiCalUnixTime[2];
 
 
-static std::vector<UInt_t> hiCalEventNumbers[pueo::k::NUM_PUEO+1];
-
-static TFile* fHiCalGpsFile;
-static TTree* fHiCalGpsTree;
-static Double_t fHiCalLon;
-static Double_t fHiCalLat;
-static Double_t fHiCalAlt;
-static Int_t fHiCalUnixTime;
-
-
-
-
-void pueo::Dataset::loadRunToEv(int pueo){
-  static TMutex m;
-  m.Lock();
-
-  const char* installDir = getenv("PUEO_UTIL_INSTALL_DIR");
-
-  TString fileName = TString::Format("%s/share/anitaCalib/runToEvP%d.txt", installDir, pueo);
-  std::ifstream runToEv(fileName.Data());
-  if (!runToEv.is_open()) {
-    std::cerr << "Error in " << __PRETTY_FUNCTION__ << " couldn't find " << fileName << std::endl;
-  }
-  else{
-    const int hopefullyMoreThanEnoughRuns = 500;
-    runs[pueo].reserve(hopefullyMoreThanEnoughRuns);
-    firstEvents[pueo].reserve(hopefullyMoreThanEnoughRuns);
-    lastEvents[pueo].reserve(hopefullyMoreThanEnoughRuns);
-
-    int run, evLow,evHigh;
-    // int elem = 0;
-    while (runToEv >> run >> evLow >> evHigh){
-      runs[pueo].push_back(run);
-      firstEvents[pueo].push_back(evLow);
-      lastEvents[pueo].push_back(evHigh);
-      // std::cout << anita << "\t" << elem << "\t" << runs[anita][elem] << "\t" << firstEvents[anita][elem] << "\t" << lastEvents[anita][elem] << std::endl;
-      // elem++;
-    }
-    // std::cout << "Finished reading in " << fileName << "!" << std::endl;
-    runToEv.close();
-  }
-  m.UnLock();
-}
 
 
 
@@ -371,18 +331,17 @@ pueo::UsefulEvent * pueo::Dataset::useful(bool force_load)
   if ((theStrat & kRandomizePolarity) && maybeInvertPolarity(fUsefulEvent->eventNumber))
   {
     // std::cerr << "Inverting event " << fUsefulEvent->eventNumber << std::endl;
-    for(int surf=0; surf < k::ACTIVE_SURFS; surf++){
-      for(int chan=0; chan < k::NUM_CHANS_PER_SURF; chan++){
-        int chanIndex = surf*k::NUM_CHANS_PER_SURF + chan;
-        for(size_t samp=0; samp < fUsefulEvent->volts[chanIndex].size(); samp++){
-          fUsefulEvent->volts[chanIndex][samp] *= -1;
-          fUsefulEvent->data[chanIndex][samp] *= -1; // do the pedestal subtracted data too
-        }
+    for(int ichan=0; ichan < k::NUM_DIGITZED_CHANNELS; ichan++)
+    {
+      for(size_t samp=0; samp < fUsefulEvent->volts[ichan].size(); samp++)
+      {
+        if (ichan < k::NUM_RF_CHANNELS) fUsefulEvent->volts[ichan][samp] *= -1;
+        fUsefulEvent->data[ichan][samp] *= -1; // do the pedestal subtracted data too
       }
     }
   }
 
-  return fUsefulEvent; 
+  return fUsefulEvent;
 }
 
 // Calling this function on it's own is just for unblinding, please use honestly
@@ -435,16 +394,6 @@ int pueo::Dataset::getEvent(int eventNumber, bool quiet)
   int entry  =  (fDecimated ? fDecimatedHeadTree : fHeadTree)->GetEntryNumberWithIndex(eventNumber); 
 
   if (entry < 0 && (eventNumber < fHeadTree->GetMinimum("eventNumber") || eventNumber > fHeadTree->GetMaximum("eventNumber")))
-  {
-    int run = getRunContainingEventNumber(eventNumber);
-    if(run > 0)
-    {
-      loadRun(run, datadir, fDecimated);
-      if (!quiet) fprintf(stderr, "changed run to %d\n", run);
-      getEvent(eventNumber, quiet); 
-    }
-  }
-  else if (entry < 0 ) 
   {
       if (!quiet) fprintf(stderr,"WARNING: event %lld not found in header tree\n", fWantedEntry); 
       if (fDecimated) 
@@ -941,135 +890,19 @@ int pueo::Dataset::previousInPlaylist()
 }
 
 
-int pueo::Dataset::getRunContainingEventNumber(UInt_t ev){
-
-  // TMutex();
-
-  int pueo = version::get();
-
-  // read in runToEvP*.txt list only once
-  if(runs[pueo].size()==0){
-    loadRunToEv(pueo);
-    // If still don't have data, loadRunToEv should have printed something
-    // There's a problem, so just return -1
-    if(runs[pueo].size()==0){
-      return -1;
-    }
-  }
-
-  // Binary search to find first event number which is greater than ev
-  std::vector<UInt_t>::iterator it = std::upper_bound(firstEvents[pueo].begin(), firstEvents[pueo].end(), ev);
-
-  // Here we convert the iterator to an integer relative to first element, so we can read matching elements in the other array
-  // And -1 so we have the last element isn't greater than ev.
-  int elem = (it - firstEvents[pueo].begin()) - 1;
-
-  // std::cout << anita << "\t" << elem << "\t" << runs[anita][elem] << "\t" << firstEvents[anita][elem] << "\t" << lastEvents[anita][elem] << std::endl;
-
-  int run = -1; // signifies error, we will set correctly after doing bounds checking...
-
-  if(elem < 0){ // then we are lower than the first event in the first run
-    std::cerr << "Error in " << __PRETTY_FUNCTION__ << ", for PUEO " << version::get()
-              << " eventNumber " << ev << " is smaller than then first event in the lowest run! "
-              << "(eventNumber " << firstEvents[pueo][0] << " in run " << runs[pueo][0] << ")"
-              << std::endl;
-  }
-  else if(ev > lastEvents[pueo].back()){ // then we are higher than the last event in the last run
-    std::cerr << "Error in " << __PRETTY_FUNCTION__ << ", for pueo " << version::get()
-              << " eventNumber " << ev << " is larger than then last event I know about in the highest run! "
-              << "(eventNumber " << lastEvents[pueo].back() << " in run " << runs[pueo].back() << ")"
-              << std::endl;
-  }
-  else if(ev > lastEvents[pueo][elem]){ // then we are in the eventNumber gap between two runs
-    std::cerr << "Error in " << __PRETTY_FUNCTION__ << ", for pueo " << version::get()
-              << " eventNumber " << ev << " is larger than then last event in run " << runs[pueo][elem]
-              << " (" << lastEvents[pueo][elem] << "), but smaller than the first event in run "
-              << runs[pueo][elem+1] << " (" << firstEvents[pueo][elem+1] << ")" << std::endl;
-  }
-  else{
-    // preliminarily set run
-    run = runs[pueo][elem];
-  }
-
-  return run;
-}
 
 int pueo::Dataset::loadPlaylist(const char* playlist)
 {
-  std::vector<std::vector<long> > runEv;
+  std::vector<std::pair<int,int> > runEv;
   int rN;
   int evN;
   std::ifstream pl(playlist);
-  pl >> evN;
-  
-  // Simulated events
-  // As iceMC generates random eventNumbers, simulated data event numbers aren't linked to actual event numbers, so ignore evN restrictions
-  Bool_t simulatedData = false; // must be set to false for non-simulated data
-  if(simulatedData == true)
-    {
-      std::cout << "Using simulated data! Turn off the simulatedData variable if you are working with real data." << std::endl;
-      rN = evN;
-      pl >> evN;
-      std::vector<long> Row;
-      Row.push_back(rN);
-      Row.push_back(evN);
-      runEv.push_back(Row);
-      while(pl >> rN >> evN)
-	{
-	  std::vector<long> newRow;
-	  newRow.push_back(rN);
-	  newRow.push_back(evN);
-	  runEv.push_back(newRow);
-	}
-
-    }
-  else
-    {	
-      if(evN < 400)
-	{
-	  rN = evN;
-	  pl >> evN;
-	  std::vector<long> Row;
-	  Row.push_back(rN);
-	  Row.push_back(evN);
-	  runEv.push_back(Row);
-	  while(pl >> rN >> evN)
-	    {
-	      std::vector<long> newRow;
-	      newRow.push_back(rN);
-	      newRow.push_back(evN);
-	      runEv.push_back(newRow);
-	    }
-	}
-      else
-	{
-	  rN = getRunContainingEventNumber(evN);
-	  if(rN == -1)
-	    {
-	      fprintf(stderr, "Something is wrong with your playlist\n");
-	      return -1;
-	    }
-	  std::vector<long> Row;
-	  Row.push_back(rN);
-	  Row.push_back(evN);
-	  runEv.push_back(Row);
-	  while(pl >> evN)
-	    {
-	      rN = getRunContainingEventNumber(evN);
-	      if(rN == -1)
-		{
-		  fprintf(stderr, "Something is wrong with your playlist\n");
-		  return -1;
-		}
-	      std::vector<long> newRow;
-	      newRow.push_back(rN);
-	      newRow.push_back(evN);
-	      runEv.push_back(newRow);
-	    }
-	}
-    }
-  fPlaylist = runEv;
-  return runEv.size();
+  while (pl >> rN >> evN )
+  {
+    runEv.push_back(std::pair<int,int>(rN,evN));
+  }
+  fPlaylist = std::move(runEv);
+  return fPlaylist.size();
 }
 
 
@@ -1265,129 +1098,26 @@ pueo::Dataset::BlindingStrategy pueo::Dataset::getStrategy(){
 
 void pueo::Dataset::loadBlindTrees() {
 
-  // std::cout << __PRETTY_FUNCTION__ << std::endl;
-
-  /* for now, just A3 */ 
-  if(!loadedBlindTrees && version::get()==3){
-
-    fBlindFile = NULL;
-
-    char calibDir[FILENAME_MAX-64];
-    char fileName[FILENAME_MAX];
-    char *calibEnv=getenv("PUEO_CALIB_DIR");
-    if(!calibEnv) {
-      char *utilEnv=getenv("PUEO_UTIL_INSTALL_DIR");
-      if(!utilEnv){
-        sprintf(calibDir,"calib");
-      }
-      else{
-        snprintf(calibDir,sizeof(calibDir),"%s/share/pueoCalib",utilEnv);
-      }
-    }
-    else {
-      strncpy(calibDir,calibEnv,sizeof(calibDir));
-    }
-
-    // std::cout << __PRETTY_FUNCTION__ << ": here 2" << std::endl;
-
-
-    // these are the fake events, that will be inserted in place of some min bias events    
-    snprintf(fileName,sizeof(fileName), "%s/insertedDataFile.root", calibDir);
-
-    TString theRootPwd = gDirectory->GetPath();
-    // std::cerr << "Before opening blind file" << "\t" << gDirectory->GetPath() << std::endl;
-    fBlindFile = TFile::Open(fileName);
-    // std::cerr << "After opening blind file" << "\t" << gDirectory->GetPath() << std::endl;
-    
-    if(fBlindFile){
-
-      TString polPrefix[pol::kNotAPol];
-      polPrefix[pol::kHorizontal] = "HPol";
-      polPrefix[pol::kVertical] = "VPol";
-
-      for(int pol=0; pol < pol::kNotAPol; pol++){
-
-	TString headTreeName = polPrefix[pol] + "HeadTree";
-	fBlindHeadTree[pol] = (TTree*) fBlindFile->Get(headTreeName);
-
-	TString eventTreeName = polPrefix[pol] + "EventTree";
-	fBlindEventTree[pol] = (TTree*) fBlindFile->Get(eventTreeName);
-
-	// If you found the data then prepare for data reading
-	if(fBlindHeadTree[pol] && fBlindEventTree[pol]){
-
-	  fBlindHeadTree[pol]->SetBranchAddress("header", &fBlindHeader[pol]);
-	  fBlindEventTree[pol]->SetBranchAddress("event", &fBlindEvent[pol]);          
-	}
-	else{
-	  // complain if you can't find the data
-	  std::cerr << "Error in " << __PRETTY_FUNCTION__ << ": "
-		    << "fBlindHeadTree[" << pol << "] = " << fBlindHeadTree[pol] << ", "
-		    << "fBlindEventTree[" << pol << "] = " << fBlindEventTree[pol] << std::endl;
-	}
-      }
-    }
-    else{
-      std::cerr << "Error in " << __PRETTY_FUNCTION__ << ": "
-		<< "Unable to find " << fileName << " for inserted event blinding." << std::endl;
-    }
-
-    // std::cout << __PRETTY_FUNCTION__ << ": here 3" << std::endl;
-
-    // these are the min bias event numbers to be overwritten, with the entry in the fakeEventTree
-    // that is used to overwrite the event
-    snprintf(fileName,sizeof(fileName), "%s/pueo%dOverwrittenEventInfo.txt",calibDir, version::get());
-    std::ifstream overwrittenEventInfoFile(fileName);
-    char firstLine[180];
-    overwrittenEventInfoFile.getline(firstLine,179);
-    UInt_t overwrittenEventNumber;
-    Int_t fakeTreeEntry, pol;
-    Int_t numEvents = 0;
-    while(overwrittenEventInfoFile >> overwrittenEventNumber >> fakeTreeEntry >> pol){
-      eventsToOverwrite.push_back(overwrittenEventNumber);
-      fakeTreeEntries.push_back(fakeTreeEntry);
-      pol::pol_t thePol = pol::pol_t(pol);
-      polarityOfEventToInsert.push_back(thePol);
-      // std::cout << overwrittenEventNumber << "\t" << fakeTreeEntry << "\t" << thePol << std::endl;
-      numEvents++;
-    }
-    if(numEvents==0){
-      std::cerr << "Warning in " << __FILE__ << std::endl;
-      std::cerr << "Unable to find overwrittenEventInfo" << std::endl;
-    }
-
-    gDirectory->cd(theRootPwd);
-    
-    // const char* treeNames[4] = {"HPolHeadTree", "HPolEventTree", "VPolHeadTree", "VPolEventTree"};
-    // for(int i=0; i < 4; i++){
-    //   std::cerr << "after close file " << "\t" << gROOT->FindObject(treeNames[i]) << std::endl;
-    // }    
-
-    loadedBlindTrees = true;
-  }
-
-//   gROOT->cd(0); 
-  // std::cout << __PRETTY_FUNCTION__ << ": here 4" << std::endl;
-
-}
+   std::cerr << __PRETTY_FUNCTION__ << "not implemented yet for PUEO" << std::endl;
+ }
 
 
 
-void pueo::Dataset::loadHiCalGps() {
-  if(!fHiCalGpsFile){
+void pueo::Dataset::loadHiCalGps(char which) {
+  if(!fHiCalGpsFile[which-'A']){
 
     const TString theRootPwd = gDirectory->GetPath();    
 
-    TString fName = TString::Format("%s/share/pueoCalib/H1b_GPS_time_interp.root", getenv("ANITA_UTIL_INSTALL_DIR"));
-    fHiCalGpsFile = TFile::Open(fName);
-    fHiCalGpsTree = (TTree*) fHiCalGpsFile->Get("Tpos");
+    TString fName = TString::Format("%s/share/pueoCalib/H1b_GPS_time_interp.root", getenv("PUEO_UTIL_INSTALL_DIR"));
+    fHiCalGpsFile[which-'A'] = TFile::Open(fName);
+    fHiCalGpsTree[which-'A'] = (TTree*) fHiCalGpsFile[which-'A']->Get("Tpos");
 
-    fHiCalGpsTree->BuildIndex("unixTime");
+    fHiCalGpsTree[which-'A']->BuildIndex("unixTime");
 
-    fHiCalGpsTree->SetBranchAddress("longitude", &fHiCalLon);
-    fHiCalGpsTree->SetBranchAddress("latitude", &fHiCalLat);
-    fHiCalGpsTree->SetBranchAddress("altitude", &fHiCalAlt);
-    fHiCalGpsTree->SetBranchAddress("unixTime", &fHiCalUnixTime);
+    fHiCalGpsTree[which-'A']->SetBranchAddress("longitude", &fHiCalLon[which-'A']);
+    fHiCalGpsTree[which-'A']->SetBranchAddress("latitude", &fHiCalLat[which-'A']);
+    fHiCalGpsTree[which-'A']->SetBranchAddress("altitude", &fHiCalAlt[which-'A']);
+    fHiCalGpsTree[which-'A']->SetBranchAddress("unixTime", &fHiCalUnixTime[which-'A']);
 
     gDirectory->cd(theRootPwd);
   }
@@ -1402,9 +1132,9 @@ void pueo::Dataset::loadHiCalGps() {
  * @param latitude hical position
  * @param altitude hical position
  */
-void pueo::Dataset::hiCal(Double_t& longitude, Double_t& latitude, Double_t& altitude) {
+void pueo::Dataset::hiCal(char which, Double_t& longitude, Double_t& latitude, Double_t& altitude) {
   UInt_t realTime = fHeader ? fHeader->realTime : 0;
-  hiCal(realTime, longitude, latitude, altitude);
+  hiCal(which, realTime, longitude, latitude, altitude);
 }
 
 
@@ -1417,16 +1147,16 @@ void pueo::Dataset::hiCal(Double_t& longitude, Double_t& latitude, Double_t& alt
  * @param altitude hical position
  * @param realTime unixTime stamp of the gps tree
  */
-void pueo::Dataset::hiCal(UInt_t realTime, Double_t& longitude, Double_t& latitude, Double_t& altitude) {
-  loadHiCalGps();
-  Long64_t entry = fHiCalGpsTree->GetEntryNumberWithIndex(realTime);
+void pueo::Dataset::hiCal(char which, UInt_t realTime, Double_t& longitude, Double_t& latitude, Double_t& altitude) {
+  loadHiCalGps(which);
+  Long64_t entry = fHiCalGpsTree[which-'A']->GetEntryNumberWithIndex(realTime);
 
   if(entry > 0){
-    fHiCalGpsTree->GetEntry(entry);
-    longitude = fHiCalLon;
-    latitude = fHiCalLat;
+    fHiCalGpsTree[which-'A']->GetEntry(entry);
+    longitude = fHiCalLon[which-'A'];
+    latitude = fHiCalLat[which-'A'];
     const double feetToMeters = 0.3048;
-    altitude = fHiCalAlt*feetToMeters;
+    altitude = fHiCalAlt[which-'A']*feetToMeters;
   }
   else{
     longitude = -9999;
@@ -1435,9 +1165,6 @@ void pueo::Dataset::hiCal(UInt_t realTime, Double_t& longitude, Double_t& latitu
   }
 }
 
-
-
- 
 
 
 /**
