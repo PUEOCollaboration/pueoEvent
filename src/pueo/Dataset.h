@@ -75,14 +75,14 @@ namespace pueo
      * @param strat is the strategy to use. This can be a combination e.g. (kInsertedVPolEvents | kAnotherStrategy)
      * @return the strategy that was set
      */
-     BlindingStrategy setStrategy(BlindingStrategy strat);
+     BlindingStrategy setStrategy(BlindingStrategy strat){theStrat=strat; return theStrat;};
 
 
     /**
      * Get the currently set strategy
      * @return the strategy that was set
      */
-     BlindingStrategy getStrategy();
+     BlindingStrategy getStrategy(){return theStrat;};
 
     /** 
      * Get the description string for the currently enabled strategy
