@@ -270,10 +270,22 @@ namespace pueo
       /* Wraps the random number generator for polarity inversion so it is derministic regardless of event processing order */
       bool maybeInvertPolarity(UInt_t eventNumber);
 
-      /* Where was HiCal at a particular time?*/
+      /* Where was HiCal at a particular time?
+       * 
+       * @param longitude hical position
+       * @param latitude hical position
+       * @param altitude hical position
+       * @param realTime unixTime stamp of the gps tree
+       */
       static void hiCal(UInt_t unixTime, Double_t& longitude,  Double_t& latitude, Double_t& altitude);
 
-      /* Where was hical? Uses the current header realTime*/ 
+      /** 
+       * Where was hical? Uses the current header realTime to query the hical gps tree...
+       * 
+       * @param longitude hical position
+       * @param latitude hical position
+       * @param altitude hical position
+       */
       void hiCal(Double_t& longitude,  Double_t& latitude, Double_t& altitude);
 
     protected:
