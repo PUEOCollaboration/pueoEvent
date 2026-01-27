@@ -16,30 +16,6 @@
 #include "TCut.h" 
 #include <iostream>
 
-void  pueo::Dataset::unloadRun() 
-{
-
-  for (unsigned i = 0; i < filesToClose.size(); i++) 
-  {
-    filesToClose[i]->Close(); 
-    delete filesToClose[i]; 
-  }
-
-  fHeadTree = 0; 
-  fDecimatedHeadTree = 0; 
-  fEventTree = 0; 
-  fGpsTree = 0; 
-  fRunLoaded = false;
-  filesToClose.clear();
-
-  if (fCutList) 
-  {
-    delete fCutList; 
-    fCutList = 0; 
-  }  
-
-}
-
 pueo::nav::Attitude * pueo::Dataset::gps(bool force_load)
 {
 
