@@ -1,29 +1,5 @@
-/****************************************************************************************
-*   PUEODataset.cc            Alternative implementation of pueo::Dataset
-*  
-*   This file is used for convenient access to PUEO data. Adapted from Datast.cc
-* 
-*  Cosmin Deaconu <cozzyd@kicp.uchicago.edu>    
-*  Ben Strutt <strutt@physics.ucla.edu> 
-*
-*
-*  (C) 2023-, The Payload for Ultrahigh Energy Observations (PUEO) Collaboration
-* 
-*  This file is part of pueoEvent, the ROOT I/O library for PUEO. 
-* 
-*  pueoEvent is free software: you can redistribute it and/or modify it under the
-*  terms of the GNU General Public License as published by the Free Software
-*  Foundation, either version 2 of the License, or (at your option) any later
-*  version.
-* 
-*  Foobar is distributed in the hope that it will be useful, but WITHOUT ANY
-*  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-*  A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-* 
-*  You should have received a copy of the GNU General Public License along with
-*  Foobar. If not, see <https://www.gnu.org/licenses/
-*
-****************************************************************************************/ 
+// Implementation of the Dataset class, essentially a subset of `Dataset.cc`
+
 #include "pueo/Dataset.h"
 #include "pueo/UsefulEvent.h"
 #include "pueo/RawHeader.h"
@@ -42,54 +18,11 @@
 #include "TROOT.h"
 #include "TEventList.h" 
 #include "TCut.h" 
-#include "TMutex.h" 
 #include <dirent.h>
 #include <algorithm>
 #include "TEnv.h" 
 #include <iostream>
 #include <fstream>
-// #include <sstream>
-
-
-// from runToEvP*.txt
-static std::vector<UInt_t> firstEvents[pueo::k::NUM_PUEO+1];
-static std::vector<UInt_t> lastEvents[pueo::k::NUM_PUEO+1];
-static std::vector<Int_t> runs[pueo::k::NUM_PUEO+1];
-
-
-void pueo::Dataset::loadRunToEv(int pueo){
-  static TMutex m;
-  m.Lock();
-
-  const char* installDir = getenv("PUEO_UTIL_INSTALL_DIR");
-
-  TString fileName = TString::Format("%s/share/anitaCalib/runToEvP%d.txt", installDir, pueo);
-  std::ifstream runToEv(fileName.Data());
-  if (!runToEv.is_open()) {
-    std::cerr << "Error in " << __PRETTY_FUNCTION__ << " couldn't find " << fileName << std::endl;
-  }
-  else{
-    const int hopefullyMoreThanEnoughRuns = 500;
-    runs[pueo].reserve(hopefullyMoreThanEnoughRuns);
-    firstEvents[pueo].reserve(hopefullyMoreThanEnoughRuns);
-    lastEvents[pueo].reserve(hopefullyMoreThanEnoughRuns);
-
-    int run, evLow,evHigh;
-    // int elem = 0;
-    while (runToEv >> run >> evLow >> evHigh){
-      runs[pueo].push_back(run);
-      firstEvents[pueo].push_back(evLow);
-      lastEvents[pueo].push_back(evHigh);
-      // std::cout << anita << "\t" << elem << "\t" << runs[anita][elem] << "\t" << firstEvents[anita][elem] << "\t" << lastEvents[anita][elem] << std::endl;
-      // elem++;
-    }
-    // std::cout << "Finished reading in " << fileName << "!" << std::endl;
-    runToEv.close();
-  }
-  m.UnLock();
-}
-
-
 
 
 static bool checkIfFileExists(const char * file)
@@ -923,58 +856,6 @@ int pueo::Dataset::previousInPlaylist()
 }
 
 
-int pueo::Dataset::getRunContainingEventNumber(UInt_t ev){
-
-  // TMutex();
-
-  int pueo = version::get();
-
-  // read in runToEvP*.txt list only once
-  if(runs[pueo].size()==0){
-    loadRunToEv(pueo);
-    // If still don't have data, loadRunToEv should have printed something
-    // There's a problem, so just return -1
-    if(runs[pueo].size()==0){
-      return -1;
-    }
-  }
-
-  // Binary search to find first event number which is greater than ev
-  std::vector<UInt_t>::iterator it = std::upper_bound(firstEvents[pueo].begin(), firstEvents[pueo].end(), ev);
-
-  // Here we convert the iterator to an integer relative to first element, so we can read matching elements in the other array
-  // And -1 so we have the last element isn't greater than ev.
-  int elem = (it - firstEvents[pueo].begin()) - 1;
-
-  // std::cout << anita << "\t" << elem << "\t" << runs[anita][elem] << "\t" << firstEvents[anita][elem] << "\t" << lastEvents[anita][elem] << std::endl;
-
-  int run = -1; // signifies error, we will set correctly after doing bounds checking...
-
-  if(elem < 0){ // then we are lower than the first event in the first run
-    std::cerr << "Error in " << __PRETTY_FUNCTION__ << ", for PUEO " << version::get()
-              << " eventNumber " << ev << " is smaller than then first event in the lowest run! "
-              << "(eventNumber " << firstEvents[pueo][0] << " in run " << runs[pueo][0] << ")"
-              << std::endl;
-  }
-  else if(ev > lastEvents[pueo].back()){ // then we are higher than the last event in the last run
-    std::cerr << "Error in " << __PRETTY_FUNCTION__ << ", for pueo " << version::get()
-              << " eventNumber " << ev << " is larger than then last event I know about in the highest run! "
-              << "(eventNumber " << lastEvents[pueo].back() << " in run " << runs[pueo].back() << ")"
-              << std::endl;
-  }
-  else if(ev > lastEvents[pueo][elem]){ // then we are in the eventNumber gap between two runs
-    std::cerr << "Error in " << __PRETTY_FUNCTION__ << ", for pueo " << version::get()
-              << " eventNumber " << ev << " is larger than then last event in run " << runs[pueo][elem]
-              << " (" << lastEvents[pueo][elem] << "), but smaller than the first event in run "
-              << runs[pueo][elem+1] << " (" << firstEvents[pueo][elem+1] << ")" << std::endl;
-  }
-  else{
-    // preliminarily set run
-    run = runs[pueo][elem];
-  }
-
-  return run;
-}
 
 int pueo::Dataset::loadPlaylist(const char* playlist)
 {

@@ -1,12 +1,12 @@
 // Implementation of the HiCal portion of the Dataset class.
 // Created for organization purposes.
 // Mayhap we should just have a HiCal class?
+
 #include "pueo/Dataset.h"
 #include "pueo/RawHeader.h"
 #include "TTree.h"
 #include "TFile.h"
 
-// non-const global is potentially a bad idea
 namespace {
   // std::vector<UInt_t> hiCalEventNumbers[pueo::k::NUM_PUEO+1]; // note: variable not used at all
   TFile* fHiCalGpsFile;
