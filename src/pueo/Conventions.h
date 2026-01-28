@@ -43,16 +43,16 @@ namespace  pueo
     constexpr int NANTS_MI = 96; 
     constexpr int NANTS_NADIR = 0; 
     constexpr int NANTS_LF = 8; 
-    constexpr int MULTIPLEX_LF = 0; 
     constexpr int NUM_HORNS = NANTS_MI + NANTS_NADIR; 
     constexpr int NUM_ANTS = NANTS_MI + NANTS_NADIR + NANTS_LF; 
     constexpr int NUM_POLS = 2;
     constexpr int NUM_PUEO = 1; 
     constexpr int NUM_PHI = 24; 
     constexpr int NUM_CHANS_PER_SURF = 8; 
-    constexpr int ACTIVE_SURFS = 28; 
-    constexpr int NUM_DIGITZED_CHANNELS = NUM_ANTS*NUM_POLS; 
-    constexpr int MAX_NUMBER_SAMPLES = 4096; 
+    constexpr int NUM_SURF_SLOTS = 28; 
+    constexpr int NUM_DIGITZED_CHANNELS = NUM_SURF_SLOTS * NUM_CHANS_PER_SURF;
+    constexpr int NUM_RF_CHANNELS = NUM_POLS *NUM_ANTS;
+    constexpr int MAX_NUMBER_SAMPLES = 1024; // always 1024 for PUEO now
   }
 
 //Now some geometry and polarisation considerations
