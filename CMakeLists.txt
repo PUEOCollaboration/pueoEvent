@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.23.0)
 project(pueoEvent VERSION 1.0.0)
 add_library(${PROJECT_NAME} SHARED)
 
+
+
 set(HEADER_FILES
   src/pueo/Conventions.h
   src/pueo/Converter.h
@@ -98,6 +100,9 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
 )
 
+add_executable(pueo-convert src/pueo-converter.cc)
+target_link_libraries(pueo-convert ${PROJECT_NAME})
+
 # CERN ROOT dictionary generation
 set(DICTNAME G__${PROJECT_NAME})
 root_generate_dictionary(${DICTNAME} ${HEADER_FILES} MODULE ${PROJECT_NAME} LINKDEF LinkDef.h)
@@ -123,7 +128,7 @@ install(
 
 # Install the library and its header files
 install(
-  TARGETS ${PROJECT_NAME} 
+  TARGETS ${PROJECT_NAME} pueo-convert
   EXPORT ${PROJECT_NAME}Targets 
   FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )

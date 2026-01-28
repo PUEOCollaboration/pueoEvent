@@ -47,9 +47,9 @@
 // the temporary file will simply be moved to the final file.
 
 #define CONVERTIBLE_TYPES(PUEO_CONVERT_TYPE)\
-  PUEO_CONVERT_TYPE(waveform, full_waveform, pueo::RawEvent, nullptr)\
-  PUEO_CONVERT_TYPE(header, full_waveform, pueo::RawHeader, pueo::convert::postprocess_headers)\
-  PUEO_CONVERT_TYPE(attitude, nav_att, pueo::Nav::Attitude, pueo::convert::postprocess_attitude)\
+  PUEO_CONVERT_TYPE(waveform, full_waveforms, pueo::RawEvent, nullptr)\
+  PUEO_CONVERT_TYPE(header, full_waveforms,pueo::RawHeader, pueo::convert::postprocess_headers)\
+  PUEO_CONVERT_TYPE(attitude, nav_att, pueo::nav::Attitude, pueo::convert::postprocess_attitude)\
 
 
 
@@ -68,6 +68,7 @@ namespace pueo
     // These are just shortcuts here
     namespace typetags
     {
+      constexpr const char * AUTO = "auto";
       constexpr const char * HEADER = "header";
       constexpr const char * WAVEFORMS = "waveform";
       constexpr const char * ATTITUDE = "attitude";
@@ -80,7 +81,27 @@ namespace pueo
      **/
     typedef int ( * postprocess_fn) (const char * infile, const char * outfile, const char * args);
 
-    int convertRawDirectory(const char * typetag, const char * indir, const char * outfile, const ConvertOpts & opts = ConvertOpts());
+    /** Convert input files to output file
+     *
+     * If typetag is NULL, empty or auto, the first packet from the first file will be read to determine the type. 
+     * Note that this is fraught with peril as there is not necessarily a one-to-one mapping 
+     * (e.g. full_waveforms_t can either generate RawEvents or RawHeaders and auto won't know which one you want!)
+     *
+     * We only allow one type per output file, not supporting heterogenous files 
+     * (that could be done, but in practice is not that useful given how we wrote out the data and the fact that there is no one-to-one mapping)
+     *
+     * @param typetag the type tag, you can use one of the helper constants under convert::typetags, or pass empty, 
+     *         NULL or "auto" to try try to determine by itself, but this will work poorly in cases there is not a one-to-one mapping.
+     *
+     * @param nfiles  the number of input files
+     * @param infiles  array of input files
+     * @param outfile The output file
+     *
+     */
+    int convertFiles(const char * typetag, int nfiles, const char ** infiles,  const char * outfile, const ConvertOpts & opts = ConvertOpts());
+
+    /** Similar to above, but an argument can be a directory instead of a file and in that case everything in the directory is added */
+    int convertFilesOrDirectories(const char * typetag, int N, const char ** in,  const char * outfile, const ConvertOpts & opts = ConvertOpts());
 
     int postprocess_headers(const char * infile, const char * outfile, const char * args);
     int postprocess_attitudes(const char * infile, const char * outfile, const char * args);
