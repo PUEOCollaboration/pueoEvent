@@ -24,6 +24,22 @@
 
 #include "pueo/RawEvent.h" 
 
-ClassImp(pueo::RawEvent); 
+ClassImp(pueo::RawEvent);
 
+
+#ifdef HAVE_PUEORAWDATA
+
+pueo::RawEvent::RawEvent(const pueo_full_waveforms_t * raw)
+  : eventNumber(raw->event), runNumber(raw->run)
+{
+  static_assert(PUEO_NCHAN == pueo::k::NUM_DIGITZED_CHANNELS);
+
+  for (size_t i = 0; i < PUEO_NCHAN; i++)
+  {
+    std::copy(raw->wfs[i].data, raw->wfs[i].data+pueo::k::MAX_NUMBER_SAMPLES, data[i].begin());
+  }
+}
+
+
+#endif
 

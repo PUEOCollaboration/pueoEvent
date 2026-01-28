@@ -30,6 +30,8 @@
 #include "pueo/RawEvent.h"
 #include "pueo/Conventions.h" 
 
+#include <array>
+
 class TGraph; 
 
 
@@ -49,13 +51,13 @@ namespace pueo
       TGraph *makeGraph(ring::ring_t ring, int phi, pol::pol_t pol) const; 
       TGraph *makeGraph(int surf, int chan) const; 
 
-      std::vector<double> volts[k::NUM_DIGITZED_CHANNELS];
-      double t0[k::NUM_DIGITZED_CHANNELS];
-      double dt[k::NUM_DIGITZED_CHANNELS]; 
+      std::array< std::array<double, pueo::k::MAX_NUMBER_SAMPLES>, pueo::k::NUM_RF_CHANNELS> volts;
+      std::array<double, k::NUM_RF_CHANNELS> t0;
+      std::array<double, k::NUM_RF_CHANNELS> dt; 
       double t(size_t chan, size_t i) const { return t0[chan] + i * dt[chan]; }
 
 
-    ClassDef(UsefulEvent,1); 
+    ClassDef(UsefulEvent,2); 
   }; 
 }
 

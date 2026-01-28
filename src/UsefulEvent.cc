@@ -38,16 +38,26 @@ pueo::UsefulEvent::UsefulEvent(const RawEvent & event, const RawHeader & header)
 {
   (void) header; 
 
+
+
   auto geom = GeomTool::Instance(); 
+
+  auto flight_geom = GeomTool::Instance(0,"flight");
+
   for (size_t ichan = 0; ichan < k::NUM_DIGITZED_CHANNELS; ichan++) 
   {
-    volts[ichan].resize(data[ichan].size()); 
+
+    int ant;
+    pueo::pol::pol_t pol;
+    geom.getAntPolFromChanIndex(ichan, ant,pol);
+
+    int flight_chan = flight_geom.getChanIndexFromAntPol(ant,pol);
     for (size_t i = 0; i < volts[ichan].size(); i++) 
     {
-      volts[ichan][i] = data[ichan][i] *500./2048 ; // TODO: CALIBRATION
+      volts[ichan][i] = data[flight_chan][i] *500./2048 ; // TODO: CALIBRATION
     }
     t0[ichan] = 0;//TODO!!!  will likely depend on trigger type or something... 
-    dt[ichan] = ring::isLF(geom.getRingFromChanIndex(ichan)) ? 1./1.5 :  1./3; 
+    dt[ichan] = 1/3.;
   }
 
 }

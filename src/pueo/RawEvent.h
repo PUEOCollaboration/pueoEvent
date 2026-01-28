@@ -30,7 +30,13 @@
 #include <TObject.h>
 #include "pueo/Conventions.h"
 
-//!  pue::RawEevent -- The Raw PUEO Event Data
+#ifdef HAVE_PUEORAWDATA
+#include "pueo/rawdata.h"
+#endif
+
+#include <array>
+
+//!  pueo::RawEvent -- The Raw PUEO Event Data
 /*!
   The ROOT implementation of the raw PUEO event data
   \ingroup rootclasses
@@ -42,15 +48,18 @@ namespace pueo
   {
    public:
      RawEvent(){;} ///< Default constructor
+#ifdef HAVE_PUEORAWDATA
+     RawEvent(const pueo_full_waveforms_t * raw); ///< Constructor from raw type
+#endif
      virtual ~RawEvent() {;} ///< Destructor
 
      ULong_t eventNumber = 0; ///< Event number from software
 
      Int_t runNumber = 0;   ///< Run number from software
-    
-     std::vector<Short_t> data[k::NUM_DIGITZED_CHANNELS]; 
 
-    ClassDef(RawEvent,1);
+     std::array<std::array<Short_t, pueo::k::MAX_NUMBER_SAMPLES>, pueo::k::NUM_DIGITZED_CHANNELS> data;
+
+    ClassDef(RawEvent,2);
   };
 
 }
