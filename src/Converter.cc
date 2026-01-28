@@ -54,7 +54,7 @@ template <typename T> const char * getName() { return "unnamed"; }
 
 #define NAME_TEMPLATE(TAG, RAW, ROOT, POST) template <> const char * getName<ROOT>() { return #TAG; }
 
-CONVERTIBLE_TYPES(NAME_TEMPLATE)
+PUEO_CONVERTIBLE_TYPES(NAME_TEMPLATE)
 
 static const char * getTagFromRawName(const char* raw_name)
 {
@@ -73,7 +73,7 @@ static const char * getTagFromRawName(const char* raw_name)
 
 
 template <typename RootType, typename RawType, int (*ReaderFn)(pueo_handle_t*, RawType*), pueo::convert::postprocess_fn PostProcess  = nullptr>
-static int converterImpl(size_t N, const char ** infiles,  char * outfile, const char * tmp_suffix, const char * postprocess_args)
+static int converterImpl(size_t N, const char ** infiles,  const char * outfile, const char * tmp_suffix, const char * postprocess_args)
 {
 
   std::string tmpfilename = outfile + std::string(tmp_suffix);
@@ -95,7 +95,7 @@ static int converterImpl(size_t N, const char ** infiles,  char * outfile, const
 
   int nprocessed = 0;
 
-  for (int i = 0; i < N; i++)
+  for (size_t i = 0; i < N; i++)
   {
     pueo_handle_t h;
     pueo_handle_init(&h, infiles[i], "r");
@@ -185,8 +185,10 @@ int pueo::convert::convertFiles(const char * typetag, int nfiles, const char ** 
 #define CONVERT_TEMPLATE(TAG, RAW, ROOT, POST)\
   else if (!strcmp(typetag,#TAG))\
   {\
-    return converterImpl<ROOT,RAW,POST>(nfiles, infiles, outfile, opts.tmp_suffix, opts.postprocess_args);\
+    return converterImpl<ROOT,pueo_##RAW##_t,pueo_read_##RAW,POST>(nfiles, infiles, outfile, opts.tmp_suffix, opts.postprocess_args);\
   }
+
+  PUEO_CONVERTIBLE_TYPES(CONVERT_TEMPLATE)
 
   else
   {

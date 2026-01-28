@@ -46,7 +46,7 @@
 // takes arguments of input file, output file and a freeform argument. If NULL
 // the temporary file will simply be moved to the final file.
 
-#define CONVERTIBLE_TYPES(PUEO_CONVERT_TYPE)\
+#define PUEO_CONVERTIBLE_TYPES(PUEO_CONVERT_TYPE)\
   PUEO_CONVERT_TYPE(waveform, full_waveforms, pueo::RawEvent, nullptr)\
   PUEO_CONVERT_TYPE(header, full_waveforms,pueo::RawHeader, pueo::convert::postprocess_headers)\
   PUEO_CONVERT_TYPE(attitude, nav_att, pueo::nav::Attitude, pueo::convert::postprocess_attitude)\
