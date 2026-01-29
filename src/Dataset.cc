@@ -382,7 +382,7 @@ int pueo::Dataset::getEntry(int entryNumber)
 
 
   // use the header to set the PUEO version 
-  version::setVersionFromUnixTime(header()->realTime); 
+  version::setVersionFromUnixTime(header()->triggerTime); 
 
   return fDecimated ? fDecimatedEntry : fWantedEntry; 
 }
@@ -1133,7 +1133,7 @@ void pueo::Dataset::loadHiCalGps(char which) {
  * @param altitude hical position
  */
 void pueo::Dataset::hiCal(char which, Double_t& longitude, Double_t& latitude, Double_t& altitude) {
-  UInt_t realTime = fHeader ? fHeader->realTime : 0;
+  UInt_t realTime = fHeader ? fHeader->triggerTime : 0;
   hiCal(which, realTime, longitude, latitude, altitude);
 }
 
@@ -1197,19 +1197,17 @@ void pueo::Dataset::overwriteHeader(RawHeader* header, pol::pol_t pol, Int_t fak
   }
 
   // Retain some of the header data for camouflage
-  UInt_t realTime = header->realTime;
+  UInt_t realTime = header->triggerTime;
   UInt_t triggerTimeNs = header->triggerTimeNs;
   UInt_t eventNumber = header->eventNumber;
   Int_t run = header->run;
-  Int_t trigNum = header->trigNum;
 
   (*header) = (*fBlindHeader[pol]);
 
-  header->realTime = realTime;
+  header->triggerTime = realTime;
   header->triggerTimeNs = triggerTimeNs;
   header->eventNumber = eventNumber;
   header->run = run;
-  header->trigNum = trigNum;
 
 }
 
