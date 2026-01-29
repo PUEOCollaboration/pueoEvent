@@ -108,35 +108,35 @@ namespace {
       return stop_time < other.stop_time; 
     }
   }; 
-  static std::vector<run_info> run_times[pueo::k::NUM_PUEO+1]; 
+  std::vector<run_info> run_times[pueo::k::NUM_PUEO+1]; 
 }
 int pueo::Dataset::getRunAtTime(double t)
 {
 
   int version= version::getVersionFromUnixTime(t); 
 
-  if (!run_times[version].size())
+  if (run_times[version].empty())
   {
     TLockGuard lock(&run_at_time_mutex); 
-    if (!run_times[version].size()) 
+    if (run_times[version].empty()) 
     {
 
-      std::vector<const char *> possibleTimeRunMapFiles;
-      possibleTimeRunMapFiles.reserve(3);
-      possibleTimeRunMapFiles.emplace_back(Form("%s/timerunmap_%d.txt", getenv("PUEO_CALIB_DIR"),version)); 
-      possibleTimeRunMapFiles.emplace_back(Form("%s/share/pueoCalib/timerunmap_%d.txt", getenv("PUEO_UTIL_INSTALL_DIR"),version)); 
-      possibleTimeRunMapFiles.emplace_back(Form("./calib/timerunmap_%d.txt",version)); 
-      const char * cache_file_name = checkIfFilesExist(possibleTimeRunMapFiles);
+      std::vector<TString> possiblePaths;
+      possiblePaths.reserve(3);
+      possiblePaths.emplace_back(TString::Format("%s/timerunmap_%d.txt", getenv("PUEO_CALIB_DIR"),version)); 
+      possiblePaths.emplace_back(TString::Format("%s/share/pueoCalib/timerunmap_%d.txt", getenv("PUEO_UTIL_INSTALL_DIR"),version)); 
+      possiblePaths.emplace_back(TString::Format("./calib/timerunmap_%d.txt",version)); 
+      const char * cache_file_name = checkIfFilesExist(possiblePaths);
       if (cache_file_name) 
       {
-          FILE * cf = fopen(cache_file_name,"r"); 
-          run_info r; 
-          while(!feof(cf))
-          {
-            fscanf(cf,"%d %lf %lf\n", &r.run, &r.start_time, &r.stop_time); 
-            run_times[version].push_back(r); 
-          }
-          fclose(cf); 
+        FILE * cf = fopen(cache_file_name,"r"); 
+        run_info r; 
+        while(!feof(cf))
+        {
+          fscanf(cf,"%d %lf %lf\n", &r.run, &r.start_time, &r.stop_time); 
+          run_times[version].push_back(r); 
+        }
+        fclose(cf); 
       }
 
       if (!cache_file_name) 
@@ -157,23 +157,25 @@ int pueo::Dataset::getRunAtTime(double t)
           if (sscanf(ent->d_name,"run%d",&run))
           {
 
-            std::vector<const char *> possibleHeaderFiles;
-            possibleHeaderFiles.reserve(2);
-            possibleHeaderFiles.emplace_back(Form("%s/run%d/timedHeadFile%d.root", data_dir, run, run));
-            possibleHeaderFiles.emplace_back(Form("%s/run%d/headFile%d.root", data_dir, run, run));
+            std::vector<TString> possible_hfs;
+            possible_hfs.reserve(2);
+            possible_hfs.emplace_back(TString::Format("%s/run%d/timedHeadFile%d.root", data_dir, run, run));
+            possible_hfs.emplace_back(TString::Format("%s/run%d/headFile%d.root", data_dir, run, run));
 
-            if (const char * the_right_file = checkIfFilesExist(possibleHeaderFiles))
+            if (const char * the_right_file = checkIfFilesExist(possible_hfs))
             {
               TFile f(the_right_file); 
-              TTree * t = (TTree*) f.Get("headTree"); 
-              if (t) 
-              {
-                run_info  ri; 
-                ri.run = run; 
-                //TODO do this to nanosecond precision 
-                ri.start_time= t->GetMinimum("triggerTime"); 
-                ri.stop_time = t->GetMaximum("triggerTime") + 1; 
-                run_times[version].push_back(ri); 
+              if (!f.IsZombie()){
+                TTree * t = (TTree*) f.Get("headTree"); 
+                if (t) 
+                {
+                  run_info  ri; 
+                  ri.run = run; 
+                  //TODO do this to nanosecond precision 
+                  ri.start_time= t->GetMinimum("triggerTime"); 
+                  ri.stop_time = t->GetMaximum("triggerTime") + 1; 
+                  run_times[version].push_back(ri); 
+                }
               }
             }
           }
