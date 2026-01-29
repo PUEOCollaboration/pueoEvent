@@ -265,31 +265,18 @@ pueo::Dataset::~Dataset()
   if (fTruth) delete fTruth; 
   if (fCutList) delete fCutList;
 
-  // // Since we've set the directory to 0 for these,
-  // // ROOT won't delete them when the fBlindFile is closed
-  // // So we need to do it here.
-  // for(int pol=0; pol < AnitaPol::kNotAPol; pol++){
-  //   if(fBlindHeadTree[pol]){
-  //     delete fBlindHeadTree[pol];
-  //     fBlindHeadTree[pol] = NULL;
-  //   }
-  //   if(fBlindEventTree[pol]){
-  //     delete fBlindEventTree[pol];
-  //     fBlindEventTree[pol] = NULL;
-  //   }
-  //   if(fBlindHeader[pol]){
-  //     delete fBlindHeader[pol];
-  //     fBlindHeader[pol] = NULL;
-  //   }
-  //   if(fBlindEvent[pol]){
-  //     delete fBlindEvent[pol];
-  //     fBlindEvent[pol] = NULL;
-  //   }
-  // }
-
   if(fBlindFile){
     fBlindFile->Close();
     delete fBlindFile;
+  }
+
+  for(int pol=0; pol < pol::kNotAPol; pol++){
+    if(fBlindHeader[pol]) {
+      delete fBlindHeader[pol];
+    }
+    if(fBlindEvent[pol]) {
+      delete fBlindEvent[pol];
+    }
   }
 }
 
@@ -320,20 +307,20 @@ void pueo::Dataset::zeroBlindPointers()
 
   for(int pol=0; pol < pol::kNotAPol; pol++)
   {
-    fBlindHeadTree[pol] = NULL;
-    fBlindEventTree[pol] = NULL;
-    fBlindHeader[pol] = NULL;
-    fBlindEvent[pol] = NULL;
+    fBlindHeadTree[pol] = nullptr;
+    fBlindEventTree[pol] = nullptr;
+    fBlindHeader[pol] = nullptr;
+    fBlindEvent[pol] = nullptr;
   }
 
-  fBlindFile = NULL;
+  fBlindFile = nullptr;
 }
 
 void pueo::Dataset::loadBlindTrees() 
 {
-  if(!loadedBlindTrees && version::get()==3){
-
-    fBlindFile = NULL;
+  if(!loadedBlindTrees && version::get()==3)
+  {
+    fBlindFile = nullptr;
 
     char calibDir[FILENAME_MAX-64];
     char fileName[FILENAME_MAX];
@@ -351,51 +338,47 @@ void pueo::Dataset::loadBlindTrees()
       strncpy(calibDir,calibEnv,sizeof(calibDir));
     }
 
-    // std::cout << __PRETTY_FUNCTION__ << ": here 2" << std::endl;
-
-
     // these are the fake events, that will be inserted in place of some min bias events    
     snprintf(fileName,sizeof(fileName), "%s/insertedDataFile.root", calibDir);
 
     TString theRootPwd = gDirectory->GetPath();
-    // std::cerr << "Before opening blind file" << "\t" << gDirectory->GetPath() << std::endl;
-    fBlindFile = TFile::Open(fileName);
-    // std::cerr << "After opening blind file" << "\t" << gDirectory->GetPath() << std::endl;
-    
-    if(fBlindFile){
 
+    fBlindFile = TFile::Open(fileName);
+
+    if(!fBlindFile || fBlindFile->IsZombie())
+    {
+      fprintf(stderr, "Unable to find %s for inserted event blinding (%s)", fileName,__PRETTY_FUNCTION__ );
+    }
+    else
+    {
       TString polPrefix[pol::kNotAPol];
       polPrefix[pol::kHorizontal] = "HPol";
       polPrefix[pol::kVertical] = "VPol";
 
-      for(int pol=0; pol < pol::kNotAPol; pol++){
+      for(int pol=0; pol < pol::kNotAPol; pol++)
+      {
+        TString headTreeName = polPrefix[pol] + "HeadTree";
+        fBlindHeadTree[pol] = (TTree*) fBlindFile->Get(headTreeName);
 
-	TString headTreeName = polPrefix[pol] + "HeadTree";
-	fBlindHeadTree[pol] = (TTree*) fBlindFile->Get(headTreeName);
+        TString eventTreeName = polPrefix[pol] + "EventTree";
+        fBlindEventTree[pol] = (TTree*) fBlindFile->Get(eventTreeName);
 
-	TString eventTreeName = polPrefix[pol] + "EventTree";
-	fBlindEventTree[pol] = (TTree*) fBlindFile->Get(eventTreeName);
+        // If you found the data then prepare for data reading
+        if(fBlindHeadTree[pol] && fBlindEventTree[pol]){
 
-	// If you found the data then prepare for data reading
-	if(fBlindHeadTree[pol] && fBlindEventTree[pol]){
-
-	  fBlindHeadTree[pol]->SetBranchAddress("header", &fBlindHeader[pol]);
-	  fBlindEventTree[pol]->SetBranchAddress("event", &fBlindEvent[pol]);          
-	}
-	else{
-	  // complain if you can't find the data
-	  std::cerr << "Error in " << __PRETTY_FUNCTION__ << ": "
-		    << "fBlindHeadTree[" << pol << "] = " << fBlindHeadTree[pol] << ", "
-		    << "fBlindEventTree[" << pol << "] = " << fBlindEventTree[pol] << std::endl;
-	}
+          fBlindHeadTree[pol]->SetBranchAddress("header", &fBlindHeader[pol]);
+          fBlindEventTree[pol]->SetBranchAddress("event", &fBlindEvent[pol]);          
+        }
+        else
+        {
+          fprintf(stderr, 
+                  "Error retrieving blind tree(s):\n"
+                  "fBlindHeadTree[%d]  = %p\n"
+                  "fBlindEventTree[%d] = %p\n" "(%s)",
+                  pol, (void*) fBlindHeadTree[pol], pol, (void*) fBlindEventTree[pol], __PRETTY_FUNCTION__);
+        }
       }
     }
-    else{
-      std::cerr << "Error in " << __PRETTY_FUNCTION__ << ": "
-		<< "Unable to find " << fileName << " for inserted event blinding." << std::endl;
-    }
-
-    // std::cout << __PRETTY_FUNCTION__ << ": here 3" << std::endl;
 
     // these are the min bias event numbers to be overwritten, with the entry in the fakeEventTree
     // that is used to overwrite the event
@@ -411,7 +394,6 @@ void pueo::Dataset::loadBlindTrees()
       fakeTreeEntries.push_back(fakeTreeEntry);
       pol::pol_t thePol = pol::pol_t(pol);
       polarityOfEventToInsert.push_back(thePol);
-      // std::cout << overwrittenEventNumber << "\t" << fakeTreeEntry << "\t" << thePol << std::endl;
       numEvents++;
     }
     if(numEvents==0){
@@ -420,16 +402,6 @@ void pueo::Dataset::loadBlindTrees()
     }
 
     gDirectory->cd(theRootPwd);
-    
-    // const char* treeNames[4] = {"HPolHeadTree", "HPolEventTree", "VPolHeadTree", "VPolEventTree"};
-    // for(int i=0; i < 4; i++){
-    //   std::cerr << "after close file " << "\t" << gROOT->FindObject(treeNames[i]) << std::endl;
-    // }    
-
     loadedBlindTrees = true;
   }
-
-//   gROOT->cd(0); 
-  // std::cout << __PRETTY_FUNCTION__ << ": here 4" << std::endl;
-
 }
