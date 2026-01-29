@@ -33,7 +33,8 @@ ClassImp(pueo::nav::Sats);
 #ifdef HAVE_PUEORAWDATA
 
 pueo::nav::Attitude::Attitude(const pueo_nav_att *att)
-  : realTime(att->gps_time.utc_secs),
+  : source(att->source), 
+  realTime(att->gps_time.utc_secs),
   nSats(att->nsats),
   readoutTime(att->gps_time.utc_secs),
   readoutTimeNsecs(att->gps_time.utc_nsecs),
