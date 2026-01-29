@@ -11,6 +11,7 @@
 #include "TFile.h"
 #include <stdio.h>
 #include <filesystem>
+#include <unordered_map>
 
 // basically copied from pueorawdata's rawdata.h (see definition of the enum pueo_datatype_t)
 #define  PUEO_PACKET_INVALID   0
