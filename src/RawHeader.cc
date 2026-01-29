@@ -34,6 +34,7 @@ int pueo::RawHeader::isInPhiMask(int phi, pueo::pol::pol_t pol) const
 }
 
 
+#ifdef HAVE_PUEORAWDATA
 pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs)
   : run(wfs->run), 
   triggerTime(wfs->event_second),
@@ -57,3 +58,4 @@ pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs)
 
 }
 
+#endif
