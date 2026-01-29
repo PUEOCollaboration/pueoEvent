@@ -6,7 +6,7 @@
 void usage()
 {
 
-  std::cout << "Usage: pueo-converter [-f] [-t tmpsuf] [-P postprocessor args] typetag outfile.root input [input2]" <<std::endl;
+  std::cout << "Usage: pueo-convert [-f] [-t tmpsuf] [-P postprocessor args] typetag outfile.root input [input2]" <<std::endl;
   std::cout << "   -f   allow clobbering output " << std::endl;
   std::cout << "   -t   set a temporary file suffix " <<std::endl;
   std::cout << "   -P   post processor args (quote for multiple) " << std::endl;
@@ -22,7 +22,7 @@ int main(int nargs, char ** args)
   pueo::convert::ConvertOpts opts;
 
   std::vector<char *> inputs;
-  for (int i = 0; i < nargs; i++)
+  for (int i = 1; i < nargs; i++)
   {
     if (!strcmp(args[i],"-f")) opts.clobber = true;
     else if (!strcmp(args[i],"-t"))
@@ -46,23 +46,27 @@ int main(int nargs, char ** args)
     else if (!typetag)
     {
       typetag = args[i];
+      std::cout << "typetag: " << typetag << std::endl;
     }
     else if (!output)
     {
       output = args[i];
+      std::cout << "output: " << output << std::endl;
     }
     else
     {
+      std::cout << args[i] << std::endl;
       inputs.push_back(args[i]);
     }
 
-    if (!typetag || !output || !inputs.size())
-    {
+  }
+
+  if (!typetag || !output || !inputs.size())
+  {
       usage();
       return 1;
-    }
-
   }
+
 
   int Nproc = pueo::convert::convertFilesOrDirectories(typetag,
         inputs.size(), (const char **) &inputs[0],
