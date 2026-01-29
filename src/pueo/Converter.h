@@ -48,8 +48,8 @@
 
 #define PUEO_CONVERTIBLE_TYPES(PUEO_CONVERT_TYPE)\
   PUEO_CONVERT_TYPE(waveform, full_waveforms, pueo::RawEvent, nullptr)\
-  PUEO_CONVERT_TYPE(header, full_waveforms,pueo::RawHeader, pueo::convert::postprocess_headers)\
-  PUEO_CONVERT_TYPE(attitude, nav_att, pueo::nav::Attitude, pueo::convert::postprocess_attitude)\
+  PUEO_CONVERT_TYPE(header, full_waveforms,pueo::RawHeader, nullptr)\
+  PUEO_CONVERT_TYPE(attitude, nav_att, pueo::nav::Attitude, nullptr)\
 
 
 
@@ -103,8 +103,9 @@ namespace pueo
     /** Similar to above, but an argument can be a directory instead of a file and in that case everything in the directory is added */
     int convertFilesOrDirectories(const char * typetag, int N, const char ** in,  const char * outfile, const ConvertOpts & opts = ConvertOpts());
 
+    //TODO
     int postprocess_headers(const char * infile, const char * outfile, const char * args);
-    int postprocess_attitudes(const char * infile, const char * outfile, const char * args);
+    int postprocess_attitudes(const char * infile, const char * outfile, const char * args) ;
   }
 }
 
