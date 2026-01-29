@@ -15,7 +15,6 @@ set(HEADER_FILES
 )
 target_sources(${PROJECT_NAME} PRIVATE
   src/Conventions.cc
-  src/Dataset.cc
   src/GeomTool.cc
   src/Nav.cc
   src/RawEvent.cc
@@ -23,6 +22,11 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/TruthEvent.cc
   src/UsefulEvent.cc
   src/Version.cc
+  src/PUEODataset.cc
+  src/PUEODataset_Core.cc
+  src/PUEODataset_FreeFunctions.cc
+  src/PUEODataset_HiCal.cc
+  src/PUEODataset_Legacy.cc
 )
 
 #================================================================================================

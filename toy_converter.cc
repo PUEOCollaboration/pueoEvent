@@ -2,11 +2,11 @@
 // @brief converts pueo's raw data to the CERN ROOT format defined by this repo (pueoEvent)
 // @note  usage: ./convert <raw_file_path> <output_directory>
 
+#include "pueo/rawio.h"     // from pueorawdata
 #include "pueo/RawEvent.h"  // from this repo
 #include "pueo/RawHeader.h"
 #include "pueo/Nav.h"
 #include "pueo/Dataset.h"   // from this repo, included for testing purposes
-#include "pueo/rawio.h"     // from pueorawdata
 #include "TTree.h"          // from CERN ROOT
 #include "TFile.h"
 #include <stdio.h>
