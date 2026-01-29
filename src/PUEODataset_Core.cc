@@ -63,7 +63,7 @@ bool pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     TFile * decHead = TFile::Open(TString::Format("%s/run%d/decimatedHeadFile%d.root", data_dir, run, run)); 
     if (decHead == nullptr || decHead->IsZombie())
     {
-      fprintf(stderr, "Could not find decimated head file for run %d, giving up!\n", run); 
+      fprintf(stderr, "Could not find decimated header file for run %d, giving up!\n", run); 
       fRunLoaded = false;
       return false; 
     }
@@ -71,7 +71,7 @@ bool pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     fDecimatedHeadTree = (TTree*) decHead->Get("headTree"); 
     if (!fDecimatedHeadTree) 
     {
-      fprintf(stderr, "Could not load decimate header tree for run %d from %s", run, data_dir);
+      fprintf(stderr, "Could not load decimated header tree for run %d from %s", run, decHead->GetName());
       fRunLoaded = false;
       return false;
     }
@@ -95,13 +95,13 @@ bool pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   const char * aHeader = checkIfFilesExist(possibleHeaders);
   if (!aHeader)
   {
-    fprintf(stderr,"Could not find head file for run %d, giving up!\n", run);
+    fprintf(stderr,"Could not find header file for run %d, giving up!\n", run);
     fRunLoaded = false;
     return false; 
   }
   if (strcasestr(aHeader,"Simulated")) simulated = true; 
 
-  fprintf(stdout, "Using head file: %s\n", aHeader);
+  fprintf(stdout, "Using header file: %s\n", aHeader);
 
   TFile * headFile = TFile::Open(aHeader);
   if (headFile == nullptr || headFile->IsZombie()) {
@@ -230,10 +230,15 @@ bool pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     if ( const char * the_right_file = checkIfFilesExist(possibleTruths) )
     {
       TFile * truthFile = TFile::Open(the_right_file); 
-      if ( truthFile != nullptr && !truthFile->IsZombie()){
+      if ( truthFile != nullptr && !truthFile->IsZombie())
+      {
         filesToClose.push_back(truthFile); 
         fTruthTree = (TTree*) truthFile->Get("truthPueoTree"); 
-        if (fTruthTree) {
+        if (!fTruthTree) {
+          fprintf(stderr, "Warning: found a truth file but couldn't load the truth tree!");
+        } 
+        else 
+        {
           fTruthTree->SetBranchAddress("truth", &fTruth); 
         }
       }
