@@ -30,6 +30,10 @@
 //Includes
 #include <TObject.h>
 
+#include <array>
+#ifdef HAVE_PUEORAWDATA
+#include "pueo/rawdata.h"
+#endif
 namespace pueo 
 {
 
@@ -76,26 +80,31 @@ namespace pueo
     {
      public:
        Attitude() {;}
+#ifdef HAVE_PUEORAWDATA
+       Attitude(const pueo_nav_att_t *att);
+#endif
        virtual ~Attitude(){;}
-
-       Int_t           run = 0; 
+       char source;
        UInt_t          realTime = 0; ///<Time from the GPS unit
-       UInt_t          timeOfDay = 0; ///<in ms since the start of the day
-       UShort_t        nSatsVis = 0; 
-       UShort_t        nSatsTracked = 0; 
-       UInt_t          payloadTime = 0;
-       UInt_t          payloadTimeUs = 0;
+       UShort_t        nSats= 0;
+       UInt_t          readoutTime = 0;
+       UInt_t          readoutTimeNsecs = 0;
        Float_t         latitude = 0; ///< In degrees
        Float_t         longitude = 0; ///<In degrees
        Float_t         altitude = 0; ///<In metres, WGS84
        Float_t         heading = 0; ///<In degrees
        Float_t         pitch = 0; ///<In degreess
        Float_t         roll = 0; ///<In degreess
-       Float_t         mrms = 0; 
-       Float_t         brms = 0; 
-       Int_t           flag = 0; 
+       Float_t         headingSigma = -1;
+       Float_t         pitchSigma = -1;
+       Float_t         rollSigma = -1;
+       Float_t         vdop = 0;
+       Float_t         hdop = 0;
+       Int_t           flag = 0;
+       std::array<UShort_t, 3> antennaCurrents;
+       Short_t        temperature = 0;
        
-      ClassDef(Attitude,1);
+      ClassDef(Attitude,2);
     };
 
     class Sat:  public TObject

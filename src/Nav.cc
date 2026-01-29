@@ -29,3 +29,30 @@ ClassImp(pueo::nav::Position);
 ClassImp(pueo::nav::Attitude); 
 ClassImp(pueo::nav::Sat); 
 ClassImp(pueo::nav::Sats); 
+
+#ifdef HAVE_PUEORAWDATA
+
+pueo::nav::Attitude::Attitude(const pueo_nav_att *att)
+  : realTime(att->gps_time.utc_secs),
+  nSats(att->nsats),
+  readoutTime(att->gps_time.utc_secs),
+  readoutTimeNsecs(att->gps_time.utc_nsecs),
+  latitude(att->lat),
+  longitude(att->lon),
+  altitude(att->alt),
+  heading(att->heading),
+  pitch(att->pitch),
+  roll(att->roll),
+  headingSigma(att->heading_sigma),
+  pitchSigma(att->pitch_sigma),
+  rollSigma(att->roll_sigma),
+  vdop(att->vdop),
+  hdop(att->hdop), 
+  flag(att->flags),
+  temperature(att->temperature)
+{
+  for (size_t i = 0; i < antennaCurrents.size(); i++) antennaCurrents[i] = att->antenna_currents[i];
+}
+
+
+#endif
