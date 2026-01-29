@@ -295,22 +295,22 @@ pueo::Dataset::~Dataset()
 
 void  pueo::Dataset::unloadRun() 
 {
-  for (unsigned i = 0; i < filesToClose.size(); i++) 
+  for (auto f: filesToClose) 
   {
-    filesToClose[i]->Close(); 
-    delete filesToClose[i]; 
+    f->Close(); 
+    delete f; 
   }
-  fHeadTree = 0; 
-  fDecimatedHeadTree = 0; 
-  fEventTree = 0; 
-  fGpsTree = 0; 
+  fHeadTree = nullptr; 
+  fDecimatedHeadTree = nullptr; 
+  fEventTree = nullptr; 
+  fGpsTree = nullptr; 
   fRunLoaded = false;
   filesToClose.clear();
 
   if (fCutList) 
   {
     delete fCutList; 
-    fCutList = 0; 
+    fCutList = nullptr;
   }  
 }
 

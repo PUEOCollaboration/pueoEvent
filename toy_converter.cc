@@ -218,7 +218,8 @@ int main(int argc, char** argv){
     FILENAME = pair.second.find(#FILENAME)->second; \
     FILENAME->Write("", TObject::kOverwrite); \
     printf("closing file %s\n", FILENAME->GetName()); \
-    FILENAME->Close();
+    FILENAME->Close(); \
+    delete FILENAME;
     FILES_TO_CREATE
     #undef X
   }
