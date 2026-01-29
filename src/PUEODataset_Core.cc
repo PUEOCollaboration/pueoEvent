@@ -31,17 +31,16 @@ pueo::Dataset::Dataset(int run,  DataDirectory version, bool decimated, Blinding
   loadBlindTrees(); // want this to come after opening the data files to try to have correct ANITA flight
 }
 
-bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec) 
+bool pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec) 
 {
-
   datadir = dir; 
 
-  // stop loadRun() changing the ROOT directory
+  // stop loadRun() from changing the ROOT directory
   // in case you book histograms or trees after instantiating AnitaDataset  
   const TString theRootPwd = gDirectory->GetPath();
   
   fDecimated = dec; 
-  fIndices = 0; 
+  fIndices = nullptr; 
 
   currRun = run;
 
@@ -51,160 +50,200 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   const char * data_dir = getDataDir(dir); 
 
   //seems like a good idea 
-  
   int version = (int) dir; 
   if (version>0) version::set(version); 
 
-  //if decimated, try to load decimated tree
-
-  if (fDecimated) 
+  if (!fDecimated) 
   {
-
+    fDecimatedHeadTree = nullptr; 
+  }
+  else //if decimated, try to load decimated tree
+  {
     fDecimatedEntry = 0; 
-    TString fname = TString::Format("%s/run%d/decimatedHeadFile%d.root", data_dir, run, run); 
-    if (checkIfFileExists(fname.Data()))
+    TFile * decHead = TFile::Open(TString::Format("%s/run%d/decimatedHeadFile%d.root", data_dir, run, run)); 
+    if (decHead == nullptr || decHead->IsZombie())
     {
-      TFile * f = new TFile(fname.Data()); 
-      filesToClose.push_back(f); 
-      fDecimatedHeadTree = (TTree*) f->Get("headTree"); 
-      fDecimatedHeadTree->BuildIndex("eventNumber"); 
-      fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
-      fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
-    }
-    else
-    {
-      fprintf(stderr," Could not find decimated head file for run %d, giving up!\n", run); 
+      fprintf(stderr, "Could not find decimated head file for run %d, giving up!\n", run); 
       fRunLoaded = false;
       return false; 
     }
-  }
-  else
-  {
-    fDecimatedHeadTree = 0; 
+    filesToClose.push_back(decHead); 
+    fDecimatedHeadTree = (TTree*) decHead->Get("headTree"); 
+    if (!fDecimatedHeadTree) 
+    {
+      fprintf(stderr, "Could not load decimate header tree for run %d from %s", run, data_dir);
+      fRunLoaded = false;
+      return false;
+    }
+    fDecimatedHeadTree->BuildIndex("eventNumber"); 
+    fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
+    fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
   }
   // try to load timed header file 
   
   // For telemetered crap 
-  std::vector<const char *> possibleHeaders;
+  std::vector<TString> possibleHeaders;
   possibleHeaders.reserve(5);
-  possibleHeaders.emplace_back(Form("%s/run%d/eventHeadFile%d.root", data_dir, run, run));
-  possibleHeaders.emplace_back(Form("%s/run%d/timedHeadFile%d.root", data_dir, run, run)); 
-  possibleHeaders.emplace_back(Form("%s/run%d/headFile%d.root", data_dir, run, run)); 
-  possibleHeaders.emplace_back(Form("%s/run%d/SimulatedHeadFile%d.root", data_dir, run, run));
-  possibleHeaders.emplace_back(Form("%s/run%d/SimulatedPueoHeadFile%d.root", data_dir, run, run));
+  possibleHeaders.emplace_back(TString::Format("%s/run%d/eventHeadFile%d.root", data_dir, run, run));
+  possibleHeaders.emplace_back(TString::Format("%s/run%d/timedHeadFile%d.root", data_dir, run, run)); 
+  possibleHeaders.emplace_back(TString::Format("%s/run%d/headFile%d.root", data_dir, run, run)); 
+  possibleHeaders.emplace_back(TString::Format("%s/run%d/SimulatedHeadFile%d.root", data_dir, run, run));
+  possibleHeaders.emplace_back(TString::Format("%s/run%d/SimulatedPueoHeadFile%d.root", data_dir, run, run));
 
   bool simulated = false; 
 
-  if (const char * the_right_file = checkIfFilesExist(possibleHeaders))
+  const char * aHeader = checkIfFilesExist(possibleHeaders);
+  if (!aHeader)
   {
-    if (strcasestr(the_right_file,"Simulated")) simulated = true; 
-
-    fprintf(stderr,"Using head file: %s\n",the_right_file); 
-    TFile * f = new TFile(the_right_file); 
-    filesToClose.push_back(f); 
-    fHeadTree = (TTree*) f->Get("headTree"); 
-  }
-  else 
-  {
-    fprintf(stderr,"Could not find head file for run %d, giving up!\n", run); 
+    fprintf(stderr,"Could not find head file for run %d, giving up!\n", run);
     fRunLoaded = false;
     return false; 
   }
+  if (strcasestr(aHeader,"Simulated")) simulated = true; 
 
-  if (!fDecimated) fHeadTree->SetBranchAddress("header",&fHeader); 
+  fprintf(stdout, "Using head file: %s\n", aHeader);
 
-  fHeadTree->BuildIndex("eventNumber"); 
+  TFile * headFile = TFile::Open(aHeader);
+  if (headFile == nullptr || headFile->IsZombie()) {
+    fprintf(stderr, "Failed to open %s", aHeader);
+    fRunLoaded = false;
+    return false;
+  }
+  filesToClose.push_back(headFile);
+  fHeadTree = (TTree*) headFile->Get("headTree");
 
-  if (!fDecimated) fIndices = ((TTreeIndex*) fHeadTree->GetTreeIndex())->GetIndex(); 
+  if (fHeadTree == nullptr) {
+    fprintf(stderr, "Failed to load header tree for run %d from %s", run, data_dir);
+    fRunLoaded = false;
+    return false;
+  }
+
+  if (!fDecimated) {
+    fHeadTree->SetBranchAddress("header",&fHeader);
+    fHeadTree->BuildIndex("eventNumber");
+    fIndices = ((TTreeIndex*) fHeadTree->GetTreeIndex())->GetIndex(); 
+  }
 
   //try to load gps event file  
-  std::vector<const char *> possibleGps;
+  std::vector<TString> possibleGps;
   possibleGps.reserve(5);
-  possibleGps.emplace_back(Form("%s/run%d/gpsEvent%d.root", data_dir, run, run));
-  possibleGps.emplace_back(Form("%s/run%d/SimulatedGpsFile%d.root", data_dir, run, run)); 
-  possibleGps.emplace_back(Form("%s/run%d/SimulatedPueoGpsFile%d.root", data_dir, run, run));
+  possibleGps.emplace_back(TString::Format("%s/run%d/gpsEvent%d.root", data_dir, run, run));
+  possibleGps.emplace_back(TString::Format("%s/run%d/SimulatedGpsFile%d.root", data_dir, run, run)); 
+  possibleGps.emplace_back(TString::Format("%s/run%d/SimulatedPueoGpsFile%d.root", data_dir, run, run));
   if (const char * the_right_file = checkIfFilesExist(possibleGps))
   {
-     TFile * f = new TFile(the_right_file); 
-     filesToClose.push_back(f); 
-     fGpsTree = (TTree*) f->Get("gpsTree"); 
-     fHaveGpsEvent = true; 
+    TFile * f = TFile::Open(the_right_file);
+    if (f->IsZombie()) {
+      fprintf(stderr,"Could not load gps file for run %d from %s, giving up!\n",run, data_dir); 
+      fRunLoaded = false;
+      return false;
+    }
+    filesToClose.push_back(f); 
+    fGpsTree = (TTree*) f->Get("gpsTree"); 
+    if (fGpsTree==nullptr){
+      fprintf(stderr,"Could not load gpsTree from file %s for run %d, giving up!\n", the_right_file, run); 
+      fRunLoaded = false;
+      return false;
+    }
+    fHaveGpsEvent = true; 
   } 
   else   // load gps file instead
   {
-    TFile * gpsFile = TFile::Open(Form("%s/run%d/gpsFile%d.root", data_dir, run, run));
-    if (gpsFile->IsZombie()) 
+    TFile * gpsFile = TFile::Open(TString::Format("%s/run%d/gpsFile%d.root", data_dir, run, run));
+    if (gpsFile->IsZombie() || gpsFile == nullptr) 
     {
-      fprintf(stderr,"Could not find gps file for run %d, giving up!\n",run); 
+      fprintf(stderr,"Could not find gps file for run %d from %s, giving up!\n", run, data_dir);
       fRunLoaded = false;
       return false; 
     }
     else
     {
-       filesToClose.push_back(gpsFile);
-       fGpsTree = (TTree*) gpsFile->Get("gpsTree"); 
-       fGpsTree->BuildIndex("realTime"); 
-       fHaveGpsEvent = false; 
+      filesToClose.push_back(gpsFile);
+      fGpsTree = (TTree*) gpsFile->Get("gpsTree"); 
+      if (fGpsTree==nullptr){
+        fprintf(stderr,"Could not load gpsTree from file %s for run %d, giving up!\n", gpsFile->GetName(), run); 
+        fRunLoaded = false;
+        return false;
+      }
+      fHaveGpsEvent = false; 
+      fGpsTree->BuildIndex("realTime"); 
     }
   }
 
   fGpsTree->SetBranchAddress("gps",&fGps); 
 
   //try to load useful event file 
-  std::vector<const char *> possibleEventFiles;
+  std::vector<TString> possibleEventFiles;
   possibleEventFiles.reserve(3);
-  possibleEventFiles.emplace_back(Form("%s/run%d/usefulEventFile%d.root", data_dir, run, run));
-  possibleEventFiles.emplace_back(Form("%s/run%d/SimulatedEventFile%d.root", data_dir, run, run)); 
-  possibleEventFiles.emplace_back(Form("%s/run%d/SimulatedPueoEventFile%d.root", data_dir, run, run)); 
+  possibleEventFiles.emplace_back(TString::Format("%s/run%d/usefulEventFile%d.root", data_dir, run, run));
+  possibleEventFiles.emplace_back(TString::Format("%s/run%d/SimulatedEventFile%d.root", data_dir, run, run)); 
+  possibleEventFiles.emplace_back(TString::Format("%s/run%d/SimulatedPueoEventFile%d.root", data_dir, run, run)); 
   if (const char * the_right_file = checkIfFilesExist(possibleEventFiles))
   {
-     TFile * f = new TFile(the_right_file); 
-     filesToClose.push_back(f); 
-     fEventTree = (TTree*) f->Get("eventTree"); 
-     fHaveUsefulFile = true; 
-     fEventTree->SetBranchAddress("event",&fUsefulEvent); 
+    TFile * evtFile = TFile::Open(the_right_file); 
+    if (evtFile->IsZombie())
+    {
+      fprintf(stderr,"Failed to load %s from %s", the_right_file, data_dir);
+      fRunLoaded = false;
+      return false; 
+    }
+    filesToClose.push_back(evtFile);
+    fEventTree = (TTree*) evtFile->Get("eventTree"); 
+    if (!fEventTree) 
+    {
+      fprintf(stderr,"Could not load event tree from file %s for run %d, giving up!\n", evtFile->GetName(), run); 
+      fRunLoaded = false;
+      return false;
+    }
+    fHaveUsefulFile = true; 
+    fEventTree->SetBranchAddress("event",&fUsefulEvent); 
   }
   else 
   {
-    TFile * eventFile = TFile::Open(Form("%s/run%d/eventFile%d.root", data_dir, run, run)); 
-    if (! eventFile->IsZombie())
+    TFile * eventFile = TFile::Open(TString::Format("%s/run%d/eventFile%d.root", data_dir, run, run)); 
+    if (eventFile->IsZombie() || eventFile==nullptr)
     {
-       filesToClose.push_back(eventFile); 
-       fEventTree = (TTree*) eventFile->Get("eventTree"); 
-       fHaveUsefulFile = false; 
-       fEventTree->SetBranchAddress("event",&fRawEvent); 
+      fprintf(stderr,"Failed to load %s", the_right_file); 
+      fRunLoaded = false;
+      return false; 
     }
+    filesToClose.push_back(eventFile); 
+    fEventTree = (TTree*) eventFile->Get("eventTree"); 
+    if (!fEventTree) 
+    {
+      fprintf(stderr,"Could not load event tree from file %s for run %d, giving up!\n", eventFile->GetName(), run); 
+      fRunLoaded = false;
+      return false;
+    }
+    fHaveUsefulFile = false; 
+    fEventTree->SetBranchAddress("event",&fRawEvent); 
   }
 
-  if (!fEventTree) 
-  {
-    std::cerr << "WARNING: did not load an event tree for run " << run << " in " << data_dir << std::endl; 
-
-  }
   
   //try to load truth 
   if (simulated)
   {
-    std::vector<const char *> possibleSimulatedFiles;
-    possibleSimulatedFiles.reserve(2);
-    possibleSimulatedFiles.emplace_back(Form("%s/run%d/SimulatedTruthFile%d.root",data_dir,run,run));
-    possibleSimulatedFiles.emplace_back(Form("%s/run%d/SimulatedPueoTruthFile%d.root",data_dir,run,run));
-    if ( const char * the_right_file = checkIfFilesExist(possibleSimulatedFiles) )
+    std::vector<TString> possibleTruths;
+    possibleTruths.reserve(2);
+    possibleTruths.emplace_back(TString::Format("%s/run%d/SimulatedTruthFile%d.root",data_dir,run,run));
+    possibleTruths.emplace_back(TString::Format("%s/run%d/SimulatedPueoTruthFile%d.root",data_dir,run,run));
+    if ( const char * the_right_file = checkIfFilesExist(possibleTruths) )
     {
-     TFile * f = new TFile(the_right_file); 
-     filesToClose.push_back(f); 
-     fTruthTree = (TTree*) f->Get("truthPueoTree"); 
-     fTruthTree->SetBranchAddress("truth",&fTruth); 
+      TFile * truthFile = TFile::Open(the_right_file); 
+      if ( truthFile != nullptr && !truthFile->IsZombie()){
+        filesToClose.push_back(truthFile); 
+        fTruthTree = (TTree*) truthFile->Get("truthPueoTree"); 
+        if (fTruthTree) {
+          fTruthTree->SetBranchAddress("truth", &fTruth); 
+        }
+      }
     }
   }
 
-  //load the first entry 
-  getEntry(0); 
-  
-
+  getEntry(0); //load the first entry 
   fRunLoaded = true;
 
-  // stop loadRun() changing the ROOT directory
+  // change the ROOT gDirectory back (ie stop this function from changing the ROOT directory)
   // in case you book histograms or trees after instantiating AnitaDataset
   gDirectory->cd(theRootPwd); 
   

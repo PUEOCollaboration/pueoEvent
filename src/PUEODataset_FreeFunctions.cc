@@ -1,5 +1,4 @@
 // Implementation of the Dataset class's public static member methods, and their private helpers
-// note: not all static methods are here, as some of them are in PUEODataset_core.cc
 
 #include "pueo/Dataset.h"
 #include "TFile.h"
@@ -33,9 +32,9 @@ TString pueo::Dataset::getDescription(BlindingStrategy strat){
   return description;
 }
 
-const char * pueo::Dataset::checkIfFilesExist(const std::vector<const char *>& files)
+const char * pueo::Dataset::checkIfFilesExist(const std::vector<TString>& files)
 {
-  for (const char * f: files) 
+  for (const TString& f: files) 
   {
     if(checkIfFileExists(f)) return f;
   }

@@ -357,8 +357,8 @@ namespace pueo
       DataDirectory datadir; 
 
     private:
-      static bool checkIfFileExists(const char * file) {return access(file, R_OK) == 0;}
-      static const char * checkIfFilesExist(const std::vector<const char *>& files);
+      static bool checkIfFileExists(const TString& file) {return access(file, R_OK) == 0;}
+      static const char * checkIfFilesExist(const std::vector<TString>& files);
     
   };
 
