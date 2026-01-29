@@ -98,10 +98,11 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   for (size_t i = 0; i < N; i++)
   {
     pueo_handle_t h;
+    std::cout << "Processing file " << infiles[i] << std::endl;
     pueo_handle_init(&h, infiles[i], "r");
 
 
-    while (ReaderFn(&h, &r))
+    while (ReaderFn(&h, &r) > 0)
     {
       nprocessed++;
       R = new (R) RootType(&r);
@@ -137,7 +138,7 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
 int pueo::convert::convertFiles(const char * typetag, int nfiles, const char ** infiles,  const char * outfile, const ConvertOpts & opts)
 {
 
-  if (!opts.clobber && access(outfile,F_OK))
+  if (!opts.clobber && !access(outfile,F_OK))
   {
     std::cerr << outfile << " already exists and we didn't enable clobber" <<std::endl;
     return -1;
