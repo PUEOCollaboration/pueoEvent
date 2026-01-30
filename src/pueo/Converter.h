@@ -4,12 +4,12 @@
 /************************************************************
 *  pueo/Converter.h           PUEO raw data convesion
 *
-*  Converter API. Main consumer will be a driver program but maybe someone will want to use 
-*  stuff interactively.
+*  Converter API. Main consumer will be a driver program but maybe someone will want to use
+*  stuff interactively (or from PyROOT).
 *
 *  Cosmin Deaconu <cozzyd@kicp.uchicago.edu
 *
-*  (C) 2027-, The Payload for Ultrahigh Energy Observations (PUEO) Collaboration
+*  (C) 2026-, The Payload for Ultrahigh Energy Observations (PUEO) Collaboration
 *
 *  This file is part of pueoEvent, the ROOT I/O library for PUEO.
 *
@@ -27,7 +27,19 @@
 *
 ****************************************************************************/
 
+
 #include <vector>
+#ifdef HAVE_PUEORAWDATA 
+#include <pueo/rawdata.h>
+#endif
+
+
+
+namespace pueo
+{
+  namespace convert
+  {
+
 
 
 // X-macro defining the convertible types,
@@ -45,19 +57,30 @@
 // nullptr then the intermediate tmp tree is just renamed to the output. It
 // takes arguments of input file, output file and a freeform argument. If NULL
 // the temporary file will simply be moved to the final file.
-
+//
+// has_arity should be 1 in case a raw type corresponds to multiple root types, in which case an arity
+// template specialization below should also be defined
+//
 #define PUEO_CONVERTIBLE_TYPES(PUEO_CONVERT_TYPE)\
-  PUEO_CONVERT_TYPE(waveform, full_waveforms, pueo::RawEvent, nullptr)\
-  PUEO_CONVERT_TYPE(header, full_waveforms,pueo::RawHeader, nullptr)\
-  PUEO_CONVERT_TYPE(attitude, nav_att, pueo::nav::Attitude, nullptr)\
+/*                  |  tag           |     raw_type        | ROOT type                |  postprocessor  | has_arity    */\
+/*==================================================================================================================== */\
+PUEO_CONVERT_TYPE(/*|*/ waveform,  /*|*/  full_waveforms, /*|*/ pueo::RawEvent,     /*|*/ nullptr,    /*|*/ 0           )\
+PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,    /*|*/ nullptr,    /*|*/ 0           )\
+PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attitude,/*|*/ nullptr,    /*|*/ 0           )\
 
 
 
-namespace pueo
-{
 
-  namespace convert
-  {
+// If a ROOT constructor should take an index (because we've batched stuff), we can do that at compile time by adding a template specialization here.
+// and adding pueo::convert::arity to the arity the x-macro
+template <typename T> int arity(const T * t) { (void) t ; return -1; }
+#ifdef HAVE_PUEORAWDATA
+template <> inline int arity<pueo_sensors_telem_t> (const pueo_sensors_telem_t * telem) { return telem->num_packets; }
+template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * disk) { return disk->num_packets; }
+#endif
+
+
+
     struct ConvertOpts
     {
       bool clobber = false;

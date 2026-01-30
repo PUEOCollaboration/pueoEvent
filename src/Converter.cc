@@ -52,7 +52,7 @@
 
 template <typename T> const char * getName() { return "unnamed"; } 
 
-#define NAME_TEMPLATE(TAG, RAW, ROOT, POST) template <> const char * getName<ROOT>() { return #TAG; }
+#define NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY) template <> const char * getName<ROOT>() { return #TAG; }
 
 PUEO_CONVERTIBLE_TYPES(NAME_TEMPLATE)
 
@@ -63,7 +63,8 @@ static const char * getTagFromRawName(const char* raw_name)
   static bool init = false;
   if (!init)
   {
-#define RAWTABLE(TAG, RAW, ROOT, POST) table[#RAW] = #TAG;
+#define RAWTABLE(TAG, RAW, ROOT, POST, ARITY) table[#RAW] = #TAG;
+    PUEO_CONVERTIBLE_TYPES(RAWTABLE)
   }
 
   if (table.count(raw_name)) return table[raw_name];
@@ -72,7 +73,7 @@ static const char * getTagFromRawName(const char* raw_name)
 
 
 
-template <typename RootType, typename RawType, int (*ReaderFn)(pueo_handle_t*, RawType*), pueo::convert::postprocess_fn PostProcess  = nullptr>
+template <typename RootType, typename RawType, int (*ReaderFn)(pueo_handle_t*, RawType*), pueo::convert::postprocess_fn PostProcess  = nullptr, bool Arity = false>
 static int converterImpl(size_t N, const char ** infiles,  const char * outfile, const char * tmp_suffix, const char * postprocess_args)
 {
 
@@ -104,9 +105,23 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
 
     while (ReaderFn(&h, &r) > 0)
     {
-      nprocessed++;
-      R = new (R) RootType(&r);
-      t->Fill();
+      if constexpr (Arity)
+      {
+        int num_items = pueo::convert::arity(&r);
+        for (int j = 0; j < num_items; j++)
+        {
+          nprocessed++;
+          R = new (R) RootType(&r, j);
+          t->Fill();
+        }
+      }
+      else
+      {
+
+        nprocessed++;
+        R = new (R) RootType(&r);
+        t->Fill();
+      }
     }
     pueo_handle_close(&h);
   }
@@ -183,10 +198,10 @@ int pueo::convert::convertFiles(const char * typetag, int nfiles, const char ** 
     return -1;
   }
 
-#define CONVERT_TEMPLATE(TAG, RAW, ROOT, POST)\
+#define CONVERT_TEMPLATE(TAG, RAW, ROOT, POST, ARITY)\
   else if (!strcmp(typetag,#TAG))\
   {\
-    return converterImpl<ROOT,pueo_##RAW##_t,pueo_read_##RAW,POST>(nfiles, infiles, outfile, opts.tmp_suffix, opts.postprocess_args);\
+    return converterImpl<ROOT,pueo_##RAW##_t,pueo_read_##RAW,POST, ARITY>(nfiles, infiles, outfile, opts.tmp_suffix, opts.postprocess_args);\
   }
 
   PUEO_CONVERTIBLE_TYPES(CONVERT_TEMPLATE)
