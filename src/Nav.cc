@@ -33,7 +33,7 @@ ClassImp(pueo::nav::Sats);
 #ifdef HAVE_PUEORAWDATA
 
 pueo::nav::Attitude::Attitude(const pueo_nav_att *att)
-  : source(att->source), 
+  : source(att->source),
   realTime(att->gps_time.utc_secs),
   nSats(att->nsats),
   readoutTime(att->gps_time.utc_secs),
@@ -48,7 +48,7 @@ pueo::nav::Attitude::Attitude(const pueo_nav_att *att)
   pitchSigma(att->pitch_sigma),
   rollSigma(att->roll_sigma),
   vdop(att->vdop),
-  hdop(att->hdop), 
+  hdop(att->hdop),
   flag(att->flags),
   temperature(att->temperature)
 {
