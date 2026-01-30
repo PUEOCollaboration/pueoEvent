@@ -44,7 +44,7 @@ namespace pueo
 
 // X-macro defining the convertible types,
 //
-// arguments are:  (typetag, raw_type, root_type, postprocess_function)
+// arguments are:  (tag, raw type, ROOT type, postprocessor, has_arit)
 //
 // The typetag is used as the argument to the convert driver program, as well
 // as the tree and branch name.
@@ -62,7 +62,7 @@ namespace pueo
 // template specialization below should also be defined
 //
 #define PUEO_CONVERTIBLE_TYPES(PUEO_CONVERT_TYPE)\
-/*                  |  tag           |     raw_type        | ROOT type                |  postprocessor  | has_arity    */\
+/*                  |  tag           |     raw type        | ROOT type                |  postprocessor  | has_arity    */\
 /*==================================================================================================================== */\
 PUEO_CONVERT_TYPE(/*|*/ waveform,  /*|*/  full_waveforms, /*|*/ pueo::RawEvent,     /*|*/ nullptr,    /*|*/ 0           )\
 PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,    /*|*/ nullptr,    /*|*/ 0           )\
@@ -70,15 +70,13 @@ PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attit
 
 
 
-
-// If a ROOT constructor should take an index (because we've batched stuff), we can do that at compile time by adding a template specialization here.
-// and adding pueo::convert::arity to the arity the x-macro
+// If a ROOT constructor should take an index (because we've batched stuff), we should set has_arity to 1 above
+// and then define an appropriate template specialization here
 template <typename T> int arity(const T * t) { (void) t ; return -1; }
 #ifdef HAVE_PUEORAWDATA
 template <> inline int arity<pueo_sensors_telem_t> (const pueo_sensors_telem_t * telem) { return telem->num_packets; }
 template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * disk) { return disk->num_packets; }
 #endif
-
 
 
     struct ConvertOpts
@@ -88,13 +86,11 @@ template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * d
       const char * postprocess_args = nullptr;
     };
 
-    // These are just shortcuts here
-    namespace typetags
+    namespace tags
     {
-      constexpr const char * AUTO = "auto";
-      constexpr const char * HEADER = "header";
-      constexpr const char * WAVEFORMS = "waveform";
-      constexpr const char * ATTITUDE = "attitude";
+      constexpr const char * automatic = "auto"; //since we can't use auto as a token :)
+#define DEFINE_TAG(TAG, IG,NO,RE,D) constexpr const char * TAG = #TAG;
+      PUEO_CONVERTIBLE_TYPES(DEFINE_TAG)
     }
 
     /* Typedef for a postprocessor function when converting.
