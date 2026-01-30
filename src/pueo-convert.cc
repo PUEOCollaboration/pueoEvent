@@ -12,7 +12,7 @@ void usage()
   std::cout << "   -P   post processor args (quote for multiple) " << std::endl;
   std::cout << "   typetag  typetag of input, or use auto to try to determine (problematic if more than one ROOT type can be generate from the same raw type)"<<std::endl;
   std::cout << "   outfile  name of output file " <<std::endl;
-  std::cout << "   input    name of output file or directory " <<std::endl;
+  std::cout << "   input    name(s) of input files or directories (note that directories are not recursive) " <<std::endl;
 }
 
 int main(int nargs, char ** args) 

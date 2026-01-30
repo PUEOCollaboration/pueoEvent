@@ -100,7 +100,7 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
 )
 
-add_executable(pueo-convert src/pueo-converter.cc)
+add_executable(pueo-convert src/pueo-convert.cc)
 target_link_libraries(pueo-convert ${PROJECT_NAME})
 
 # CERN ROOT dictionary generation
