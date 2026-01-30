@@ -86,21 +86,7 @@ template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * d
       const char * postprocess_args = nullptr;
     };
 
-    namespace tags
-    {
-      constexpr const char * automatic = "auto"; //since we can't use auto as a token :)
-#define DEFINE_TAG(TAG, IG,NO,RE,D) constexpr const char * TAG = #TAG;
-      PUEO_CONVERTIBLE_TYPES(DEFINE_TAG)
-    }
-
-    /* Typedef for a postprocessor function when converting.
-     * This has a very dumb (and flexible) interface taking the name of the input temporary ROOT file (with a TTree*) and the output
-     * that we should hopefully create as well as a free-form argument string.
-     *
-     **/
-    typedef int ( * postprocess_fn) (const char * infile, const char * outfile, const char * args);
-
-    /** Convert input files to output file
+   /** Convert input files to output file
      *
      * If typetag is NULL, empty or auto, the first packet from the first file will be read to determine the type. 
      * Note that this is fraught with peril as there is not necessarily a one-to-one mapping 
@@ -121,6 +107,20 @@ template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * d
 
     /** Similar to above, but an argument can be a directory instead of a file and in that case everything in the directory is added */
     int convertFilesOrDirectories(const char * typetag, int N, const char ** in,  const char * outfile, const ConvertOpts & opts = ConvertOpts());
+
+    namespace tags
+    {
+      constexpr const char * automatic = "auto"; //since we can't use auto as a token :)
+#define DEFINE_TAG(TAG, IG,NO,RE,D) constexpr const char * TAG = #TAG;
+      PUEO_CONVERTIBLE_TYPES(DEFINE_TAG)
+    }
+
+    /* Typedef for a postprocessor function when converting.
+     * This has a very dumb (and flexible) interface taking the name of the input temporary ROOT file (with a TTree*) and the output
+     * that we should hopefully create as well as a free-form argument string.
+     *
+     **/
+    typedef int ( * postprocess_fn) (const char * infile, const char * outfile, const char * args);
 
     //TODO
     int postprocess_headers(const char * infile, const char * outfile, const char * args);
