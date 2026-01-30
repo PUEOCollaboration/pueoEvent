@@ -52,8 +52,7 @@ namespace pueo
      UInt_t          readoutTime = 0 ; ///< unixTime of readout
      UInt_t          readoutTimeNs= 0 ; ///< sub second time of readout
      ULong_t         eventNumber = 0 ; ///< Software event number
-
-
+     UInt_t          L2Mask = {0};
      UInt_t          phiTrigMask[k::NUM_POLS] = {0}; ///< 24-bit phi mask (from TURF)
      UInt_t          flags = 0; 
 

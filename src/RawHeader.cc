@@ -53,6 +53,7 @@ pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs)
   if (wfs->pps_trigger) trigType |= pueo::trigger::kPPS0;
   if (wfs->ext_trigger) trigType |= pueo::trigger::kExt;
   if (wfs->L2_mask) trigType |= pueo::trigger::kRFMI;
+  L2Mask = wfs->L2_mask;
 
   //TODO convert L2 mask ,L1 mask as needed
 
