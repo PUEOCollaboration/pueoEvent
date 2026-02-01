@@ -65,6 +65,8 @@ static const char * getTagFromRawName(const char* raw_name)
   {
 #define RAWTABLE(TAG, RAW, ROOT, POST, ARITY) table[#RAW] = #TAG;
     PUEO_CONVERTIBLE_TYPES(RAWTABLE)
+
+    init = true;
   }
 
   if (table.count(raw_name)) return table[raw_name];
