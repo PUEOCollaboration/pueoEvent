@@ -111,6 +111,7 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
         for (int j = 0; j < num_items; j++)
         {
           nprocessed++;
+          R->~RootType();
           R = new (R) RootType(&r, j);
           t->Fill();
         }
@@ -119,6 +120,7 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
       {
 
         nprocessed++;
+        R->~RootType();
         R = new (R) RootType(&r);
         t->Fill();
       }
