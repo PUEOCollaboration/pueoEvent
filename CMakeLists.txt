@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23.0)
 project(pueoEvent VERSION 1.0.0)
 add_library(${PROJECT_NAME} SHARED)
-
+include(GNUInstallDirs)
 
 
 set(HEADER_FILES
@@ -29,8 +29,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/Version.cc
 )
 
-
-
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "This creates compile_commands.json, useful for LSP" FORCE)
 
 #================================================================================================
 #                                       HOUSEKEEPING
@@ -40,8 +39,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 #look for libpueorawdata, and enable converting if it's found
-find_library(PUEORAWDATA NAMES pueorawdata libpueorawdata PATHS "$ENV{PUEO_UTIL_INSTALL_DIR}/lib")
-
+find_package(pueorawdata CONFIG)
 
 # note: * This provides pueo-data_VERSION and GeometryReader.h 
 find_package(pueo-data 1.0.0 REQUIRED)  
@@ -50,16 +48,12 @@ find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
 # find_package(FFTW REQUIRED) # TODO: Pretty sure there's no need for FFTW
 find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
-
-
-if (PUEORAWDATA)
+if (pueorawdata_FOUND)
   target_compile_options(${PROJECT_NAME} PRIVATE -DHAVE_PUEORAWDATA)
-  target_link_libraries(${PROJECT_NAME} PRIVATE ${PUEORAWDATA})
-  message("Found libpueorawdata")
-else()
-  message("No libpueorawdata found, will not be able to convert")
-
+  target_link_libraries(${PROJECT_NAME} PRIVATE PUEO::pueorawdata)
+  message(STATUS "Found libpueorawdata")
 endif()
+
 #================================================================================================
 #                                       CERN ROOT FLAGS
 #================================================================================================
@@ -100,8 +94,15 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
 )
 
-add_executable(pueo-convert src/pueo-convert.cc)
-target_link_libraries(pueo-convert ${PROJECT_NAME})
+if (pueorawdata_FOUND)
+  add_executable(pueo-convert src/pueo-convert.cc)
+  target_link_libraries(pueo-convert ${PROJECT_NAME})
+  install(
+    TARGETS pueo-convert
+    EXPORT ${PROJECT_NAME}Targets 
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+endif()
 
 # CERN ROOT dictionary generation
 set(DICTNAME G__${PROJECT_NAME})
@@ -119,7 +120,6 @@ write_basic_package_version_file(
     COMPATIBILITY AnyNewerVersion
 )
 # Install the Config and ConfigVersion files
-include(GNUInstallDirs)
 install(
   FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
@@ -128,7 +128,7 @@ install(
 
 # Install the library and its header files
 install(
-  TARGETS ${PROJECT_NAME} pueo-convert
+  TARGETS ${PROJECT_NAME}
   EXPORT ${PROJECT_NAME}Targets 
   FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
