@@ -85,9 +85,10 @@ namespace pueo
 #endif
        virtual ~Attitude(){;}
        char source;
-       UInt_t          realTime = 0; ///<Time from the GPS unit
+       ULong_t         realTime = 0; ///<Time from the GPS unit
+       UInt_t          realTimeNsecs = 0;
        UShort_t        nSats= 0;
-       UInt_t          readoutTime = 0;
+       ULong_t         readoutTime = 0;
        UInt_t          readoutTimeNsecs = 0;
        Float_t         latitude = 0; ///< In degrees
        Float_t         longitude = 0; ///<In degrees
@@ -136,4 +137,4 @@ namespace pueo
 }
 
 
-#endif //ADU5PAT_H
+#endif //PUEO_NAV_H
