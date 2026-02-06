@@ -35,9 +35,10 @@ ClassImp(pueo::nav::Sats);
 pueo::nav::Attitude::Attitude(const pueo_nav_att *att)
   : source(att->source),
   realTime(att->gps_time.utc_secs),
+  realTimeNsecs(att->gps_time.utc_nsecs),
   nSats(att->nsats),
-  readoutTime(att->gps_time.utc_secs),
-  readoutTimeNsecs(att->gps_time.utc_nsecs),
+  readoutTime(att->readout_time.utc_secs),
+  readoutTimeNsecs(att->readout_time.utc_nsecs),
   latitude(att->lat),
   longitude(att->lon),
   altitude(att->alt),
