@@ -8,7 +8,7 @@ Dec. 19 2024 Update:
     The `CMakeLists.txt` makes sure that the `DEFAULT_PUEO_VERSION` comes from the `pueo-data` repo version.
 
 
-##Instructions for building
+# Instructions for building
 This repo has a dependency on pueo-data. Be sure to build pueo-data with an install location that is used by this repo with some paths you know of.
 Right now, the best option is to make a folder and env variable for `PUEO_UTIL_INSTALL_DIR` like:
 ```
