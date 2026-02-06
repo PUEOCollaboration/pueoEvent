@@ -36,7 +36,7 @@ pueo::RawEvent::RawEvent(const pueo_full_waveforms_t * raw)
 
   for (size_t i = 0; i < PUEO_NCHAN; i++)
   {
-    std::copy(raw->wfs[i].data, raw->wfs[i].data+pueo::k::MAX_NUMBER_SAMPLES, data[i].begin());
+    std::copy(raw->wfs[i].data, raw->wfs[i].data+pueo::k::NUM_SAMPLES, data[i].begin());
   }
 }
 
