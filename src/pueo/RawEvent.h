@@ -57,7 +57,7 @@ namespace pueo
 
      Int_t runNumber = 0;   ///< Run number from software
 
-     std::array<std::array<Short_t, pueo::k::MAX_NUMBER_SAMPLES>, pueo::k::NUM_DIGITZED_CHANNELS> data;
+     std::array<std::array<Short_t, pueo::k::NUM_SAMPLES>, pueo::k::NUM_DIGITZED_CHANNELS> data;
 
     ClassDef(RawEvent,2);
   };

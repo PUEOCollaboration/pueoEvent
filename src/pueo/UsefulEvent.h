@@ -51,7 +51,7 @@ namespace pueo
       TGraph *makeGraph(ring::ring_t ring, int phi, pol::pol_t pol) const; 
       TGraph *makeGraph(int surf, int chan) const; 
 
-      std::array< std::array<double, pueo::k::MAX_NUMBER_SAMPLES>, pueo::k::NUM_RF_CHANNELS> volts;
+      std::array< std::array<double, pueo::k::NUM_SAMPLES>, pueo::k::NUM_RF_CHANNELS> volts;
       std::array<double, k::NUM_RF_CHANNELS> t0;
       std::array<double, k::NUM_RF_CHANNELS> dt; 
       double t(size_t chan, size_t i) const { return t0[chan] + i * dt[chan]; }

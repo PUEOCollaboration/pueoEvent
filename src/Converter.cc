@@ -131,8 +131,11 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
     pueo_handle_close(&h);
   }
 
+
   outf.Write();
   outf.Close();
+
+  delete R;
 
   if (PostProcess != nullptr)
   {

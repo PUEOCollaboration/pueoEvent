@@ -52,7 +52,7 @@ namespace  pueo
     constexpr int NUM_SURF_SLOTS = 28; 
     constexpr int NUM_DIGITZED_CHANNELS = NUM_SURF_SLOTS * NUM_CHANS_PER_SURF;
     constexpr int NUM_RF_CHANNELS = NUM_POLS *NUM_ANTS;
-    constexpr int MAX_NUMBER_SAMPLES = 1024; // always 1024 for PUEO now
+    constexpr int NUM_SAMPLES= 1024; // always 1024 for PUEO now
   }
 
 //Now some geometry and polarisation considerations
