@@ -9,7 +9,7 @@ Dec. 19 2024 Update:
 
 
 # Instructions for building
-This repo has a dependency on pueo-data. Be sure to build pueo-data with an install location that is used by this repo with some paths you know of.
+This repo has a dependency on [pueo-data](https://github.com/PUEOCollaboration/pueo-data). Be sure to build pueo-data with an install location that is used by this repo with some paths you know of.
 Right now, the best option is to make a folder and env variable for `PUEO_UTIL_INSTALL_DIR` like:
 ```
 export PUEO_UTIL_INSTALL_DIR = /path/to/pueo-install
