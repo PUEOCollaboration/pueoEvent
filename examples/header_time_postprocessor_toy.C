@@ -1,10 +1,24 @@
 #include "ROOT/RDataFrame.hxx"
 #include "TSystem.h"
 #include "TTree.h"
-#include <unordered_set>
+#include <iostream>
+#include <map>
 
 using ROOT::RDataFrame;
 using ROOT::RDF::RResultPtr;
+
+UInt_t rollover_difference_32bit(UInt_t big, UInt_t small){
+  return big > small ? big-small : big + UINT32_MAX-small;
+}
+
+struct pps_and_their_diff {
+  UInt_t last_pps = 0;
+  UInt_t llast_pps = 0;
+  UInt_t delta = 0; // last_pps - llast_pps, with rollover taken care of
+};
+
+// arbitrarily deciding that any diff larger than three clock count is "bad"
+constexpr UInt_t CLOCK_COUNT_TOLERANCE = 3;
 
 // Some assumptions about the data are made:
 // (a)  The column `event_second` is monotonically increasing, ie "sorted"
@@ -13,44 +27,49 @@ void header_time_postprocessor_toy(){
 
   gSystem->Load("libpueoEvent.so");
 
-  // ROOT::DisableImplicitMT(); // default already disables this so no need
-  RDataFrame rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  // default already disables this so no need to explicitly disable
+  // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
+  RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
-  std::unordered_set<UInt_t> encounters;
-  UInt_t event_second, last_pps, llast_pps;
+  std::map<UInt_t, pps_and_their_diff> encounters; // stores unique encounters of `event_second`
+  TGraph evtsec_vs_lpps; // for interpolating/extrapolating last_pps at certain "bad" seconds
+  ROOT::RVecD deltas;    // for computing the average delta
 
-  // this tree only stores unique encounters
-  TTree unique_trigger_time("", "");
-  unique_trigger_time.Branch("event_second", &event_second);
-  unique_trigger_time.Branch("last_pps", &last_pps);
-  unique_trigger_time.Branch("llast_pps", &llast_pps);
-
-  auto fill_tree_with = 
-    [&encounters, &unique_trigger_time, &event_second, &last_pps, &llast_pps]
-    (UInt_t evtsec, UInt_t lpps, UInt_t llpps)
+  auto search_and_fill = 
+    [&encounters, &evtsec_vs_lpps, &deltas]
+    (UInt_t event_second, UInt_t lpps, UInt_t llpps)
     {
-      bool not_found = encounters.find(evtsec) == encounters.end();
+      bool not_found = encounters.find(event_second) == encounters.end();
       if (not_found) {
-        encounters.insert(evtsec);
-        event_second = evtsec;
-        last_pps = lpps;
-        llast_pps = llpps;
-        unique_trigger_time.Fill();
+        UInt_t diff = rollover_difference_32bit(lpps, llpps);
+        encounters.emplace(
+          event_second, 
+          pps_and_their_diff{lpps, llpps, diff}
+        );
+        evtsec_vs_lpps.AddPoint(event_second, lpps);
+        deltas.emplace_back(diff);
       }
     };
+  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS","lastLastPPS"});
 
-  rdf.Foreach(fill_tree_with, {"triggerTime","lastPPS","lastLastPPS"});
-  
-  RDataFrame new_rdf(unique_trigger_time);
-  auto is_diff_between = []
-    (UInt_t lpps, UInt_t llpps)
-    {
-      return lpps > llpps ? lpps-llpps : lpps + UINT32_MAX-llpps; // ie deal with rollover
-    };
-  auto diff_rdf = new_rdf.Define("delta", is_diff_between, {"last_pps", "llast_pps"});
+  // ie. skip first two seconds when computing average
+  deltas = ROOT::VecOps::Take(deltas, -deltas.size() + 2);
+  double avg_delta = ROOT::VecOps::Mean(deltas);
 
-  diff_rdf.Display({"event_second", "last_pps", "llast_pps", "delta"}, 100)->Print();
+  UInt_t first_second = encounters.begin()->first;
+  UInt_t second_second = std::next(encounters.begin(),1)->first;
+  // remove first two seconds in the TGraph, and then re-evaluate with extrapolation
+  evtsec_vs_lpps.RemovePoint(0);
+  evtsec_vs_lpps.RemovePoint(0);
+  encounters[first_second].last_pps = (ULong64_t)(evtsec_vs_lpps.Eval(first_second) + UINT32_MAX) % UINT32_MAX;
+  encounters[second_second].last_pps = (ULong64_t)(evtsec_vs_lpps.Eval(second_second) + UINT32_MAX) % UINT32_MAX;
+  std::cout << encounters[first_second].last_pps << std::endl;;
+  std::cout << encounters[second_second].last_pps;
 
-  
+  // TCanvas c1("", "", 1920, 1080);
+  // evtsec_vs_lpps.Draw("ALP");
+  // evtsec_vs_lpps.SetMarkerStyle(kCircle);
+  // evtsec_vs_lpps.GetXaxis()->SetRangeUser(evtsec_vs_lpps.GetPointX(0), evtsec_vs_lpps.GetPointX(0)+10);
+  // c1.SaveAs("foo.svg");
   exit(0);
 }
