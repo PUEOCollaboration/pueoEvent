@@ -135,7 +135,7 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   outf.Write();
   outf.Close();
 
-  delete R;
+  ::operator delete(R);
 
   if (PostProcess != nullptr)
   {
