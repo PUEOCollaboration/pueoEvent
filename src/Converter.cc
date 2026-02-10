@@ -92,6 +92,7 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   const char * typetag = getName<RootType>();
 
   TTree * t = new TTree(typetag, typetag);
+  t->SetAutoSave(0);
   RootType * R = new RootType();
   t->Branch(typetag, &R);
   RawType r;
