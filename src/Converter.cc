@@ -215,7 +215,7 @@ int pueo::convert::convertFiles(const char * typetag, int nfiles, const char ** 
 
   else
   {
-    std::cerr <<"Unhandled typetag" << typetag << std::endl;
+    std::cerr <<"Unhandled typetag \"" << typetag << "\"" << std::endl;
     return -1;
   }
 }
