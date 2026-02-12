@@ -1,6 +1,7 @@
 #include "ROOT/RDataFrame.hxx"
 #include "TSystem.h"
 #include "TTree.h"
+#include "TCanvas.h"
 #include <unordered_set>
 
 using ROOT::RDataFrame;
@@ -15,7 +16,7 @@ void print_unique_seconds(){
   gSystem->Load("libpueoEvent.so");
 
   // ROOT::DisableImplicitMT(); // default already disables this so no need
-  RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
 
   std::unordered_set<UInt_t> encounters;
   UInt_t event_second, last_pps, llast_pps, delta;
@@ -45,7 +46,13 @@ void print_unique_seconds(){
   tmp_header_rdf.Foreach(fill_tree_with, {"triggerTime","lastPPS","lastLastPPS"});
 
   RDataFrame unique_rdf(unique_trigger_time);
+  auto delta_gr = unique_rdf.Range(2,0).Graph<UInt_t, UInt_t>("event_second", "delta");
+
   unique_rdf.Display({"event_second", "last_pps", "llast_pps", "delta"}, 100)->Print();
+  TCanvas c1("", "", 1920, 1080);
+  delta_gr->Draw("ALP");
+  delta_gr->SetMarkerStyle(kCircle);
+  c1.SaveAs("foobar.svg");
 
   
   exit(0);
