@@ -11,12 +11,13 @@ UInt_t rollover_difference_32bit(UInt_t big, UInt_t small){
   return big > small ? big-small : big + UINT32_MAX-small;
 }
 
-void print_unique_seconds(){
+void print_unique_seconds_and_plot_delta(){
 
   gSystem->Load("libpueoEvent.so");
 
   // ROOT::DisableImplicitMT(); // default already disables this so no need
-  RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  // RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   std::unordered_set<UInt_t> encounters;
   UInt_t event_second, last_pps, llast_pps, delta;
@@ -48,7 +49,7 @@ void print_unique_seconds(){
   RDataFrame unique_rdf(unique_trigger_time);
   auto delta_gr = unique_rdf.Range(2,0).Graph<UInt_t, UInt_t>("event_second", "delta");
 
-  unique_rdf.Display({"event_second", "last_pps", "llast_pps", "delta"}, 100)->Print();
+  unique_rdf.Display({"event_second", "last_pps", "llast_pps", "delta"}, 500)->Print();
   TCanvas c1("", "", 1920, 1080);
   delta_gr->Draw("ALP");
   delta_gr->SetMarkerStyle(kCircle);
