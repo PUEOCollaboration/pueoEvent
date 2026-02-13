@@ -151,7 +151,11 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   }
   else
   {
-    return rename(tmpfilename.c_str(), outfile);
+    if (rename(tmpfilename.c_str(), outfile))
+    {
+      std::cerr << " rename returned non-zero " << std::endl;
+      return -1;
+    }
   }
 
   return nprocessed;
