@@ -84,6 +84,7 @@ template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * d
       bool clobber = false;
       const char * tmp_suffix = ".tmp";
       const char * postprocess_args = nullptr;
+      const char * sort_by = nullptr;
     };
 
    /** Convert input files to output file

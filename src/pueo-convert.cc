@@ -9,6 +9,7 @@ void usage()
   std::cout << "Usage: pueo-convert [-f] [-t tmpsuf] [-P postprocessor args] typetag outfile.root input [input2]" <<std::endl;
   std::cout << "   -f   allow clobbering output " << std::endl;
   std::cout << "   -t   set a temporary file suffix " <<std::endl;
+  std::cout << "   -s   sort by" <<std::endl;
   std::cout << "   -P   post processor args (quote for multiple) " << std::endl;
   std::cout << "   typetag  typetag of input, or use auto to try to determine (problematic if more than one ROOT type can be generate from the same raw type)"<<std::endl;
   std::cout << "   outfile  name of output file " <<std::endl;
@@ -42,6 +43,15 @@ int main(int nargs, char ** args)
         return 1;
       }
       opts.postprocess_args = args[++i];
+    }
+    else if (!strcmp(args[i],"-s"))
+    {
+      if (i == nargs - 1)
+      {
+        usage();
+        return 1;
+      }
+      opts.sort_by = args[++i];
     }
     else if (!typetag)
     {
