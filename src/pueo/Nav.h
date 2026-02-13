@@ -112,7 +112,7 @@ namespace pueo
     {
       public: 
         Sat() { used=0; } 
-        int id =-1; // constellation + prn or soething
+        int id =-1; // constellation + prn or something
         int8_t elevation=0;
         uint8_t azimuth=0; 
         uint8_t snr=0; 
@@ -133,6 +133,78 @@ namespace pueo
 
        ClassDef(Sats,1); 
     }; 
+
+    class SunSensor : public TObject
+    {
+      public:
+        SunSensor() {; }
+        virtual ~SunSensor() {;}
+        UInt_t x1 = 0;
+        UInt_t x2 = 0;
+        UInt_t y1 = 0;
+        UInt_t y2 = 0;
+        UInt_t tempADS1220 = 0;
+        UInt_t tempSS = 0;
+
+      ClassDef(SunSensor,1);
+    };
+    
+    class SunSensors : public TObject
+    {
+      public:
+        SunSensors() {; }
+        #ifdef HAVE_PUEORAWDATA
+        SunSensors(const pueo_ss *ss);
+        #endif
+        virtual ~SunSensors() {;}
+        // UInt_t SS0_x1;
+        // UInt_t SS0_x2;
+        // UInt_t SS0_y1;
+        // UInt_t SS0_y2;
+        // UInt_t SS1_x1;
+        // UInt_t SS1_x2;
+        // UInt_t SS1_y1;
+        // UInt_t SS1_y2;
+        // UInt_t SS2_x1;
+        // UInt_t SS2_x2;
+        // UInt_t SS2_y1;
+        // UInt_t SS2_y2;
+        // UInt_t SS3_x1;
+        // UInt_t SS3_x2;
+        // UInt_t SS3_y1;
+        // UInt_t SS3_y2;
+        // UInt_t SS4_x1;
+        // UInt_t SS4_x2;
+        // UInt_t SS4_y1;
+        // UInt_t SS4_y2;
+        // UInt_t SS5_x1;
+        // UInt_t SS5_x2;
+        // UInt_t SS5_y1;
+        // UInt_t SS5_y2;
+        // UInt_t SS6_x1;
+        // UInt_t SS6_x2;
+        // UInt_t SS6_y1;
+        // UInt_t SS6_y2;
+        // UInt_t SS7_x1;
+        // UInt_t SS7_x2;
+        // UInt_t SS7_y1;
+        // UInt_t SS7_y2;
+        SunSensor SS0;
+        SunSensor SS1;
+        SunSensor SS2;
+        SunSensor SS3;
+        SunSensor SS4;
+        SunSensor SS5;
+        SunSensor SS6;
+        SunSensor SS7;
+        ULong_t readoutTime = 0;
+        UInt_t readoutTimeNsecs = 0; 
+        UInt_t sequence_number = 0;
+        UInt_t flags = 0;
+
+      ClassDef(SunSensors,1); 
+    }; 
+
   }
 }
 
