@@ -1,47 +1,30 @@
 #include "ROOT/RDataFrame.hxx"
 #include "TSystem.h"
-#include "TTree.h"
 #include <iostream>
+#include <iomanip>
 #include <map>
 
 using ROOT::RDataFrame;
-using ROOT::RDF::RResultPtr;
 
-UInt_t rollover_difference_32bit(UInt_t big, UInt_t small)
+struct second_boundaries 
 {
-  return big > small ? big-small : big + UINT32_MAX-small;
-}
-
-struct pps_and_their_diff 
-{
-  UInt_t last_pps = 0;
-  UInt_t llast_pps = 0;
+  UInt_t start = 0;
+  UInt_t end = 0;
   UInt_t delta = 0; // last_pps - llast_pps, with rollover taken care of
 };
 
-// "promotes" the Y-value range of the graph from [0, UINT32_MAX) to [0, UINT64_MAX)
-// warning: the first two seconds of the graph MUST have been removed as they contain garbage,
-// and this function is not smart enough about that 
-// (it only uses a slope to determine when a wrap-around has occured)
-void unwrap(TGraph * gr) 
+// approximately equal with some arbitrary default tolerance
+bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 200)
 {
-  // some arbitrary negative number to determine whehter a wrap-around has occured.
-  // this number should be lenient enough -- that is, not exactly (-UINT32_MAX)
-  // that said, how lenient is lenient seems to be somewhat arbitrary...
-  const double SLOPE_TOLERANCE = -(double) UINT32_MAX / 5;
-
-  int num_wraps = 0;
-  for (int i=1; i < gr->GetN(); ++i)
-  {
-    double dy = (gr->GetPointY(i) + (double) UINT32_MAX * num_wraps) - gr->GetPointY(i-1);
-
-    if (dy < SLOPE_TOLERANCE) 
-    {
-      num_wraps++;
-    }
-    gr->SetPointY(i, gr->GetPointY(i) + (double) num_wraps * UINT32_MAX);
-  }
+  UInt_t diff = a > b ? a - b : b - a;
+  return diff <= tolerance;
 }
+
+void print(std::map<UInt_t, second_boundaries>& encounters);
+
+// average value of (end-start); last two seconds should be excluded when computing this,
+// because they don't have (start, end) pairs.
+UInt_t average_delta(std::map<UInt_t, second_boundaries>& encounters, UInt_t exclude1, UInt_t exclude2);
 
 // Some assumptions about the data are made:
 // (a)  The column `event_second` is monotonically increasing, ie "sorted"
@@ -52,50 +35,66 @@ void header_time_postprocessor_toy()
 
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
-  // RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
-  RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  // RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
 
-  std::map<UInt_t, pps_and_their_diff> encounters; // stores unique encounters of `event_second`
-  TGraph evtsec_vs_lpps; // for interpolating/extrapolating last_pps at certain "bad" seconds
-  ROOT::RVecD deltas;    // for computing the average delta
+  std::map<UInt_t, second_boundaries> encounters; // stores unique encounters of `event_second`
 
+  UInt_t previous_second   = UINT32_MAX;     // initialize to garbage
+  UInt_t previous_previous = UINT32_MAX - 1; // initialize to garbage
   auto search_and_fill = 
-    [&encounters, &evtsec_vs_lpps, &deltas]
-    (UInt_t event_second, UInt_t lpps, UInt_t llpps)
+    [&encounters, &previous_second, &previous_previous]
+    (UInt_t event_second, UInt_t lpps)
     {
-      bool not_found = encounters.find(event_second) == encounters.end();
-      if (not_found) {
-        UInt_t diff = rollover_difference_32bit(lpps, llpps);
-        encounters.emplace(
-          event_second, 
-          pps_and_their_diff{lpps, llpps, diff}
-        );
-        evtsec_vs_lpps.AddPoint(event_second, lpps);
-        deltas.emplace_back(diff);
+      bool new_encounter = encounters.find(event_second) == encounters.end();
+      if (new_encounter) 
+      {
+        encounters.emplace(event_second, second_boundaries{});
+        // the start of the previous second is the lpps of the current second
+        // note that this inserts garbage into `encounters` during the first two iterations;
+        encounters[previous_second].start = lpps;
+        encounters[previous_previous].end = lpps;
+        encounters[previous_previous].delta = lpps - encounters[previous_previous].start;
+        // note: wrap-around subtraction is automatic for unsigned integers
+        
+        previous_previous = previous_second;
+        previous_second = event_second;
       }
     };
-  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS","lastLastPPS"});
+  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
+  encounters.erase(UINT32_MAX);  // erase the garbage
+  encounters.erase(UINT32_MAX-1);
+  print(encounters);
 
-  // remove first two seconds in the TGraph before unwrapping
-  evtsec_vs_lpps.RemovePoint(0);
-  evtsec_vs_lpps.RemovePoint(0);
-  unwrap(&evtsec_vs_lpps);
-
-  //  then re-evaluate with extrapolation
-  UInt_t first_second = encounters.begin()->first;
-  UInt_t second_second = std::next(encounters.begin(),1)->first;                 // + UINT32_MAX in case extrapolation is negative
-  encounters[first_second].last_pps = (ULong64_t)(evtsec_vs_lpps.Eval(first_second) + UINT32_MAX) % UINT32_MAX;
-  encounters[second_second].last_pps = (ULong64_t)(evtsec_vs_lpps.Eval(second_second) + UINT32_MAX) % UINT32_MAX;
-
-                                   // ie. skip first two seconds when computing average delta
-  deltas = ROOT::VecOps::Take(deltas, -deltas.size() + 2);
-  double avg_delta = ROOT::VecOps::Mean(deltas);
-
-
-  TCanvas c1("", "", 1920, 1080);
-  evtsec_vs_lpps.Draw("ALP");
-  evtsec_vs_lpps.SetMarkerStyle(kCircle);
-  // evtsec_vs_lpps.GetXaxis()->SetRangeUser(evtsec_vs_lpps.GetPointX(0), evtsec_vs_lpps.GetPointX(0)+10);
-  c1.SaveAs("bar.svg");
+  // UInt_t avg_delta = average_delta(encounters, previous_second, previous_previous);
+  //
+  // // iterate from 1st entry to 2nd-to-last entry
+  // for (auto it = encounters.begin(); it != std::prev(encounters.end()); it++) 
+  // {
+  //
+  // }
   exit(0);
+}
+
+void print(std::map<UInt_t, second_boundaries>& encounters)
+{
+  std::cout << "   second   |   start   |    end    |  delta" << "\n"
+            << "--------------------------------------------\n";
+  for (auto& e: encounters)
+  {
+    std::cout << std::setw(11) << e.first
+              << " " << std::setw(11) << e.second.start
+              << " " << std::setw(11) << e.second.end
+              << " " << std::setw(11) << e.second.delta << "\n";
+  }
+}
+
+UInt_t average_delta(std::map<UInt_t, second_boundaries>& encounters, UInt_t exclude1, UInt_t exclude2)
+{
+  ULong64_t sum = 0;
+  for (auto& e: encounters) sum += e.second.delta;
+  sum -= encounters[exclude1].delta;
+  sum -= encounters[exclude2].delta;
+  sum /= encounters.size()-2;
+  return sum;
 }
