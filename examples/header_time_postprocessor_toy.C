@@ -106,41 +106,57 @@ void plot(std::map<Long64_t, second_boundaries>& encounters, TString name)
 {
   TGraph original(encounters.size());
   TGraph corrected(encounters.size());
+  TGraph diff(encounters.size());
 
   std::size_t counter=0;
   for (auto& e: encounters){
-    original.SetPoint(counter, e.first,e.second.original_start);
-    corrected.SetPoint(counter, e.first, e.second.corrected_start);
+
+    UInt_t o = e.second.original_start;
+    original.SetPoint(counter, e.first,o);
+    UInt_t c = e.second.corrected_start;
+    corrected.SetPoint(counter, e.first, c);
+    int d = o > c ? c - o : o - c;
+    diff.SetPoint(counter, e.first, d);
     counter++;
   }
-  // original.RemovePoint(original.GetN()-1); // last second's start doesn't exist before correction
+  diff.RemovePoint(original.GetN()-1); // last second's start doesn't exist before correction
 
-  TCanvas c1(name, name, 1920 * 1.5, 1080);
+  TCanvas c1(name, name, 1920 * 1.5, 1080 * 2);
+  c1.Divide(1,2);
+  c1.cd(1);
   original.Draw("ALP");
   original.SetMarkerStyle(kFullCrossX);
   original.SetMarkerSize(3);
-  original.SetTitle("Event Second Boundaries");
+  original.SetTitle("`Event_Second` Boundaries");
   original.GetYaxis()->SetTitle("PPS [sysclk count]");
-  original.GetXaxis()->SetTitle("Event Second [seconds since Unix epoch]");
   original.GetYaxis()->CenterTitle();
+  original.GetXaxis()->SetTitle("Event Second [seconds since Unix epoch]");
   original.GetXaxis()->CenterTitle();
-  corrected.Draw("LP");
+  original.GetXaxis()->SetLabelOffset(0.1);
+  corrected.Draw("P");
   corrected.SetMarkerStyle(kCircle);
   corrected.SetMarkerColor(kRed);
   corrected.SetMarkerSize(2);
 
   double y0 = UINT32_MAX;
-
-  c1.Update();
   TLine line(original.GetPointX(0), y0, original.GetPointX(original.GetN()-1), y0);
   line.SetLineStyle(2);   // dashed
   line.Draw();
 
-  TLegend leg(0.1, 0.8, 0.2, 0.9); // (x1,y1,x2,y2) in NDC
+  TLegend leg(0.1, 0.8, 0.25, 0.9); // (x1,y1,x2,y2) in NDC
   leg.AddEntry(&original, "Original", "p");
   leg.AddEntry(&corrected, "Corrected", "p");
   leg.AddEntry(&line, "UINT 32Bit MAX", "l");
   leg.Draw();
+  
+  c1.cd(2);
+  diff.Draw("ALP");
+  diff.SetTitle("");
+  diff.SetMarkerStyle(kCircle);
+  diff.GetXaxis()->SetLabelSize(0);
+  diff.GetYaxis()->SetTitle("abs(original-corrected) [sysclk counts]");
+  diff.GetYaxis()->CenterTitle();
+
   c1.SaveAs(name);
 }
 
