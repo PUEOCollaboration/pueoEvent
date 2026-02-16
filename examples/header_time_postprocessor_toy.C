@@ -81,6 +81,64 @@ void header_time_postprocessor_toy()
   exit(0);
 }
 
+UInt_t average_delta(std::map<Long64_t, second_boundaries>& encounters, Long64_t exclude1, Long64_t exclude2)
+{
+  ULong64_t sum = 0;
+  for (auto& e: encounters) sum += e.second.delta;
+  sum -= encounters[exclude1].delta;
+  sum -= encounters[exclude2].delta;
+  sum /= encounters.size()-2;
+  return sum;
+}
+
+void stupid_extrapolation(std::map<Long64_t, second_boundaries>& encounters, UInt_t avg_delta)
+{
+  // find the mid-point of a "stable region" where the delta's are all approximately avg_delta
+  std::size_t stable_period = encounters.size() / 3;
+  auto mid_point = encounters.begin();
+  std::vector<ULong64_t> stable_seconds;
+  stable_seconds.reserve(stable_period);
+
+  for (auto &e: encounters) 
+  {
+    if (stable_seconds.size() == stable_period) break; 
+
+    if (approx_equal(e.second.delta , avg_delta)) stable_seconds.emplace_back(e.first);
+    else stable_seconds.clear();
+  }
+
+  if (stable_seconds.size() != stable_period) 
+  {
+    print(encounters);
+    fprintf(
+      stderr,
+      "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
+      "where `end_pps` - `start_pps` are all approximately %u clock counts.\n"
+      "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
+      stable_period, avg_delta, mid_point->first
+    );
+  } else {
+    mid_point = encounters.find(stable_seconds.at(stable_period/2));
+  }
+
+  for (auto it = encounters.begin(); it!=mid_point; ++it)
+  {
+    Long64_t diff_sec = it->first - mid_point->first;
+    it->second.corrected_start = (mid_point->second.original_start) + diff_sec * avg_delta;
+    it->second.corrected_end = (mid_point->second.original_end) + diff_sec * avg_delta;
+  }
+
+  mid_point->second.corrected_start = mid_point->second.original_start;
+  mid_point->second.corrected_end = mid_point->second.original_end;
+
+  for (auto it = std::next(mid_point); it!=encounters.end(); ++it)
+  {
+    Long64_t diff_sec = it->first - mid_point->first;
+    it->second.corrected_start = (mid_point->second.original_start) + diff_sec * avg_delta;
+    it->second.corrected_end = (mid_point->second.original_end) + diff_sec * avg_delta;
+  }
+}
+
 void print(std::map<Long64_t, second_boundaries>& encounters)
 {
 
@@ -157,60 +215,3 @@ void plot(std::map<Long64_t, second_boundaries>& encounters, TString name)
   c1.SaveAs(name);
 }
 
-UInt_t average_delta(std::map<Long64_t, second_boundaries>& encounters, Long64_t exclude1, Long64_t exclude2)
-{
-  ULong64_t sum = 0;
-  for (auto& e: encounters) sum += e.second.delta;
-  sum -= encounters[exclude1].delta;
-  sum -= encounters[exclude2].delta;
-  sum /= encounters.size()-2;
-  return sum;
-}
-
-void stupid_extrapolation(std::map<Long64_t, second_boundaries>& encounters, UInt_t avg_delta)
-{
-  // find the mid-point of a "stable region" where the delta's are all approximately avg_delta
-  std::size_t stable_period = encounters.size() / 3;
-  auto mid_point = encounters.begin();
-  std::vector<ULong64_t> stable_seconds;
-  stable_seconds.reserve(stable_period);
-
-  for (auto &e: encounters) 
-  {
-    if (stable_seconds.size() == stable_period) break; 
-
-    if (approx_equal(e.second.delta , avg_delta)) stable_seconds.emplace_back(e.first);
-    else stable_seconds.clear();
-  }
-
-  if (stable_seconds.size() != stable_period) 
-  {
-    print(encounters);
-    fprintf(
-      stderr,
-      "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
-      "where `end_pps` - `start_pps` are all approximately %u clock counts.\n"
-      "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
-      stable_period, avg_delta, mid_point->first
-    );
-  } else {
-    mid_point = encounters.find(stable_seconds.at(stable_period/2));
-  }
-
-  for (auto it = encounters.begin(); it!=mid_point; ++it)
-  {
-    Long64_t diff_sec = it->first - mid_point->first;
-    it->second.corrected_start = (mid_point->second.original_start) + diff_sec * avg_delta;
-    it->second.corrected_end = (mid_point->second.original_end) + diff_sec * avg_delta;
-  }
-
-  mid_point->second.corrected_start = mid_point->second.original_start;
-  mid_point->second.corrected_end = mid_point->second.original_end;
-
-  for (auto it = std::next(mid_point); it!=encounters.end(); ++it)
-  {
-    Long64_t diff_sec = it->first - mid_point->first;
-    it->second.corrected_start = (mid_point->second.original_start) + diff_sec * avg_delta;
-    it->second.corrected_end = (mid_point->second.original_end) + diff_sec * avg_delta;
-  }
-}
