@@ -170,7 +170,7 @@ void plot(std::map<Long64_t, second_boundaries>& encounters, TString name)
     original.SetPoint(counter, e.first,o);
     UInt_t c = e.second.corrected_start;
     corrected.SetPoint(counter, e.first, c);
-    int d = o > c ? c - o : o - c;
+    int d = o < c ? c - o : o - c;
     diff.SetPoint(counter, e.first, d);
     counter++;
   }
@@ -214,4 +214,3 @@ void plot(std::map<Long64_t, second_boundaries>& encounters, TString name)
 
   c1.SaveAs(name);
 }
-
