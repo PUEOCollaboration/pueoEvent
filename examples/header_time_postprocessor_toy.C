@@ -1,11 +1,13 @@
 #include "ROOT/RDataFrame.hxx"
+#include "TAttMarker.h"
 #include "TSystem.h"
-#include <climits>
+#include "TGraph.h"
+#include "TLine.h"
+#include "TCanvas.h"
+#include "TLegend.h"
 #include <iostream>
 #include <iomanip>
 #include <map>
-
-using ROOT::RDataFrame;
 
 struct second_boundaries 
 {
@@ -24,6 +26,7 @@ bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 20)
 }
 
 void print(std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end);
+void plot(std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
 
 // average value of (original_end-original_start); the final two seconds should be excluded when computing this,
 // because they don't have valid (original_start, original_end) pairs.
@@ -41,13 +44,13 @@ void header_time_postprocessor_toy()
 
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
-  // RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
-  RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  // ROOT::RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  ROOT::RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
   // the map stores unique encounters of `event_second` (aka triggerTime)
   std::map<Long64_t, second_boundaries> encounters;
 
-  Long64_t previous_previous = LONG_LONG_MIN; // initialize to garbage
-  Long64_t previous_second   = LONG_LONG_MIN+1;
+  Long64_t previous_previous = -2; // initialize to garbage
+  Long64_t previous_second   = -1;
   auto search_and_fill = 
     [&encounters, &previous_second, &previous_previous]
     (UInt_t event_second, UInt_t lpps)
@@ -69,13 +72,14 @@ void header_time_postprocessor_toy()
       }
     };
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
-  encounters.erase(LONG_LONG_MIN);  // erase the garbage
-  encounters.erase(LONG_LONG_MIN+1);
+  encounters.erase(-2);  // erase the garbage
+  encounters.erase(-1);
   // print(encounters);
 
   UInt_t avg_delta = average_delta(encounters, previous_second, previous_previous);
   stupid_extrapolation(encounters, avg_delta);
   // print(encounters);
+  plot(encounters);
 
   exit(0);
 }
@@ -96,6 +100,48 @@ void print(std::map<Long64_t, second_boundaries>& encounters)
               << " " << std::setw(11) << e.second.corrected_start
               << " " << std::setw(11) << e.second.corrected_end << "\n";
   }
+}
+
+void plot(std::map<Long64_t, second_boundaries>& encounters, TString name)
+{
+  TGraph original(encounters.size());
+  TGraph corrected(encounters.size());
+
+  std::size_t counter=0;
+  for (auto& e: encounters){
+    original.SetPoint(counter, e.first,e.second.original_start);
+    corrected.SetPoint(counter, e.first, e.second.corrected_start);
+    counter++;
+  }
+  // original.RemovePoint(original.GetN()-1); // last second's start doesn't exist before correction
+
+  TCanvas c1(name, name, 1920 * 1.5, 1080);
+  original.Draw("ALP");
+  original.SetMarkerStyle(kFullCrossX);
+  original.SetMarkerSize(3);
+  original.SetTitle("Event Second Boundaries");
+  original.GetYaxis()->SetTitle("PPS [sysclk count]");
+  original.GetXaxis()->SetTitle("Event Second [seconds since Unix epoch]");
+  original.GetYaxis()->CenterTitle();
+  original.GetXaxis()->CenterTitle();
+  corrected.Draw("LP");
+  corrected.SetMarkerStyle(kCircle);
+  corrected.SetMarkerColor(kRed);
+  corrected.SetMarkerSize(2);
+
+  double y0 = UINT32_MAX;
+
+  c1.Update();
+  TLine line(original.GetPointX(0), y0, original.GetPointX(original.GetN()-1), y0);
+  line.SetLineStyle(2);   // dashed
+  line.Draw();
+
+  TLegend leg(0.1, 0.8, 0.2, 0.9); // (x1,y1,x2,y2) in NDC
+  leg.AddEntry(&original, "Original", "p");
+  leg.AddEntry(&corrected, "Corrected", "p");
+  leg.AddEntry(&line, "UINT 32Bit MAX", "l");
+  leg.Draw();
+  c1.SaveAs(name);
 }
 
 UInt_t average_delta(std::map<Long64_t, second_boundaries>& encounters, Long64_t exclude1, Long64_t exclude2)
