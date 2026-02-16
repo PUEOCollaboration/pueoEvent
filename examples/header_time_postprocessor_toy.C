@@ -11,43 +11,40 @@
 
 struct second_boundaries 
 {
-  UInt_t original_start = 0; // value of the sysclk counter at the start of the second
+  UInt_t original_start = 0; // value of the sysclk counter (ie pps) at the start of the second
   UInt_t original_end = 0;
   UInt_t corrected_start = 0;
   UInt_t corrected_end = 0;
   UInt_t delta = 0; // end_pps - start_pps, with rollover taken care of
 };
 
-// approximately equal with some arbitrary default tolerance (20 sysclk counts)
+// average value of (original_end-original_start); the final two seconds should be excluded when computing this,
+// because they don't have valid (start, end) pairs.
+UInt_t average_delta(std::map<Long64_t, second_boundaries>& encounters, Long64_t exclude1, Long64_t exclude2);
+
+// first attempt at correcting the start and end of each second via extrapolation
+void stupid_extrapolation(std::map<Long64_t, second_boundaries>& encounters, UInt_t avg_delta);
+
+void print(std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end);
+void plot (std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
 bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 20)
 {
   UInt_t diff = a > b ? a - b : b - a;
   return diff <= tolerance;
 }
 
-void print(std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end);
-void plot(std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
-
-// average value of (original_end-original_start); the final two seconds should be excluded when computing this,
-// because they don't have valid (original_start, original_end) pairs.
-UInt_t average_delta(std::map<Long64_t, second_boundaries>& encounters, Long64_t exclude1, Long64_t exclude2);
-
-// first attempt at correcting the start and end of each second via extrapolation
-void stupid_extrapolation(std::map<Long64_t, second_boundaries>& encounters, UInt_t avg_delta);
-
 // Some assumptions about the data are made:
-// (a)  The column `event_second` is monotonically increasing, ie "sorted"
+// (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
 // (b)  0 <= event_second[x] - event_second[x-1] <= 1
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
+
   // ROOT::RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
   ROOT::RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
-  // the map stores unique encounters of `event_second` (aka triggerTime)
-  std::map<Long64_t, second_boundaries> encounters;
+  std::map<Long64_t, second_boundaries> encounters; // this map only stores unique seconds
 
   Long64_t previous_previous = -2; // initialize to garbage
   Long64_t previous_second   = -1;
@@ -65,7 +62,7 @@ void header_time_postprocessor_toy()
         encounters[previous_second].original_start = lpps;
         encounters[previous_previous].original_end = lpps;
         encounters[previous_previous].delta = lpps - encounters[previous_previous].original_start;
-        // note: wrap-around subtraction is automatic for unsigned integers
+        // note: for unsigned integers, wrap-around subtraction is automaticlly taken care of
         
         previous_previous = previous_second;
         previous_second = evtsec;
