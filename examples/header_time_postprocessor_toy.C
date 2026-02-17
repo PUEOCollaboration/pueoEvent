@@ -18,16 +18,23 @@ struct second_boundaries
   UInt_t delta = 0; // end_pps - start_pps, with rollover taken care of
 };
 
+using TimeTable=std::map<Long64_t, second_boundaries>;
+
 // average value of (original_end-original_start); the final two seconds should be excluded when computing this,
 // because they don't have valid (start, end) pairs.
-UInt_t average_delta(std::map<Long64_t, second_boundaries>& encounters, Long64_t exclude1, Long64_t exclude2);
+UInt_t average_delta(TimeTable& t, Long64_t exclude1, Long64_t exclude2);
 
 // first attempt at correcting the start and end of each second via extrapolation
-void stupid_extrapolation(std::map<Long64_t, second_boundaries>& encounters, UInt_t avg_delta);
+void stupid_extrapolation(TimeTable& t, UInt_t avg_delta);
 
-void print(std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end);
-void plot (std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
-void plot_delta(std::map<Long64_t, second_boundaries>& encounters, TString name="pps_delta.svg", const double * average_delta=nullptr);
+// Returns a graph of the pps value at the start of each `event_second`
+// The Y-value ranges from [0, UINT64_MAX) instead of [0, UINT32_MAX); that is, unwrapped.
+// The unwrapping is kinda dumb because the function only uses a slope to determine whether a wrap-around has occured
+TGraph naive_unrawp(TimeTable& encounters);
+
+void print(TimeTable& utcSecond_start_end_delta_start_end);
+void plot (TimeTable& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
+
 bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 20)
 {
   UInt_t diff = a > b ? a - b : b - a;
@@ -45,7 +52,7 @@ void header_time_postprocessor_toy()
 
   // ROOT::RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
   ROOT::RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
-  std::map<Long64_t, second_boundaries> encounters; // this map only stores unique seconds
+  TimeTable encounters; // this map only stores unique seconds
 
   Long64_t previous_previous = -2; // initialize to garbage
   Long64_t previous_second   = -1;
@@ -74,16 +81,40 @@ void header_time_postprocessor_toy()
   encounters.erase(-1);
   // print(encounters);
 
+  TGraph gr = naive_unrawp(encounters);
   // UInt_t avg_delta = average_delta(encounters, previous_second, previous_previous);
-  plot_delta(encounters);
   // stupid_extrapolation(encounters, avg_delta);
-  print(encounters);
   // plot(encounters);
 
   exit(0);
 }
 
-UInt_t average_delta(std::map<Long64_t, second_boundaries>& encounters, Long64_t exclude1, Long64_t exclude2)
+TGraph naive_unrawp(TimeTable& encounters) 
+{
+  // some arbitrary negative number to determine whether a wrap-around has occured.
+  // this number should be lenient enough -- that is, not exactly (-UINT32_MAX)
+  // that said, how lenient is lenient seems to be somewhat arbitrary...
+  const Long64_t SLOPE_TOLERANCE = - (Long64_t) UINT32_MAX / 5;
+
+  TGraph gr;
+  gr.AddPoint(encounters.begin()->first, encounters.begin()->second.original_start);
+
+  int nwrap = 0;
+  for(auto it=std::next(encounters.begin()); it!=std::prev(encounters.end()); ++it)
+  {
+    auto pr = std::prev(it);
+    Long64_t this_y = (Long64_t) it->second.original_start; // UInt_t -> Long64_t
+    Long64_t prev_y = (Long64_t) pr->second.original_start;
+
+    if (this_y - prev_y < SLOPE_TOLERANCE) nwrap++;
+
+    gr.AddPoint(it->first, this_y + nwrap * (ULong64_t) UINT32_MAX);
+  }
+
+  return gr;
+}
+
+UInt_t average_delta(TimeTable& encounters, Long64_t exclude1, Long64_t exclude2)
 {
   ULong64_t sum = 0;
   for (auto& e: encounters) sum += e.second.delta;
@@ -93,7 +124,7 @@ UInt_t average_delta(std::map<Long64_t, second_boundaries>& encounters, Long64_t
   return sum;
 }
 
-void stupid_extrapolation(std::map<Long64_t, second_boundaries>& encounters, UInt_t avg_delta)
+void stupid_extrapolation(TimeTable& encounters, UInt_t avg_delta)
 {
   // find the mid-point of a "stable region" where the delta's are all approximately avg_delta
   std::size_t stable_period = encounters.size() / 3;
@@ -141,7 +172,7 @@ void stupid_extrapolation(std::map<Long64_t, second_boundaries>& encounters, UIn
   }
 }
 
-void print(std::map<Long64_t, second_boundaries>& encounters)
+void print(TimeTable& encounters)
 {
 
   std::cout << "-------------------------------------------------------------------------------\n"
@@ -159,26 +190,7 @@ void print(std::map<Long64_t, second_boundaries>& encounters)
   }
 }
 
-void plot_delta(std::map<Long64_t, second_boundaries>& encounters, TString name, const double * average_delta){
-  TGraph delta_graph;
-
-  for (auto& e: encounters) delta_graph.AddPoint(e.first, e.second.delta);
-
-  // last two seconds don't have proper deltas
-  delta_graph.RemovePoint(delta_graph.GetN()-1);
-  delta_graph.RemovePoint(delta_graph.GetN()-1);
-
-  TCanvas c1(name, name, 1920 * 1.5, 1080);
-  delta_graph.Draw("ALP");
-  delta_graph.SetTitle("Delta (Second End - Second Start)");
-  delta_graph.GetYaxis()->SetTitle("end-start [sysclk counts]");
-  delta_graph.GetYaxis()->CenterTitle();
-  delta_graph.GetYaxis()->SetTitleOffset(1.5);
-  delta_graph.GetXaxis()->SetTitle("Seconds since Unix epoch");
-  c1.SaveAs(name);
-}
-
-void plot(std::map<Long64_t, second_boundaries>& encounters, TString name)
+void plot(TimeTable& encounters, TString name)
 {
   TGraph original(encounters.size());
   TGraph corrected(encounters.size());
