@@ -27,6 +27,7 @@ void stupid_extrapolation(std::map<Long64_t, second_boundaries>& encounters, UIn
 
 void print(std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end);
 void plot (std::map<Long64_t, second_boundaries>& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
+void plot_delta(std::map<Long64_t, second_boundaries>& encounters, TString name="pps_delta.svg", const double * average_delta=nullptr);
 bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 20)
 {
   UInt_t diff = a > b ? a - b : b - a;
@@ -73,10 +74,11 @@ void header_time_postprocessor_toy()
   encounters.erase(-1);
   // print(encounters);
 
-  UInt_t avg_delta = average_delta(encounters, previous_second, previous_previous);
-  stupid_extrapolation(encounters, avg_delta);
-  // print(encounters);
-  plot(encounters);
+  // UInt_t avg_delta = average_delta(encounters, previous_second, previous_previous);
+  plot_delta(encounters);
+  // stupid_extrapolation(encounters, avg_delta);
+  print(encounters);
+  // plot(encounters);
 
   exit(0);
 }
@@ -155,6 +157,25 @@ void print(std::map<Long64_t, second_boundaries>& encounters)
               << " " << std::setw(11) << e.second.corrected_start
               << " " << std::setw(11) << e.second.corrected_end << "\n";
   }
+}
+
+void plot_delta(std::map<Long64_t, second_boundaries>& encounters, TString name, const double * average_delta){
+  TGraph delta_graph;
+
+  for (auto& e: encounters) delta_graph.AddPoint(e.first, e.second.delta);
+
+  // last two seconds don't have proper deltas
+  delta_graph.RemovePoint(delta_graph.GetN()-1);
+  delta_graph.RemovePoint(delta_graph.GetN()-1);
+
+  TCanvas c1(name, name, 1920 * 1.5, 1080);
+  delta_graph.Draw("ALP");
+  delta_graph.SetTitle("Delta (Second End - Second Start)");
+  delta_graph.GetYaxis()->SetTitle("end-start [sysclk counts]");
+  delta_graph.GetYaxis()->CenterTitle();
+  delta_graph.GetYaxis()->SetTitleOffset(1.5);
+  delta_graph.GetXaxis()->SetTitle("Seconds since Unix epoch");
+  c1.SaveAs(name);
 }
 
 void plot(std::map<Long64_t, second_boundaries>& encounters, TString name)
