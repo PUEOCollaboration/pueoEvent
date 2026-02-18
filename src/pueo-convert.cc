@@ -6,10 +6,10 @@
 void usage()
 {
 
-  std::cout << "Usage: pueo-convert [-f] [-t tmpsuf] [-P postprocessor args] typetag outfile.root input [input2]" <<std::endl;
+  std::cout << "Usage: pueo-convert [-f] [-t tmpsuf] [-s sortby] [-P postprocessor args] typetag outfile.root input [input2]" <<std::endl;
   std::cout << "   -f   allow clobbering output " << std::endl;
   std::cout << "   -t   set a temporary file suffix " <<std::endl;
-  std::cout << "   -s   sort by" <<std::endl;
+  std::cout << "   -s   sort by an expression (quotes for complex expression, anything that goes in TTree::Draw and produces a double will work)." << std::endl << "       Mostly useful for telemetered data. A useful expression may be \"run*1e9+event\"."<<std::endl;
   std::cout << "   -P   post processor args (quote for multiple) " << std::endl;
   std::cout << "   typetag  typetag of input, or use auto to try to determine (problematic if more than one ROOT type can be generate from the same raw type)"<<std::endl;
   std::cout << "   outfile  name of output file " <<std::endl;
@@ -23,34 +23,23 @@ int main(int nargs, char ** args)
   pueo::convert::ConvertOpts opts;
 
   std::vector<char *> inputs;
+#define CHECK_NOT_LAST if (i == nargs -1) { usage(); return 1; }
   for (int i = 1; i < nargs; i++)
   {
     if (!strcmp(args[i],"-f")) opts.clobber = true;
     else if (!strcmp(args[i],"-t"))
     {
-      if (i == nargs - 1) 
-      {
-        usage(); 
-        return 1;
-      }
+      CHECK_NOT_LAST
       opts.tmp_suffix = args[++i];
     }
     else if (!strcmp(args[i],"-P"))
     {
-      if (i == nargs - 1)
-      {
-        usage();
-        return 1;
-      }
+      CHECK_NOT_LAST
       opts.postprocess_args = args[++i];
     }
     else if (!strcmp(args[i],"-s"))
     {
-      if (i == nargs - 1)
-      {
-        usage();
-        return 1;
-      }
+      CHECK_NOT_LAST
       opts.sort_by = args[++i];
     }
     else if (!typetag)
