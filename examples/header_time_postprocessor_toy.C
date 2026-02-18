@@ -5,6 +5,7 @@
 #include "TLine.h"
 #include "TCanvas.h"
 #include "TLegend.h"
+#include "TF1.h"
 #include <iostream>
 #include <iomanip>
 #include <map>
@@ -27,9 +28,10 @@ UInt_t average_delta(TimeTable& t, Long64_t exclude1, Long64_t exclude2);
 // first attempt at correcting the start and end of each second via extrapolation
 void stupid_extrapolation(TimeTable& t, UInt_t avg_delta);
 
-// Returns a graph of the pps value at the start of each `event_second`
-// The Y-value ranges from [0, UINT64_MAX) instead of [0, UINT32_MAX); that is, unwrapped.
-// The unwrapping is kinda dumb because the function only uses a slope to determine whether a wrap-around has occured
+// Returns a graph of the pps value at the start of each `event_second`.
+// The Y-values range from [0, UINT64_MAX) instead of [0, UINT32_MAX); that is, unwrapped.
+// The X-values are relative to t0; that is, instead of starting from ~1.7 billion seconds, it start from 0.
+// The unwrapping is kinda dumb because the function only uses a slope to determine whether a wrap-around has occured.
 TGraph naive_unrawp(TimeTable& encounters);
 
 void print(TimeTable& utcSecond_start_end_delta_start_end);
@@ -79,12 +81,37 @@ void header_time_postprocessor_toy()
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
   encounters.erase(-2);  // erase the garbage
   encounters.erase(-1);
-  // print(encounters);
 
   TGraph gr = naive_unrawp(encounters);
+  Long64_t t0 = encounters.begin()->first;
+
+  // use the unwrapped graph to fit a linear function
+  gr.Fit("pol1", "0");
+  TF1 * fun = gr.GetFunction("pol1");
+
+  for(int i=0; i<gr.GetN(); ++i)
+  {
+    Long64_t relative_sec = gr.GetPointX(i);
+    Long64_t utc_sec = relative_sec + t0;
+
+    auto row = encounters.find(utc_sec);
+
+    if (row==encounters.end())
+    {
+      std::cerr << "something terrible has happend \n";
+      exit(1);
+    } else {
+      ULong64_t corrected_start_pps = (ULong64_t)fun->Eval(relative_sec) % ((ULong64_t)UINT32_MAX + 1);
+      row->second.corrected_start = static_cast<UInt_t>(corrected_start_pps);
+    }
+  }
+
+  print(encounters); 
+  plot(encounters);
+
   // UInt_t avg_delta = average_delta(encounters, previous_second, previous_previous);
   // stupid_extrapolation(encounters, avg_delta);
-  // plot(encounters);
+  // plot(encounters, "foo.svg");
 
   exit(0);
 }
@@ -96,19 +123,27 @@ TGraph naive_unrawp(TimeTable& encounters)
   // that said, how lenient is lenient seems to be somewhat arbitrary...
   const Long64_t SLOPE_TOLERANCE = - (Long64_t) UINT32_MAX / 5;
 
-  TGraph gr;
-  gr.AddPoint(encounters.begin()->first, encounters.begin()->second.original_start);
+  TGraph gr(encounters.size()-1); // pre-allocate size()-1 points (ie final second doesn't have a valid start)
+  Long64_t t0 = encounters.begin()->first; // all x-values are relative to this number
 
-  int nwrap = 0;
+  int num_wraps = 0; // number of wrap-arounds
+  int idx= 0;  // add the first row of the time table
+  gr.SetPoint(idx, encounters.begin()->first - t0, encounters.begin()->second.original_start);
+
+  // iterate starting from the second row to the second-to-last row,
+  // since in each iteration we need to refer to the previous row;
+  // last row is excluded because the final second doesn't have a valid start pps.
   for(auto it=std::next(encounters.begin()); it!=std::prev(encounters.end()); ++it)
   {
     auto pr = std::prev(it);
-    Long64_t this_y = (Long64_t) it->second.original_start; // UInt_t -> Long64_t
+    Long64_t this_x = (Long64_t) it->first;
+    Long64_t this_y = (Long64_t) it->second.original_start;
     Long64_t prev_y = (Long64_t) pr->second.original_start;
 
-    if (this_y - prev_y < SLOPE_TOLERANCE) nwrap++;
+    if (this_y - prev_y < SLOPE_TOLERANCE) num_wraps++;
 
-    gr.AddPoint(it->first, this_y + nwrap * (ULong64_t) UINT32_MAX);
+    // gr.AddPoint(it->first, this_y + nwrap * (ULong64_t) UINT32_MAX);
+    gr.SetPoint(++idx, this_x - t0, this_y + num_wraps * (ULong64_t) UINT32_MAX);
   }
 
   return gr;
