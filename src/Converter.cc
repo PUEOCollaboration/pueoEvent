@@ -77,12 +77,14 @@ static const char * getTagFromRawName(const char* raw_name)
 
 
 template <typename RootType, typename RawType, int (*ReaderFn)(pueo_handle_t*, RawType*), pueo::convert::postprocess_fn PostProcess  = nullptr, bool Arity = false>
-static int converterImpl(size_t N, const char ** infiles,  const char * outfile, const char * tmp_suffix, const char * postprocess_args, const char * sort_by)
+static int converterImpl(size_t N, const char ** infiles,  const char * outfile, const pueo::convert::ConvertOpts & opts  )
 {
 
-  std::string tmpfilename = outfile + std::string(tmp_suffix);
+  std::string tmpfilename = outfile + std::string(opts.tmp_suffix);
 
   TFile outf(tmpfilename.c_str(), "RECREATE");
+  outf.SetCompressionAlgorithm(opts.compression_algo);
+  outf.SetCompressionLevel(opts.compression_level);
 
   if (!outf.IsOpen())
   {
@@ -135,11 +137,11 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   bool out_of_sorts = false;
   std::vector<std::pair<size_t,double>> sorted;
 
-  if (sort_by)
+  if (opts.sort_by)
   {
     //see if we are sorted or not
 
-    size_t N = t->Draw(sort_by,"","goff");
+    size_t N = t->Draw(opts.sort_by,"","goff");
     for (size_t i = 1; i < N; i++)
     {
       if (t->GetV1()[i] < t->GetV1()[i-1]) 
@@ -170,9 +172,12 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
 
   outf.Write();
 
-  if (sort_by && out_of_sorts)
+  if (opts.sort_by && out_of_sorts)
   {
     TFile fsorted(tmpfilename.c_str(),"RECREATE"); //will overwrite original temp file, but it will still exist until we close outf
+
+    fsorted.SetCompressionAlgorithm(opts.compression_algo);
+    fsorted.SetCompressionLevel(opts.compression_level);
     TTree * t_sorted = new TTree(typetag, typetag);
     t_sorted->SetAutoSave(0);
     t_sorted->Branch(typetag, &R);
@@ -195,7 +200,7 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
 
   if (PostProcess != nullptr)
   {
-    if (!PostProcess(tmpfilename.c_str(), outfile, postprocess_args))
+    if (!PostProcess(tmpfilename.c_str(), outfile, opts.postprocess_args))
     {
       unlink(tmpfilename.c_str());
     }
@@ -269,7 +274,7 @@ int pueo::convert::convertFiles(const char * typetag, int nfiles, const char ** 
 #define CONVERT_TEMPLATE(TAG, RAW, ROOT, POST, ARITY)\
   else if (!strcmp(typetag,#TAG))\
   {\
-    return converterImpl<ROOT,pueo_##RAW##_t,pueo_read_##RAW,POST, ARITY>(nfiles, infiles, outfile, opts.tmp_suffix, opts.postprocess_args,opts.sort_by);\
+    return converterImpl<ROOT,pueo_##RAW##_t,pueo_read_##RAW,POST, ARITY>(nfiles, infiles, outfile, opts);\
   }
 
   PUEO_CONVERTIBLE_TYPES(CONVERT_TEMPLATE)
