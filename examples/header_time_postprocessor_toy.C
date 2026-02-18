@@ -15,7 +15,6 @@ struct second_boundaries
   UInt_t original_start = 0; // value of the sysclk counter (ie pps) at the start of the second
   UInt_t original_end = 0;
   UInt_t corrected_start = 0;
-  UInt_t corrected_end = 0;
   UInt_t delta = 0; // end_pps - start_pps, with rollover taken care of
 };
 
@@ -169,7 +168,6 @@ TGraph naive_unrawp(TimeTable& encounters)
 
     if (this_y - prev_y < SLOPE_TOLERANCE) num_wraps++;
 
-    // gr.AddPoint(it->first, this_y + nwrap * (ULong64_t) UINT32_MAX);
     gr.SetPoint(++idx, this_x - t0, this_y + num_wraps * (ULong64_t) UINT32_MAX);
   }
 
@@ -220,17 +218,14 @@ void stupid_extrapolation(TimeTable& encounters, UInt_t avg_delta)
   {
     Long64_t diff_sec = it->first - mid_point->first;
     it->second.corrected_start = (mid_point->second.original_start) + diff_sec * avg_delta;
-    it->second.corrected_end = (mid_point->second.original_end) + diff_sec * avg_delta;
   }
 
   mid_point->second.corrected_start = mid_point->second.original_start;
-  mid_point->second.corrected_end = mid_point->second.original_end;
 
   for (auto it = std::next(mid_point); it!=encounters.end(); ++it)
   {
     Long64_t diff_sec = it->first - mid_point->first;
     it->second.corrected_start = (mid_point->second.original_start) + diff_sec * avg_delta;
-    it->second.corrected_end = (mid_point->second.original_end) + diff_sec * avg_delta;
   }
 }
 
@@ -238,17 +233,16 @@ void print(TimeTable& encounters)
 {
 
   std::cout << "-------------------------------------------------------------------------------\n"
-            << "            |   original                        |    corrected                 \n"
-            << "   second   |   start   |    end    |  delta    |    start   |    end    " << "\n"
+            << "  seconds      |   original                        |    corrected                 \n"
+            << "  since epoch  |   start   |    end    |  delta    |    start                     \n"
             << "-------------------------------------------------------------------------------\n";
   for (auto& e: encounters)
   {
-    std::cout << std::setw(11) << e.first
+    std::cout << std::setw(15) << std::left << e.first
               << " " << std::setw(11) << e.second.original_start
               << " " << std::setw(11) << e.second.original_end
               << " " << std::setw(11) << e.second.delta
-              << " " << std::setw(11) << e.second.corrected_start
-              << " " << std::setw(11) << e.second.corrected_end << "\n";
+              << " " << std::setw(11) << e.second.corrected_start << "\n";
   }
 }
 
