@@ -25,23 +25,29 @@ using TimeTable=std::map<Long64_t, second_boundaries>;
 // because they don't have valid (start, end) pairs.
 UInt_t average_delta(TimeTable& t, Long64_t exclude1, Long64_t exclude2);
 
-// first attempt at correcting the start and end of each second via extrapolation
-void stupid_extrapolation(TimeTable& t, UInt_t avg_delta);
-
-// Returns a graph of the pps value at the start of each `event_second`.
-// The Y-values range from [0, UINT64_MAX) instead of [0, UINT32_MAX); that is, unwrapped.
-// The X-values are relative to t0; that is, instead of starting from ~1.7 billion seconds, it start from 0.
-// The unwrapping is kinda dumb because the function only uses a slope to determine whether a wrap-around has occured.
-TGraph naive_unrawp(TimeTable& encounters);
-
-void print(TimeTable& utcSecond_start_end_delta_start_end);
-void plot (TimeTable& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
-
 bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 20)
 {
   UInt_t diff = a > b ? a - b : b - a;
   return diff <= tolerance;
 }
+
+// first attempt at correcting the start and end of each second via a simple extrapolation
+void stupid_extrapolation(TimeTable& t, UInt_t avg_delta);
+
+// Second attempt at correcting the start and end of each second, via TGraph::Fit().
+void linear_fit(TimeTable& t);
+
+// Returns a TGraph of the pps value at the start of each `event_second`.
+// The Y-values range from [0, UINT64_MAX) instead of [0, UINT32_MAX); that is, unwrapped.
+// The X-values are relative to t0; that is, instead of starting from ~1.7 billion seconds, it starts from 0.
+// This t0 offset is needed to perform a fit of the graph, else the result would be horrible.
+// Note that the TGraph does not contain the final row of the time table (ie the final second),
+// since the final second does not have a valid start pps (that'll have to be extrapolated).
+// The unwrapping is kinda dumb because the function only uses a slope to determine whether a wrap-around has occured.
+TGraph naive_unrawp(TimeTable& encounters);
+
+void print(TimeTable& utcSecond_start_end_delta_start_end);
+void plot (TimeTable& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
 
 // Some assumptions about the data are made:
 // (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
@@ -82,13 +88,29 @@ void header_time_postprocessor_toy()
   encounters.erase(-2);  // erase the garbage
   encounters.erase(-1);
 
-  TGraph gr = naive_unrawp(encounters);
-  Long64_t t0 = encounters.begin()->first;
+  /****************** First Attempt *********************/
+  // UInt_t avg_delta = average_delta(encounters, previous_second, previous_previous);
+  // stupid_extrapolation(encounters, avg_delta);
+  // plot(encounters, "foo.svg");
+
+  /****************** Second Attempt *********************/
+  linear_fit(encounters);
+  print(encounters);
+  plot(encounters);
+
+  exit(0);
+}
+
+void linear_fit(TimeTable& encounters)
+{
+  TGraph gr = naive_unrawp(encounters);     // start_pps (unwrapped to 64 bit) vs. event_second 
+  Long64_t t0 = encounters.begin()->first;  // first second of the run
 
   // use the unwrapped graph to fit a linear function
   gr.Fit("pol1", "0");
   TF1 * fun = gr.GetFunction("pol1");
 
+  // use the fit to correct the start of each second
   for(int i=0; i<gr.GetN(); ++i)
   {
     Long64_t relative_sec = gr.GetPointX(i);
@@ -98,7 +120,7 @@ void header_time_postprocessor_toy()
 
     if (row==encounters.end())
     {
-      std::cerr << "something terrible has happend \n";
+      std::cerr << "something terrible has happened.\n";
       exit(1);
     } else {
       ULong64_t corrected_start_pps = (ULong64_t)fun->Eval(relative_sec) % ((ULong64_t)UINT32_MAX + 1);
@@ -106,14 +128,19 @@ void header_time_postprocessor_toy()
     }
   }
 
-  print(encounters); 
-  plot(encounters);
+  // the final second is not in the graph, but it can be extrapolated
+  ULong64_t final_sec = std::prev(encounters.end())->first;
+  ULong64_t final_relative_sec = final_sec - t0;
 
-  // UInt_t avg_delta = average_delta(encounters, previous_second, previous_previous);
-  // stupid_extrapolation(encounters, avg_delta);
-  // plot(encounters, "foo.svg");
-
-  exit(0);
+  auto last_row = encounters.find(final_sec);
+  if (last_row == encounters.end()) 
+  {
+    std::cerr << "something horrible has happened.\n";
+    exit(1);
+  }
+  last_row->second.corrected_start = static_cast<UInt_t>(
+    (ULong64_t)fun->Eval(final_relative_sec) % ((ULong64_t)UINT32_MAX + 1)
+  );
 }
 
 TGraph naive_unrawp(TimeTable& encounters) 
