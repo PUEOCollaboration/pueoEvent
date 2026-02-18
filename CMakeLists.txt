@@ -47,6 +47,7 @@ find_library(PUEORAWDATA NAMES pueorawdata libpueorawdata PATHS "$ENV{PUEO_UTIL_
 find_package(pueo-data 1.0.0 REQUIRED)  
 
 find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
+include_directories(${ROOT_INCLUDE_DIRS})
 # find_package(FFTW REQUIRED) # TODO: Pretty sure there's no need for FFTW
 find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
