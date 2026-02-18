@@ -43,8 +43,9 @@ void linear_fit(TimeTable& t);
 // Note that the TGraph does not contain the final row of the time table (ie the final second),
 // since the final second does not have a valid start pps (that'll have to be extrapolated).
 // The unwrapping is kinda dumb because the function only uses a slope to determine whether a wrap-around has occured.
-TGraph naive_unrawp(TimeTable& encounters);
+TGraph naive_unrawp(TimeTable& utcSecond_start_end_delta_start_end);
 
+TimeTable prep (TString header_file_name);
 void print(TimeTable& utcSecond_start_end_delta_start_end);
 void plot (TimeTable& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
 
@@ -54,48 +55,20 @@ void plot (TimeTable& utcSecond_start_end_delta_start_end, TString name="pps_cor
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // default already disables this so no need to explicitly disable
-  // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
-
-  // ROOT::RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
-  ROOT::RDataFrame tmp_header_rdf("header", "/usr/pueoBuilder/install/bin/real_R0813_head.root");
-  TimeTable encounters; // this map only stores unique seconds
-
-  Long64_t previous_previous = -2; // initialize to garbage
-  Long64_t previous_second   = -1;
-  auto search_and_fill = 
-    [&encounters, &previous_second, &previous_previous]
-    (UInt_t event_second, UInt_t lpps)
-    {
-      Long64_t evtsec = (Long64_t) event_second;
-      bool new_encounter = encounters.find(evtsec) == encounters.end();
-      if (new_encounter) 
-      {
-        encounters.emplace(evtsec, second_boundaries{});
-        // the start of the previous second is the lpps of the current second
-        // note that this inserts garbage into `encounters` during the first two iterations;
-        encounters[previous_second].original_start = lpps;
-        encounters[previous_previous].original_end = lpps;
-        encounters[previous_previous].delta = lpps - encounters[previous_previous].original_start;
-        // note: for unsigned integers, wrap-around subtraction is automaticlly taken care of
-        
-        previous_previous = previous_second;
-        previous_second = evtsec;
-      }
-    };
-  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
-  encounters.erase(-2);  // erase the garbage
-  encounters.erase(-1);
+  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   /****************** First Attempt *********************/
-  // UInt_t avg_delta = average_delta(encounters, previous_second, previous_previous);
-  // stupid_extrapolation(encounters, avg_delta);
-  // plot(encounters, "foo.svg");
+  // auto last_point = std::prev(time_table.end())->first;
+  // auto second_to_last = std::prev(time_table.end(),2)->first;
+  // UInt_t avg_delta = average_delta(time_table, last_point, second_to_last);
+  // stupid_extrapolation(time_table, avg_delta);
+  // plot(time_table, "v1_correction.svg");
 
   /****************** Second Attempt *********************/
-  linear_fit(encounters);
-  print(encounters);
-  plot(encounters);
+  linear_fit(time_table);
+  print(time_table);
+  plot(time_table, "v2_correction.svg");
 
   exit(0);
 }
@@ -227,6 +200,44 @@ void stupid_extrapolation(TimeTable& encounters, UInt_t avg_delta)
     Long64_t diff_sec = it->first - mid_point->first;
     it->second.corrected_start = (mid_point->second.original_start) + diff_sec * avg_delta;
   }
+}
+
+TimeTable prep(TString header_file_name)
+{
+  TimeTable encounters; // this table only store unique `event_second`s
+
+  // default already disables this so no need to explicitly disable
+  // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
+  ROOT::RDataFrame tmp_header_rdf("header", header_file_name);
+
+  Long64_t previous_previous = -2; // initialize first row of the table to garbage
+  Long64_t previous_second   = -1;
+  auto search_and_fill = 
+    [&encounters, &previous_second, &previous_previous]
+    (UInt_t event_second, UInt_t lpps)
+    {
+      Long64_t evtsec = (Long64_t) event_second;
+      bool new_encounter = encounters.find(evtsec) == encounters.end();
+      if (new_encounter) 
+      {
+        encounters.emplace(evtsec, second_boundaries{});
+        // the start of the previous second is the lpps of the current second
+        // note that this inserts garbage into `encounters` during the first two iterations, 
+        // since the first second doesn't have a valid lpps.
+        // This is okay since the first two rows are set to garbage anyways.
+        encounters[previous_second].original_start = lpps;
+        encounters[previous_previous].original_end = lpps;
+        encounters[previous_previous].delta = lpps - encounters[previous_previous].original_start;
+        // note: for unsigned integers, wrap-around subtraction is automaticlly taken care of
+        
+        previous_previous = previous_second;
+        previous_second = evtsec;
+      }
+    };
+  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
+  encounters.erase(-2);  // erase the garbage
+  encounters.erase(-1);
+  return encounters;
 }
 
 void print(TimeTable& encounters)
