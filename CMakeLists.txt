@@ -127,13 +127,16 @@ install(
   DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
 )
 
-# Install the library and its header files
+# Install, scripts, executables,  the library and its header files
+
 install(
   TARGETS ${PROJECT_NAME} pueo-convert
   EXPORT ${PROJECT_NAME}Targets 
   FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
+install(PROGRAMS scripts/pueo-convert-run.sh DESTINATION bin RENAME pueo-convert-run)
+  
 install(
   EXPORT ${PROJECT_NAME}Targets
   NAMESPACE PUEO::
