@@ -52,8 +52,10 @@
 #include "pueo/rawio.h"
 
 template <typename T> const char * getName() { return "unnamed"; } 
+template <typename T> const char * getTreeName() { return "unnamedTree"; } 
 
 #define NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY) template <> const char * getName<ROOT>() { return #TAG; }
+#define TREE_NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY) template <> const char * getTreeName<ROOT>() { return #TAG "Tree"; }
 
 PUEO_CONVERTIBLE_TYPES(NAME_TEMPLATE)
 
@@ -93,8 +95,9 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   }
 
   const char * typetag = getName<RootType>();
+  const char * treename = getTreeName<RootType>();
 
-  TTree * t = new TTree(typetag, typetag);
+  TTree * t = new TTree(treename, treename);
   t->SetAutoSave(0);
   RootType * R = new RootType();
   t->Branch(typetag, &R);
@@ -178,7 +181,7 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
 
     fsorted.SetCompressionAlgorithm(opts.compression_algo);
     fsorted.SetCompressionLevel(opts.compression_level);
-    TTree * t_sorted = new TTree(typetag, typetag);
+    TTree * t_sorted = new TTree(treename, treename);
     t_sorted->SetAutoSave(0);
     t_sorted->Branch(typetag, &R);
     for (size_t i = 0; i < sorted.size(); i++)
