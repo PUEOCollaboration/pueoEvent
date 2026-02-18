@@ -43,11 +43,11 @@ void linear_fit(TimeTable& t);
 // Note that the TGraph does not contain the final row of the time table (ie the final second),
 // since the final second does not have a valid start pps (that'll have to be extrapolated).
 // The unwrapping is kinda dumb because the function only uses a slope to determine whether a wrap-around has occured.
-TGraph naive_unrawp(TimeTable& utcSecond_start_end_delta_start_end);
+TGraph naive_unrawp(TimeTable& time_table);
 
 TimeTable prep (TString header_file_name);
-void print(TimeTable& utcSecond_start_end_delta_start_end);
-void plot (TimeTable& utcSecond_start_end_delta_start_end, TString name="pps_correction.svg");
+void print(TimeTable& time_table);
+void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
 // Some assumptions about the data are made:
 // (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
@@ -59,11 +59,11 @@ void header_time_postprocessor_toy()
   // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   /****************** First Attempt *********************/
-  // auto last_point = std::prev(time_table.end())->first;
-  // auto second_to_last = std::prev(time_table.end(),2)->first;
-  // UInt_t avg_delta = average_delta(time_table, last_point, second_to_last);
-  // stupid_extrapolation(time_table, avg_delta);
-  // plot(time_table, "v1_correction.svg");
+  auto last_point = std::prev(time_table.end())->first;
+  auto second_to_last = std::prev(time_table.end(),2)->first;
+  UInt_t avg_delta = average_delta(time_table, last_point, second_to_last);
+  stupid_extrapolation(time_table, avg_delta);
+  plot(time_table, "v1_correction.svg");
 
   /****************** Second Attempt *********************/
   linear_fit(time_table);
@@ -266,11 +266,11 @@ void plot(TimeTable& encounters, TString name)
   std::size_t counter=0;
   for (auto& e: encounters){
 
-    UInt_t o = e.second.original_start;
+    Long64_t o = e.second.original_start;
     original.SetPoint(counter, e.first,o);
-    UInt_t c = e.second.corrected_start;
+    Long64_t c = e.second.corrected_start;
     corrected.SetPoint(counter, e.first, c);
-    int d = o < c ? c - o : o - c;
+    Long64_t d = o-c;
     diff.SetPoint(counter, e.first, d);
     counter++;
   }
