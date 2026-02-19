@@ -16,6 +16,7 @@ struct second_boundaries
   UInt_t original_end = 0;
   UInt_t corrected_start = 0;
   UInt_t delta = 0; // end_pps - start_pps, with rollover taken care of
+  UInt_t avg_delta = 0; // average delta (moving average)
 };
 
 using TimeTable=std::map<Long64_t, second_boundaries>;
@@ -29,6 +30,10 @@ bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 20)
   UInt_t diff = a > b ? a - b : b - a;
   return diff <= tolerance;
 }
+
+TimeTable prep (TString header_file_name);
+void print(TimeTable& time_table);
+void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
 // first attempt at correcting the start and end of each second via a simple extrapolation
 void stupid_extrapolation(TimeTable& t, UInt_t avg_delta);
@@ -45,9 +50,20 @@ void linear_fit(TimeTable& t);
 // The unwrapping is kinda dumb because the function only uses a slope to determine whether a wrap-around has occured.
 TGraph naive_unrawp(TimeTable& time_table);
 
-TimeTable prep (TString header_file_name);
-void print(TimeTable& time_table);
-void plot (TimeTable& time_table, TString name="pps_correction.svg");
+// third attempt, lol
+void simple_moving_average(TimeTable time_table, int half_width = 2, bool ignore_last_two_row = true)
+{
+  auto end = ignore_last_two_row ? std::prev(time_table.end(), 2) : time_table.end();
+
+  for(auto it=std::next(time_table.begin(), half_width); it!=std::prev(end, half_width); ++it){
+
+    // it for iterator, so obviously jt is jiterator ¯\_(ツ)_/¯
+    for (auto jt=std::prev(it,half_width); jt!=std::next(it,half_width+1); ++jt){
+    }
+  }
+
+  // std::cout << deltas << "\n";
+};
 
 // Some assumptions about the data are made:
 // (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
@@ -55,20 +71,23 @@ void plot (TimeTable& time_table, TString name="pps_correction.svg");
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
-  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   /****************** First Attempt *********************/
-  auto last_point = std::prev(time_table.end())->first;
-  auto second_to_last = std::prev(time_table.end(),2)->first;
-  UInt_t avg_delta = average_delta(time_table, last_point, second_to_last);
-  stupid_extrapolation(time_table, avg_delta);
-  plot(time_table, "v1_correction.svg");
+  // auto last_point = std::prev(time_table.end())->first;
+  // auto second_to_last = std::prev(time_table.end(),2)->first;
+  // UInt_t avg_delta = average_delta(time_table, last_point, second_to_last);
+  // stupid_extrapolation(time_table, avg_delta);
+  // plot(time_table, "v1_correction.svg");
 
   /****************** Second Attempt *********************/
-  linear_fit(time_table);
-  print(time_table);
-  plot(time_table, "v2_correction.svg");
+  // linear_fit(time_table);
+  // print(time_table);
+  // plot(time_table, "v2_correction.svg");
+
+  /****************** Third Attempt *********************/
+  simple_moving_average(time_table);
 
   exit(0);
 }
@@ -243,10 +262,10 @@ TimeTable prep(TString header_file_name)
 void print(TimeTable& encounters)
 {
 
-  std::cout << "-------------------------------------------------------------------------------\n"
-            << "  seconds      |   original                        |    corrected                 \n"
-            << "  since epoch  |   start   |    end    |  delta    |    start                     \n"
-            << "-------------------------------------------------------------------------------\n";
+  std::cout << "-------------------------------------------------------------------\n"
+            << "  seconds      |   original                        |    corrected  \n"
+            << "  since epoch  |   start   |    end    |  delta    |    start      \n"
+            << "-------------------------------------------------------------------\n";
   for (auto& e: encounters)
   {
     std::cout << std::setw(15) << std::left << e.first
