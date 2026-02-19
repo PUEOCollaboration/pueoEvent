@@ -67,7 +67,7 @@ namespace pueo
      UShort_t        deadTimeLastPPS = 0;
      UShort_t        deadTimeLastLastPPS = 0;
 
-     UChar_t         L1Octants[k::NUM_SURF_SLOTS] = 0;
+     UChar_t         L1Octants[k::NUM_SURF_SLOTS] ={0};
 
      // Trigger info
      int isInPhiMask(int phi, pol::pol_t=pol::kVertical) const; ///< Returns 1 if given phi-pol is in mask
