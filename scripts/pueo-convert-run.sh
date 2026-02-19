@@ -14,4 +14,4 @@ EXTRA_ARG="$@"
 mkdir -p $OUTDIR
 
 pueo-convert header $OUTDIR/headFile$RUN.root $INDIR/  "$EXTRA_ARG"
-pueo-convert waveform $OUTDIR/eventFile$RUN.root $INDIR/ "$EXTRA_ARG"
+pueo-convert event $OUTDIR/eventFile$RUN.root $INDIR/ "$EXTRA_ARG"

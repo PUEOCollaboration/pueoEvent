@@ -67,7 +67,7 @@ namespace pueo
 #define PUEO_CONVERTIBLE_TYPES(PUEO_CONVERT_TYPE)\
 /*                  |  tag           |     raw type        | ROOT type                |  postprocessor  | has_arity    */\
 /*==================================================================================================================== */\
-PUEO_CONVERT_TYPE(/*|*/ waveform,  /*|*/  full_waveforms, /*|*/ pueo::RawEvent,       /*|*/ nullptr,    /*|*/ 0           )\
+PUEO_CONVERT_TYPE(/*|*/ event,     /*|*/  full_waveforms, /*|*/ pueo::RawEvent,       /*|*/ nullptr,    /*|*/ 0           )\
 PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,      /*|*/ nullptr,    /*|*/ 0           )\
 PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attitude,  /*|*/ nullptr,    /*|*/ 0           )\
 PUEO_CONVERT_TYPE(/*|*/ sunsensors,/*|*/  ss,             /*|*/ pueo::nav::SunSensors,/*|*/ nullptr,    /*|*/ 0           )\
@@ -89,8 +89,8 @@ template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * d
       const char * tmp_suffix = ".tmp";
       const char * postprocess_args = nullptr;
       const char * sort_by = nullptr;
-      ROOT::RCompressionSetting::EAlgorithm::EValues compression_algo = ROOT::RCompressionSetting::EAlgorithm::kLZMA;
-      int compression_level = ROOT::RCompressionSetting::ELevel::kDefaultLZMA;
+      ROOT::RCompressionSetting::EAlgorithm::EValues compression_algo = ROOT::RCompressionSetting::EAlgorithm::kZSTD;
+      int compression_level = 3;
 
     };
 
