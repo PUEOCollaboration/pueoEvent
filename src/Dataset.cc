@@ -501,6 +501,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
       TFile * f = new TFile(fname.Data()); 
       filesToClose.push_back(f); 
       fDecimatedHeadTree = (TTree*) f->Get("headTree"); 
+      if (!fDecimatedHeadTree) fDecimatedHeadTree = (TTree*) f->Get("headerTree");
       fDecimatedHeadTree->BuildIndex("eventNumber"); 
       fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
       fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
@@ -536,6 +537,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     TFile * f = new TFile(the_right_file); 
     filesToClose.push_back(f); 
     fHeadTree = (TTree*) f->Get("headTree"); 
+    if (!fHeadTree) fHeadTree = (TTree*) f->Get("headerTree");
   }
   else 
   {
@@ -1001,6 +1003,7 @@ int pueo::Dataset::getRunAtTime(double t)
             {
               TFile f(the_right_file); 
               TTree * t = (TTree*) f.Get("headTree"); 
+              if (!t) t = (TTree*) f.Get("headerTree");
               if (t) 
               {
                 run_info  ri; 
