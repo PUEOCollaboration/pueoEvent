@@ -58,6 +58,7 @@ template <typename T> const char * getTreeName() { return "unnamedTree"; }
 #define TREE_NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY) template <> const char * getTreeName<ROOT>() { return #TAG "Tree"; }
 
 PUEO_CONVERTIBLE_TYPES(NAME_TEMPLATE)
+PUEO_CONVERTIBLE_TYPES(TREE_NAME_TEMPLATE)
 
 static const char * getTagFromRawName(const char* raw_name)
 {
