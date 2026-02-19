@@ -579,12 +579,12 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     else 
     {
       fprintf(stderr,"Could not find gps file for run %d, giving up!\n",run); 
-      fRunLoaded = false;
-      return false; 
+  //    fRunLoaded = false;
+  //    return false; 
     }
   }
 
-  fGpsTree->SetBranchAddress("gps",&fGps); 
+  if (fGpsTree) fGpsTree->SetBranchAddress("gps",&fGps); 
 
 
   //try to load useful event file 
