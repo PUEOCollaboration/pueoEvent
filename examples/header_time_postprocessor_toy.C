@@ -51,18 +51,48 @@ void linear_fit(TimeTable& t);
 TGraph naive_unrawp(TimeTable& time_table);
 
 // third attempt, lol
-void simple_moving_average(TimeTable time_table, int half_width = 2, bool ignore_last_two_row = true)
+// @param half_width Half width of the window when computing the moving average.
+// @note  The deltas are nominally 125 MHz, but sometimes shit can glitch.
+//        That is, for some `event_second`, the delta would overshoot,
+//        and at a later `event_second`, its delta would undershoot.
+//        In other words, the former `event_second` is too long and the latter is too short.
+//        The opposite could also happen.
+//        The size of `half_width` depends on the magnitude of the over/undershoot that we would expect.
+//        e.g. If we can expect an error of size 100, then half_width of 5 seconds is probably fine,
+//        but if the error is of size 10000, the window needs to be larger so that the error 
+//        is distributed into each bin.
+//        However, obviously this window shouldn't be too large, else there's no point to performing
+//        a moving average.
+//
+void simple_moving_average(TimeTable time_table, int half_width = 5, bool ignore_last_two_row = true)
 {
-  auto end = ignore_last_two_row ? std::prev(time_table.end(), 2) : time_table.end();
+  auto tmp = std::next(time_table.begin(), 30);
+  tmp->second.delta+=100;
+  tmp++;
+  tmp->second.delta-=100;
 
-  for(auto it=std::next(time_table.begin(), half_width); it!=std::prev(end, half_width); ++it){
+  // moving average, carried out for most rows in the table
+  auto start = std::next(time_table.begin(), half_width);
+  auto stop = ignore_last_two_row ? std::prev(time_table.end(), 2+half_width) : std::prev(time_table.end(), half_width);
+  for(auto it= start; it!=stop; ++it){
+    ULong64_t sum = 0; // 64 bit, in case there's an overflow, although probably unlikely
 
     // it for iterator, so obviously jt is jiterator ¯\_(ツ)_/¯
     for (auto jt=std::prev(it,half_width); jt!=std::next(it,half_width+1); ++jt){
+      sum += jt->second.delta;
     }
+    it->second.avg_delta = sum / (2*half_width+1);
   }
 
-  // std::cout << deltas << "\n";
+  // As for the first/last few rows in the table,
+  // I could probably do something more sophisticated, but nah let's just extrapolate
+  for (auto it=time_table.begin(); it!=start; ++it){
+    it->second.avg_delta = start->second.avg_delta;
+  }
+  for (auto it=stop; it!=time_table.end(); ++it){
+    it->second.avg_delta = std::prev(stop)->second.avg_delta;
+  }
+  print(time_table);
 };
 
 // Some assumptions about the data are made:
@@ -262,16 +292,17 @@ TimeTable prep(TString header_file_name)
 void print(TimeTable& encounters)
 {
 
-  std::cout << "-------------------------------------------------------------------\n"
-            << "  seconds      |   original                        |    corrected  \n"
-            << "  since epoch  |   start   |    end    |  delta    |    start      \n"
-            << "-------------------------------------------------------------------\n";
+  std::cout << "------------------------------------------------------------------------------\n"
+            << " seconds     | original                          | moving       corrected  \n"
+            << " since epoch | start     | end       | delta     | avg delta    start      \n"
+            << "------------------------------------------------------------------------------\n";
   for (auto& e: encounters)
   {
-    std::cout << std::setw(15) << std::left << e.first
+    std::cout << " " << std::setw(13) << std::left << e.first
               << " " << std::setw(11) << e.second.original_start
               << " " << std::setw(11) << e.second.original_end
               << " " << std::setw(11) << e.second.delta
+              << " " << std::setw(14) << e.second.avg_delta
               << " " << std::setw(11) << e.second.corrected_start << "\n";
   }
 }
