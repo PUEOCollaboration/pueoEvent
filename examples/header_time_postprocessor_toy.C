@@ -97,20 +97,20 @@ void simple_moving_average(TimeTable time_table, int half_width = 5, bool ignore
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
-  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   /****************** First Attempt *********************/
-  // auto last_point = std::prev(time_table.end())->first;
-  // auto second_to_last = std::prev(time_table.end(),2)->first;
-  // UInt_t avg_delta = average_delta(time_table, last_point, second_to_last);
-  // stupid_extrapolation(time_table, avg_delta);
-  // plot(time_table, "v1_correction.svg");
+  auto last_point = std::prev(time_table.end())->first;
+  auto second_to_last = std::prev(time_table.end(),2)->first;
+  UInt_t avg_delta = average_delta(time_table, last_point, second_to_last);
+  stupid_extrapolation(time_table, avg_delta);
+  plot(time_table, "v1_correction.svg");
 
   /****************** Second Attempt *********************/
-  // linear_fit(time_table);
-  // print(time_table);
-  // plot(time_table, "v2_correction.svg");
+  linear_fit(time_table);
+  print(time_table);
+  plot(time_table, "v2_correction.svg");
 
   /****************** Third Attempt *********************/
   simple_moving_average(time_table);
