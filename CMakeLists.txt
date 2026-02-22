@@ -45,32 +45,17 @@ find_package(pueorawdata CONFIG)
 find_package(pueo-data 1.0.0 REQUIRED)  
 
 find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
-# find_package(FFTW REQUIRED) # TODO: Pretty sure there's no need for FFTW
-find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
-
-if (pueorawdata_FOUND)
-  target_compile_options(${PROJECT_NAME} PRIVATE -DHAVE_PUEORAWDATA)
-  target_link_libraries(${PROJECT_NAME} PRIVATE PUEO::pueorawdata)
-  message(STATUS "Found libpueorawdata")
-endif()
 
 #================================================================================================
-#                                       CERN ROOT FLAGS
+#                                       CERN ROOT C++ Standard
 #================================================================================================
 # note: copied from RootFftwWrapper's CERN ROOT FLAGS but with PUBLIC->PRIVATE
 
 # obtain the C++ standard that ROOT is compiled with
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/getRootStandard.cmake)
-# setting C++ standard
-target_compile_features(${PROJECT_NAME} PRIVATE PUBLIC cxx_std_${ROOT_CXX_STANDARD})
+# setting C++ standard accordingly for this project
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_${ROOT_CXX_STANDARD})
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
-
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
-
-target_compile_options(${PROJECT_NAME} PRIVATE -pipe)
-target_compile_options(${PROJECT_NAME} PRIVATE -fsigned-char)
 
 #================================================================================================
 #                                       BUILDING
@@ -90,16 +75,18 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PUEO_VERSION=${pueo-da
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:RelWithDebInfo>:-Wall -Wextra>)
 
 target_link_libraries(${PROJECT_NAME} 
-  PUBLIC  PUEO::pueo-data 
-  PRIVATE ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
+  PUBLIC  PUEO::pueo-data ROOT::TreePlayer ROOT::Physics
 )
 
 if (pueorawdata_FOUND)
+  message(STATUS "Found libpueorawdata")
+  target_compile_options(${PROJECT_NAME} PRIVATE -DHAVE_PUEORAWDATA)
+  target_link_libraries(${PROJECT_NAME} PRIVATE PUEO::pueorawdata)
+
   add_executable(pueo-convert src/pueo-convert.cc)
   target_link_libraries(pueo-convert ${PROJECT_NAME})
   install(
     TARGETS pueo-convert
-    EXPORT ${PROJECT_NAME}Targets 
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
 endif()
@@ -119,20 +106,25 @@ write_basic_package_version_file(
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY AnyNewerVersion
 )
-# Install the Config and ConfigVersion files
+
+# Install the Config and ConfigVersion files; the config file tells downstream projects how to find
+# the Targets.config file of this project, as well as how to find the dependencies of this project
 install(
   FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
   DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
 )
 
-# Install the library and its header files
+# Install the library and its header files and group all that into one export
 install(
   TARGETS ${PROJECT_NAME}
   EXPORT ${PROJECT_NAME}Targets 
   FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  LIBRARY DESTINATION lib
 )
 
+# generate a Targets.config from the export; install the file dirrectly to the install path
+# this file lets downstream projects know how to interact with the package that is this project.
 install(
   EXPORT ${PROJECT_NAME}Targets
   NAMESPACE PUEO::
@@ -142,6 +134,6 @@ install(
 # installing CERN ROOT's _rdict.pcm file
 install(
   FILES "${CMAKE_CURRENT_BINARY_DIR}/lib${PROJECT_NAME}_rdict.pcm"
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  DESTINATION lib
 )
 
