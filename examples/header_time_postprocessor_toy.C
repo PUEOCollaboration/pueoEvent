@@ -66,15 +66,12 @@ TGraph naive_unrawp(TimeTable& time_table);
 //
 void simple_moving_average(TimeTable time_table, int half_width = 5, bool ignore_last_two_row = true)
 {
-  auto tmp = std::next(time_table.begin(), 30);
-  tmp->second.delta+=100;
-  tmp++;
-  tmp->second.delta-=100;
-
   // moving average, carried out for most rows in the table
   auto start = std::next(time_table.begin(), half_width);
-  auto stop = ignore_last_two_row ? std::prev(time_table.end(), 2+half_width) : std::prev(time_table.end(), half_width);
-  for(auto it= start; it!=stop; ++it){
+  auto stop = ignore_last_two_row ? std::prev(time_table.end(), half_width+2)
+                                  : std::prev(time_table.end(), half_width);
+  for(auto it= start; it!=stop; ++it)
+  {
     ULong64_t sum = 0; // 64 bit, in case there's an overflow, although probably unlikely
 
     // it for iterator, so obviously jt is jiterator ¯\_(ツ)_/¯
@@ -92,7 +89,6 @@ void simple_moving_average(TimeTable time_table, int half_width = 5, bool ignore
   for (auto it=stop; it!=time_table.end(); ++it){
     it->second.avg_delta = std::prev(stop)->second.avg_delta;
   }
-  print(time_table);
 };
 
 // Some assumptions about the data are made:
@@ -293,8 +289,8 @@ void print(TimeTable& encounters)
 {
 
   std::cout << "------------------------------------------------------------------------------\n"
-            << " seconds     | original                          | moving       corrected  \n"
-            << " since epoch | start     | end       | delta     | avg delta    start      \n"
+            << " seconds     | original  | original  | original  | moving    |  corrected  \n"
+            << " since epoch | start     | end       | delta     | avg delta |  start      \n"
             << "------------------------------------------------------------------------------\n";
   for (auto& e: encounters)
   {
@@ -305,6 +301,7 @@ void print(TimeTable& encounters)
               << " " << std::setw(14) << e.second.avg_delta
               << " " << std::setw(11) << e.second.corrected_start << "\n";
   }
+  std::cout << "------------------------------------------------------------------------------\n";
 }
 
 void plot(TimeTable& encounters, TString name)
