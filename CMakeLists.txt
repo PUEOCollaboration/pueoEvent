@@ -66,8 +66,7 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PUEO_VERSION=${pueo-da
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:RelWithDebInfo>:-Wall -Wextra>)
 
 target_link_libraries(${PROJECT_NAME} 
-  PUBLIC  PUEO::pueo-data 
-  PUBLIC ROOT::TreePlayer ROOT::Physics
+  PUBLIC  PUEO::pueo-data ROOT::TreePlayer ROOT::Physics
 )
 
 # CERN ROOT dictionary generation
