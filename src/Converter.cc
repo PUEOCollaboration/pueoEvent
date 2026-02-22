@@ -43,6 +43,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <unordered_map>
 
 
 
@@ -200,7 +201,7 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
     outf.Close();
   }
 
-  delete R;
+  ::operator delete(R);
 
   if (PostProcess != nullptr)
   {
@@ -210,7 +211,7 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
     }
     else
     {
-      std::cerr << "  postprocesser for " << getName<RootType> << "  didn't return 0, leaving stray temp file" << std::endl;
+      std::cerr << "  postprocesser for " << getName<RootType>() << "  didn't return 0, leaving stray temp file" << std::endl;
       return -1;
     }
   }
