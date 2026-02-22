@@ -47,8 +47,8 @@ namespace pueo
      RawHeader(const pueo_full_waveforms_t * wfs);
 #endif
      Int_t           run = 0 ; ///< Run number, assigned on ground
-     UInt_t          triggerTime ; ///< from the DAQ, may be correct or not
-     UInt_t          triggerTimeNs;
+     UInt_t          triggerTime= 0 ; ///< from the DAQ, may be correct or not
+     UInt_t          triggerTimeNs= 0;
      UInt_t          readoutTime = 0 ; ///< unixTime of readout
      UInt_t          readoutTimeNs= 0 ; ///< sub second time of readout
      ULong_t         eventNumber = 0 ; ///< Software event number
@@ -67,7 +67,7 @@ namespace pueo
      UShort_t        deadTimeLastPPS = 0;
      UShort_t        deadTimeLastLastPPS = 0;
 
-     UChar_t         L1Octants[k::NUM_SURF_SLOTS];
+     UChar_t         L1Octants[k::NUM_SURF_SLOTS] ={0};
 
      // Trigger info
      int isInPhiMask(int phi, pol::pol_t=pol::kVertical) const; ///< Returns 1 if given phi-pol is in mask

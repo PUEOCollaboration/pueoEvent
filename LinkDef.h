@@ -36,6 +36,8 @@
 #pragma link C++ class pueo::nav::Attitude+;
 #pragma link C++ class pueo::nav::Sat+;
 #pragma link C++ class pueo::nav::Sats+;
+#pragma link C++ class pueo::nav::SunSensor+;
+#pragma link C++ class pueo::nav::SunSensors+;
 
 
 #pragma read \

@@ -44,7 +44,7 @@ pueo::UsefulEvent::UsefulEvent(const RawEvent & event, const RawHeader & header)
 
   auto flight_geom = GeomTool::Instance(0,"flight");
 
-  for (size_t ichan = 0; ichan < k::NUM_DIGITZED_CHANNELS; ichan++) 
+  for (size_t ichan = 0; ichan < k::NUM_RF_CHANNELS; ichan++) 
   {
 
     int ant;

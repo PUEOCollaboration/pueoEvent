@@ -123,6 +123,8 @@ install(
   LIBRARY DESTINATION lib
 )
 
+install(PROGRAMS scripts/pueo-convert-run.sh DESTINATION bin RENAME pueo-convert-run)
+
 # generate a Targets.config from the export; install the file dirrectly to the install path
 # this file lets downstream projects know how to interact with the package that is this project.
 install(

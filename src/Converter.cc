@@ -35,6 +35,7 @@
 
 #include <iostream>
 #include <dirent.h>
+#include <algorithm>
 #include <sys/stat.h>
 #include <cstdio>
 #include <fcntl.h>
@@ -52,10 +53,13 @@
 #include "pueo/rawio.h"
 
 template <typename T> const char * getName() { return "unnamed"; } 
+template <typename T> const char * getTreeName() { return "unnamedTree"; } 
 
 #define NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY) template <> const char * getName<ROOT>() { return #TAG; }
+#define TREE_NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY) template <> const char * getTreeName<ROOT>() { return #TAG "Tree"; }
 
 PUEO_CONVERTIBLE_TYPES(NAME_TEMPLATE)
+PUEO_CONVERTIBLE_TYPES(TREE_NAME_TEMPLATE)
 
 static const char * getTagFromRawName(const char* raw_name)
 {
@@ -77,12 +81,14 @@ static const char * getTagFromRawName(const char* raw_name)
 
 
 template <typename RootType, typename RawType, int (*ReaderFn)(pueo_handle_t*, RawType*), pueo::convert::postprocess_fn PostProcess  = nullptr, bool Arity = false>
-static int converterImpl(size_t N, const char ** infiles,  const char * outfile, const char * tmp_suffix, const char * postprocess_args)
+static int converterImpl(size_t N, const char ** infiles,  const char * outfile, const pueo::convert::ConvertOpts & opts  )
 {
 
-  std::string tmpfilename = outfile + std::string(tmp_suffix);
+  std::string tmpfilename = outfile + std::string(opts.tmp_suffix);
 
   TFile outf(tmpfilename.c_str(), "RECREATE");
+  outf.SetCompressionAlgorithm(opts.compression_algo);
+  outf.SetCompressionLevel(opts.compression_level);
 
   if (!outf.IsOpen())
   {
@@ -91,8 +97,10 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   }
 
   const char * typetag = getName<RootType>();
+  const char * treename = getTreeName<RootType>();
 
-  TTree * t = new TTree(typetag, typetag);
+  TTree * t = new TTree(treename, treename);
+  t->SetAutoSave(0);
   RootType * R = new RootType();
   t->Branch(typetag, &R);
   RawType r;
@@ -131,15 +139,73 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
     pueo_handle_close(&h);
   }
 
+  bool out_of_sorts = false;
+  std::vector<std::pair<size_t,double>> sorted;
+
+  if (opts.sort_by)
+  {
+    //see if we are sorted or not
+
+    size_t N = t->Draw(opts.sort_by,"","goff");
+    for (size_t i = 1; i < N; i++)
+    {
+      if (t->GetV1()[i] < t->GetV1()[i-1]) 
+      {
+        out_of_sorts = true;
+        break;
+      }
+
+    }
+
+    if (out_of_sorts)
+    {
+      sorted.resize(N);
+
+      for (size_t i = 0; i < N; i++)
+      {
+        sorted[i].first = i;
+        sorted[i].second = t->GetV1()[i];
+      }
+
+      std::sort(sorted.begin(), sorted.end(),
+          [](const auto & l, const auto & r) { return l.second < r.second; });
+
+    }
+
+  }
+
 
   outf.Write();
-  outf.Close();
+
+  if (opts.sort_by && out_of_sorts)
+  {
+    TFile fsorted(tmpfilename.c_str(),"RECREATE"); //will overwrite original temp file, but it will still exist until we close outf
+
+    fsorted.SetCompressionAlgorithm(opts.compression_algo);
+    fsorted.SetCompressionLevel(opts.compression_level);
+    TTree * t_sorted = new TTree(treename, treename);
+    t_sorted->SetAutoSave(0);
+    t_sorted->Branch(typetag, &R);
+    for (size_t i = 0; i < sorted.size(); i++)
+    {
+      t->GetEntry(sorted[i].first);
+      t_sorted->Fill();
+    }
+
+    outf.Close();
+    fsorted.Write();
+    fsorted.Close();
+  }
+  else
+  {
+    outf.Close();
+  }
 
   ::operator delete(R);
 
   if (PostProcess != nullptr)
   {
-    if (!PostProcess(tmpfilename.c_str(), outfile, postprocess_args))
+    if (!PostProcess(tmpfilename.c_str(), outfile, opts.postprocess_args))
     {
       unlink(tmpfilename.c_str());
     }
@@ -151,7 +217,11 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   }
   else
   {
-    return rename(tmpfilename.c_str(), outfile);
+    if (rename(tmpfilename.c_str(), outfile))
+    {
+      std::cerr << " rename returned non-zero " << std::endl;
+      return -1;
+    }
   }
 
   return nprocessed;
@@ -209,14 +279,14 @@ int pueo::convert::convertFiles(const char * typetag, int nfiles, const char ** 
 #define CONVERT_TEMPLATE(TAG, RAW, ROOT, POST, ARITY)\
   else if (!strcmp(typetag,#TAG))\
   {\
-    return converterImpl<ROOT,pueo_##RAW##_t,pueo_read_##RAW,POST, ARITY>(nfiles, infiles, outfile, opts.tmp_suffix, opts.postprocess_args);\
+    return converterImpl<ROOT,pueo_##RAW##_t,pueo_read_##RAW,POST, ARITY>(nfiles, infiles, outfile, opts);\
   }
 
   PUEO_CONVERTIBLE_TYPES(CONVERT_TEMPLATE)
 
   else
   {
-    std::cerr <<"Unhandled typetag" << typetag << std::endl;
+    std::cerr <<"Unhandled typetag \"" << typetag << "\"" << std::endl;
     return -1;
   }
 }
