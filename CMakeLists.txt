@@ -36,8 +36,6 @@ endif()
 find_package(pueo-data 1.0.0 REQUIRED)  
 
 find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
-# find_package(FFTW REQUIRED) # TODO: Pretty sure there's no need for FFTW
-find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 
 #================================================================================================
 #                                       CERN ROOT FLAGS
@@ -47,15 +45,8 @@ find_package(ZLIB REQUIRED)   # TODO: Does pueoEvent really need this?
 # obtain the C++ standard that ROOT is compiled with
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/getRootStandard.cmake)
 # setting C++ standard
-target_compile_features(${PROJECT_NAME} PRIVATE PUBLIC cxx_std_${ROOT_CXX_STANDARD})
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_${ROOT_CXX_STANDARD})
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
-
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
-
-target_compile_options(${PROJECT_NAME} PRIVATE -pipe)
-target_compile_options(${PROJECT_NAME} PRIVATE -fsigned-char)
 
 #================================================================================================
 #                                       BUILDING
@@ -76,7 +67,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:RelWithDebInfo>:-Wall 
 
 target_link_libraries(${PROJECT_NAME} 
   PUBLIC  PUEO::pueo-data 
-  PRIVATE ZLIB::ZLIB ROOT::TreePlayer ROOT::Physics
+  PUBLIC ROOT::TreePlayer ROOT::Physics
 )
 
 # CERN ROOT dictionary generation
@@ -107,6 +98,7 @@ install(
   TARGETS ${PROJECT_NAME} 
   EXPORT ${PROJECT_NAME}Targets 
   FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  LIBRARY DESTINATION lib
 )
 
 install(
@@ -118,6 +110,6 @@ install(
 # installing CERN ROOT's _rdict.pcm file
 install(
   FILES "${CMAKE_CURRENT_BINARY_DIR}/lib${PROJECT_NAME}_rdict.pcm"
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  DESTINATION lib
 )
 
