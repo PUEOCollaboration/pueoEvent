@@ -45,6 +45,54 @@ bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 20)
   return diff <= tolerance;
 }
 
+void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period);
+
+// Some assumptions about the data are made:
+// (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
+// (b)  0 <= event_second[x] - event_second[x-1] <= 1
+void header_time_postprocessor_toy()
+{
+  gSystem->Load("libpueoEvent.so");
+  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+
+  simple_moving_average(time_table);
+
+  std::size_t stable_period = time_table.size() / 3;
+  stupid_extrapolation(time_table, stable_period);
+
+  print(time_table);
+  plot(time_table);
+  exit(0);
+}
+
+void simple_moving_average(TimeTable& time_table, int half_width, bool ignore_last_two_row)
+{
+  // moving average, carried out for most rows in the table
+  auto start = std::next(time_table.begin(), half_width);
+  auto stop = ignore_last_two_row ? std::prev(time_table.end(), half_width+2)
+                                  : std::prev(time_table.end(), half_width);
+  for(auto it= start; it!=stop; ++it)
+  {
+    ULong64_t sum = 0; // 64 bit, in case there's an overflow, although probably unlikely
+
+    // it for iterator, so obviously jt is jiterator ¯\_(ツ)_/¯
+    for (auto jt=std::prev(it,half_width); jt!=std::next(it,half_width+1); ++jt){
+      sum += jt->second.delta;
+    }
+    it->second.avg_delta = sum / (2*half_width+1);
+  }
+
+  // As for the first/last few rows in the table,
+  // I could probably do something more sophisticated, but nah let's just extrapolate
+  for (auto it=time_table.begin(); it!=start; ++it){
+    it->second.avg_delta = start->second.avg_delta;
+  }
+  for (auto it=stop; it!=time_table.end(); ++it){
+    it->second.avg_delta = std::prev(stop)->second.avg_delta;
+  }
+};
+
 void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period)
 {
   // find the mid-point of a "stable region" where, for every second, its delta is approximately avg_delta
@@ -100,25 +148,6 @@ void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period)
     auto past = std::prev(it);
     it->second.corrected_start = past->second.corrected_start + past->second.avg_delta;
   }
-}
-
-// Some assumptions about the data are made:
-// (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
-// (b)  0 <= event_second[x] - event_second[x-1] <= 1
-void header_time_postprocessor_toy()
-{
-  gSystem->Load("libpueoEvent.so");
-  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
-  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
-
-  simple_moving_average(time_table);
-
-  std::size_t stable_period = time_table.size() / 3;
-  stupid_extrapolation(time_table, stable_period);
-
-  print(time_table);
-  plot(time_table);
-  exit(0);
 }
 
 TimeTable prep(TString header_file_name)
@@ -236,30 +265,3 @@ void plot(TimeTable& encounters, TString name)
 
   c1.SaveAs(name);
 }
-
-void simple_moving_average(TimeTable& time_table, int half_width, bool ignore_last_two_row)
-{
-  // moving average, carried out for most rows in the table
-  auto start = std::next(time_table.begin(), half_width);
-  auto stop = ignore_last_two_row ? std::prev(time_table.end(), half_width+2)
-                                  : std::prev(time_table.end(), half_width);
-  for(auto it= start; it!=stop; ++it)
-  {
-    ULong64_t sum = 0; // 64 bit, in case there's an overflow, although probably unlikely
-
-    // it for iterator, so obviously jt is jiterator ¯\_(ツ)_/¯
-    for (auto jt=std::prev(it,half_width); jt!=std::next(it,half_width+1); ++jt){
-      sum += jt->second.delta;
-    }
-    it->second.avg_delta = sum / (2*half_width+1);
-  }
-
-  // As for the first/last few rows in the table,
-  // I could probably do something more sophisticated, but nah let's just extrapolate
-  for (auto it=time_table.begin(); it!=start; ++it){
-    it->second.avg_delta = start->second.avg_delta;
-  }
-  for (auto it=stop; it!=time_table.end(); ++it){
-    it->second.avg_delta = std::prev(stop)->second.avg_delta;
-  }
-};
