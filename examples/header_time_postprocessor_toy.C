@@ -97,8 +97,8 @@ void simple_moving_average(TimeTable time_table, int half_width = 5, bool ignore
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
-  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   /****************** First Attempt *********************/
   auto last_point = std::prev(time_table.end())->first;
@@ -253,7 +253,7 @@ TimeTable prep(TString header_file_name)
 
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
-  ROOT::RDataFrame tmp_header_rdf("header", header_file_name);
+  ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_name);
 
   Long64_t previous_previous = -2; // initialize first row of the table to garbage
   Long64_t previous_second   = -1;
