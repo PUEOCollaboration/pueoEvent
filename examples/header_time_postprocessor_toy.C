@@ -64,7 +64,7 @@ TGraph naive_unrawp(TimeTable& time_table);
 //        However, obviously this window shouldn't be too large, else there's no point to performing
 //        a moving average.
 //
-void simple_moving_average(TimeTable time_table, int half_width = 5, bool ignore_last_two_row = true)
+void simple_moving_average(TimeTable& time_table, int half_width = 5, bool ignore_last_two_row = true)
 {
   // moving average, carried out for most rows in the table
   auto start = std::next(time_table.begin(), half_width);
@@ -97,23 +97,24 @@ void simple_moving_average(TimeTable time_table, int half_width = 5, bool ignore
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
-  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
-  /****************** First Attempt *********************/
-  auto last_point = std::prev(time_table.end())->first;
-  auto second_to_last = std::prev(time_table.end(),2)->first;
-  UInt_t avg_delta = average_delta(time_table, last_point, second_to_last);
-  stupid_extrapolation(time_table, avg_delta);
-  plot(time_table, "v1_correction.svg");
-
-  /****************** Second Attempt *********************/
-  linear_fit(time_table);
-  print(time_table);
-  plot(time_table, "v2_correction.svg");
+  // /****************** First Attempt *********************/
+  // auto last_point = std::prev(time_table.end())->first;
+  // auto second_to_last = std::prev(time_table.end(),2)->first;
+  // UInt_t avg_delta = average_delta(time_table, last_point, second_to_last);
+  // stupid_extrapolation(time_table, avg_delta);
+  // plot(time_table, "v1_correction.svg");
+  //
+  // /****************** Second Attempt *********************/
+  // linear_fit(time_table);
+  // print(time_table);
+  // plot(time_table, "v2_correction.svg");
 
   /****************** Third Attempt *********************/
   simple_moving_average(time_table);
+  print(time_table);
 
   exit(0);
 }

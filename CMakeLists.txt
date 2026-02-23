@@ -29,7 +29,6 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/Version.cc
 )
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "This creates compile_commands.json, useful for LSP" FORCE)
 
 #================================================================================================
 #                                       HOUSEKEEPING
@@ -90,6 +89,7 @@ if (pueorawdata_FOUND)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
 endif()
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "This creates compile_commands.json, useful for LSP" FORCE)
 
 # CERN ROOT dictionary generation
 set(DICTNAME G__${PROJECT_NAME})
