@@ -16,6 +16,7 @@ struct second_boundaries
   UInt_t corrected_start = 0;
   UInt_t delta = 0; // end_pps - start_pps, with rollover taken care of
   UInt_t avg_delta = 0; // average delta (moving average)
+  bool   print_bold_green = false;
 };
 
 using TimeTable=std::map<Long64_t, second_boundaries>;
@@ -44,48 +45,60 @@ bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 20)
   return diff <= tolerance;
 }
 
-void stupid_extrapolation(TimeTable& encounters, UInt_t avg_delta)
+void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period)
 {
-  // find the mid-point of a "stable region" where the delta's are all approximately avg_delta
-  std::size_t stable_period = encounters.size() / 3;
-  auto mid_point = encounters.begin();
+  // find the mid-point of a "stable region" where, for every second, its delta is approximately avg_delta
+  auto mid_point = time_table.begin();
   std::vector<ULong64_t> stable_seconds;
   stable_seconds.reserve(stable_period);
 
-  for (auto &e: encounters) 
+  for (auto &e: time_table) 
   {
     if (stable_seconds.size() == stable_period) break; 
 
-    if (approx_equal(e.second.delta , avg_delta)) stable_seconds.emplace_back(e.first);
+    if (approx_equal(e.second.delta , e.second.avg_delta)) stable_seconds.emplace_back(e.first);
     else stable_seconds.clear();
   }
 
   if (stable_seconds.size() != stable_period) 
   {
-    print(encounters);
+    print(time_table);
     fprintf(
       stderr,
       "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
-      "where `end_pps` - `start_pps` are all approximately %u clock counts.\n"
+      "where `end_pps` - `start_pps` are all approximately 125 million clock counts.\n"
       "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
-      stable_period, avg_delta, mid_point->first
+      stable_period, mid_point->first
     );
   } else {
-    mid_point = encounters.find(stable_seconds.at(stable_period/2));
+    mid_point = time_table.find(stable_seconds.at(stable_period/2));
+  }
+  // check again, for safety
+  if (mid_point == time_table.end()) 
+  {
+    fprintf(
+      stderr,
+      "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
+      "where `end_pps` - `start_pps` are all approximately 125 million clock counts.\n"
+      "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
+      stable_period, mid_point->first
+    );
+    mid_point = time_table.begin();
   }
 
-  for (auto it = encounters.begin(); it!=mid_point; ++it)
-  {
-    Long64_t diff_sec = it->first - mid_point->first;
-    it->second.corrected_start = (mid_point->second.original_start) + diff_sec * avg_delta;
-  }
+  std::cout << "found mid_point: " << mid_point->first << '\n';
 
   mid_point->second.corrected_start = mid_point->second.original_start;
+  mid_point->second.print_bold_green = true;
 
-  for (auto it = std::next(mid_point); it!=encounters.end(); ++it)
-  {
-    Long64_t diff_sec = it->first - mid_point->first;
-    it->second.corrected_start = (mid_point->second.original_start) + diff_sec * avg_delta;
+  for (auto it = std::prev(mid_point); it!=std::prev(time_table.begin()); --it){
+    auto future = std::next(it);
+    it->second.corrected_start = future->second.corrected_start - future->second.avg_delta;
+  }
+
+  for (auto it = std::next(mid_point); it!=time_table.end(); ++it){
+    auto past = std::prev(it);
+    it->second.corrected_start = past->second.corrected_start + past->second.avg_delta;
   }
 }
 
@@ -99,8 +112,12 @@ void header_time_postprocessor_toy()
   // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   simple_moving_average(time_table);
-  print(time_table);
 
+  std::size_t stable_period = time_table.size() / 3;
+  stupid_extrapolation(time_table, stable_period);
+
+  print(time_table);
+  plot(time_table);
   exit(0);
 }
 
@@ -145,18 +162,19 @@ TimeTable prep(TString header_file_name)
 void print(TimeTable& encounters)
 {
 
-  std::cout << "------------------------------------------------------------------------------\n"
-            << " seconds     | original  | original  | original  | moving    |  corrected  \n"
-            << " since epoch | start     | end       | delta     | avg delta |  start      \n"
-            << "------------------------------------------------------------------------------\n";
+  std::cout << "--------------------------------------------------------------------------\n"
+            << " seconds     | original  | original  | original  | moving    | corrected  \n"
+            << " since epoch | start pps | end pps   | pps delta | avg delta | start pps  \n"
+            << "--------------------------------------------------------------------------\n";
   for (auto& e: encounters)
   {
-    std::cout << " " << std::setw(13) << std::left << e.first
-              << " " << std::setw(11) << e.second.original_start
-              << " " << std::setw(11) << e.second.original_end
-              << " " << std::setw(11) << e.second.delta
-              << " " << std::setw(14) << e.second.avg_delta
-              << " " << std::setw(11) << e.second.corrected_start << "\n";
+    const char * space = e.second.print_bold_green ? "\033[1;32m " : "\033[0m ";
+    std::cout << space << std::setw(13) << std::left << e.first
+              << space << std::setw(11) << e.second.original_start
+              << space << std::setw(11) << e.second.original_end
+              << space << std::setw(11) << e.second.delta
+              << space << std::setw(11) << e.second.avg_delta
+              << space << std::setw(11) << e.second.corrected_start << "\n";
   }
   std::cout << "------------------------------------------------------------------------------\n";
 }
