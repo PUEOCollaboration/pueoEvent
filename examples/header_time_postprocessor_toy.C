@@ -1,5 +1,4 @@
 #include "ROOT/RDataFrame.hxx"
-#include "TF1.h"
 #include "TAttMarker.h"
 #include "TSystem.h"
 #include "TGraph.h"
@@ -10,15 +9,16 @@
 #include <iomanip>
 #include <map>
 
-// Nominally, delta = (end_pps - start_pps) should yield approximately 125M.
-// The relative_delta means delta - 125M
+/* Nominally, delta = (end_pps - start_pps) should yield approximately 125E6 
+ * (unsigned integer overflow should be taken care of when computing the difference).
+ * `relative_delta` is then defined as (delta - 125E6). */
 struct second_boundaries 
 {
-  UInt_t original_start = 0; // value of the sysclk counter (ie pps) at the start of the second
-  UInt_t original_end = 0;
-  double corrected_start = 0;
-  int    relative_delta = 0; // 125M - (end_pps - start_pps), with rollover taken care of
+  UInt_t original_start = 0;     // value of sysclk counter at start of the second (start_pps)
+  UInt_t original_end = 0;       // end_pps
+  int    relative_delta = 0;     // (end_pps - start_pps) - 125E6; unsigned int overflow taken care of
   double avg_relative_delta = 0; // average delta (moving average)
+  double corrected_start = 0;    // to be corrected using avg_relative_delta
   bool   print_bold_green = false;
 };
 
@@ -28,139 +28,43 @@ TimeTable prep (TString header_file_name);
 void print(TimeTable& time_table);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-// An attempt at correcting the start and end of each second, via calculating the avg delta and extrapolations.
+// computes `corrected_start` for each second by calling `simple_moving_average()`
 void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period);
 
-/* @param half_width Half width of the window when computing the moving average.
-   @note  The deltas are nominally 125 MHz, but sometimes shit can glitch.
-          That is, for some `event_second`, the delta would overshoot,
-          and at a later `event_second`, its delta would undershoot.
-          In other words, the former `event_second` is too long and the latter is too short.
-          The opposite could also happen.
-          The size of `half_width` depends on the magnitude of the over/undershoot that we would expect.
-          e.g. If we can expect an error of size 100, then half_width of 5 seconds is probably fine,
-          but if the error is of size 10000, the window needs to be larger so that the error 
-          is distributed into each bin.
-          However, obviously this window shouldn't be too large, else there's no point to performing
-          a moving average. */
+/* @brief computes `avg_relative_delta` for each second using neighboring seconds.
+ * @param half_width Half width of the window when computing the moving average.
+ * @note  The deltas are nominally 125 MHz, but sometimes shit can glitch.
+ *        That is, for some `event_second`, the delta would overshoot,
+ *        and at a later `event_second`, its delta would undershoot.
+ *        In other words, the former `event_second` is too long and the latter is too short.
+ *        The opposite could also happen.
+ *        The size of `half_width` depends on the magnitude of the over/undershoot that we would expect.
+ *        e.g. If we can expect an error of size 100, then half_width of 5 seconds is probably fine,
+ *        but if the error is of size 10000, the window needs to be larger so that the error 
+ *        distributed into each bin is small enough.
+ *        However, obviously this window shouldn't be too large, else there's no point to performing
+ *        a moving average. */
 void simple_moving_average(TimeTable& time_table, int half_width = 5, bool ignore_last_two_row = true);
 
-bool approx_equal(UInt_t a, UInt_t b, UInt_t tolerance = 20)
-{
-  UInt_t diff = a > b ? a - b : b - a;
-  return diff <= tolerance;
-}
-
-// Another attempt at correcting the start and end of each second, via TGraph::Fit().
-void linear_fit(TimeTable& t);
-
-/* Returns a TGraph of the pps value at the start of each `event_second`.
-The Y-values range from [0, UINT64_MAX) instead of [0, UINT32_MAX); that is, unwrapped.
-The X-values are relative to t0; that is, instead of starting from ~1.7 billion seconds, it starts from 0.
-This t0 offset is needed to perform a fit of the graph, else the result would be horrible.
-Note that the TGraph does not contain the final row of the time table (ie the final second),
-since the final second does not have a valid start pps (that'll have to be extrapolated).
-The unwrapping is kinda dumb because the function only uses a slope to determine whether a wrap-around has occured.
-*/
-TGraph naive_unrawp(TimeTable& time_table);
-
-// Some assumptions about the data are made:
-// (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
-// (b)  0 <= event_second[x] - event_second[x-1] <= 1
+/* @brief The "main" function.
+ * @note  Some assumptions about the data are made:
+ *        (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
+ *        (b)  0 <= event_second[x] - event_second[x-1] <= 1 */
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  TimeTable time_table = prep("/work/real_run_1324_header.root");
-  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
-  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  // TimeTable time_table = prep("/work/R1392_header.root");
+  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
-  /****************** First Attempt *********************/
   simple_moving_average(time_table);
   std::size_t stable_period = time_table.size() / 3;
   stupid_extrapolation(time_table, stable_period);
   print(time_table);
   plot(time_table);
-
-  /****************** Second Attempt *********************/
-  // linear_fit(time_table);
-  // print(time_table);
-  // plot(time_table, "v2_correction.svg");
-
+  std::cout << "duration of run: " << std::prev(time_table.end())->first - time_table.begin()->first
+            << " seconds";
 
   exit(0);
-}
-
-TGraph naive_unrawp(TimeTable& encounters) 
-{
-  // some arbitrary negative number to determine whether a wrap-around has occured.
-  // this number should be lenient enough -- that is, not exactly (-UINT32_MAX)
-  // that said, how lenient is lenient seems to be somewhat arbitrary...
-  const Long64_t SLOPE_TOLERANCE = - (Long64_t) UINT32_MAX / 5;
-
-  TGraph gr(encounters.size()-1); // pre-allocate size()-1 points (ie final second doesn't have a valid start)
-  Long64_t t0 = encounters.begin()->first; // all x-values are relative to this number
-
-  int num_wraps = 0; // number of wrap-arounds
-  int idx= 0;  // add the first row of the time table
-  gr.SetPoint(idx, encounters.begin()->first - t0, encounters.begin()->second.original_start);
-
-  // iterate starting from the second row to the second-to-last row,
-  // since in each iteration we need to refer to the previous row;
-  // last row is excluded because the final second doesn't have a valid start pps.
-  for(auto it=std::next(encounters.begin()); it!=std::prev(encounters.end()); ++it)
-  {
-    auto pr = std::prev(it);
-    Long64_t this_x = (Long64_t) it->first;
-    Long64_t this_y = (Long64_t) it->second.original_start;
-    Long64_t prev_y = (Long64_t) pr->second.original_start;
-
-    if (this_y - prev_y < SLOPE_TOLERANCE) num_wraps++;
-
-    gr.SetPoint(++idx, this_x - t0, this_y + num_wraps * (ULong64_t) UINT32_MAX);
-  }
-
-  return gr;
-}
-
-void linear_fit(TimeTable& encounters)
-{
-  TGraph gr = naive_unrawp(encounters);     // start_pps (unwrapped to 64 bit) vs. event_second 
-  Long64_t t0 = encounters.begin()->first;  // first second of the run
-
-  // use the unwrapped graph to fit a linear function
-  gr.Fit("pol1", "0");
-  TF1 * fun = gr.GetFunction("pol1");
-
-  // use the fit to correct the start of each second
-  for(int i=0; i<gr.GetN(); ++i)
-  {
-    Long64_t relative_sec = gr.GetPointX(i);
-    Long64_t utc_sec = relative_sec + t0;
-
-    auto row = encounters.find(utc_sec);
-
-    if (row==encounters.end())
-    {
-      std::cerr << "something terrible has happened.\n";
-      exit(1);
-    } else {
-      ULong64_t corrected_start_pps = (ULong64_t)fun->Eval(relative_sec) % ((ULong64_t)UINT32_MAX + 1);
-      row->second.corrected_start = static_cast<UInt_t>(corrected_start_pps);
-    }
-  }
-  // the final second is not in the graph, but it can be extrapolated
-  ULong64_t final_sec = std::prev(encounters.end())->first;
-  ULong64_t final_relative_sec = final_sec - t0;
-
-  auto last_row = encounters.find(final_sec);
-  if (last_row == encounters.end()) 
-  {
-    std::cerr << "something horrible has happened.\n";
-    exit(1);
-  }
-  last_row->second.corrected_start = static_cast<UInt_t>(
-    (ULong64_t)fun->Eval(final_relative_sec) % ((ULong64_t)UINT32_MAX + 1)
-  );
 }
 
 void simple_moving_average(TimeTable& time_table, int half_width, bool ignore_last_two_row)
@@ -190,6 +94,12 @@ void simple_moving_average(TimeTable& time_table, int half_width, bool ignore_la
   }
 };
 
+template<typename T> bool approx_equal(T a, T b, T tolerance = 20)
+{
+  T diff = a > b ? a - b : b - a;
+  return diff <= tolerance;
+}
+
 void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period)
 {
   // find the mid-point of a "stable region" where, for every second, its delta is approximately avg_relative_delta
@@ -201,7 +111,8 @@ void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period)
   {
     if (stable_seconds.size() == stable_period) break; 
 
-    if (approx_equal(e.second.relative_delta , e.second.avg_relative_delta)) stable_seconds.emplace_back(e.first);
+    if (approx_equal<double>(e.second.relative_delta , e.second.avg_relative_delta)) 
+      stable_seconds.emplace_back(e.first);
     else stable_seconds.clear();
   }
 
@@ -385,7 +296,7 @@ void plot(TimeTable& encounters, TString name)
   original_delta.SetMarkerStyle(kFullCrossX);
   original_delta.SetMarkerSize(3);
   original_delta.SetTitle("#Delta #equiv end_pps - start_pps ≈ 125,000,000");
-  original_delta.GetYaxis()->SetTitle("#Delta - 125 MHz [sysclk counts]");
+  original_delta.GetYaxis()->SetTitle("#Delta - 125E6 [sysclk counts]");
   original_delta.GetYaxis()->CenterTitle();
   original_delta.GetYaxis()->SetTitleSize(0.1);
   original_delta.GetYaxis()->SetTitleOffset(0.3);
