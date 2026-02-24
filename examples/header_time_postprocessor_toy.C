@@ -25,11 +25,16 @@ struct second_boundaries
 using TimeTable=std::map<Long64_t, second_boundaries>;
 
 TimeTable prep (TString header_file_name);
-void print(TimeTable& time_table);
+void print(TimeTable& time_table, std::size_t num_rows = 100);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
+// Finds the mid-point of a "stable region" where, for every second, its delta is approximately avg_relative_delta.
+// Returns time_table.begin() if a stable region couldn't be found
+TimeTable::iterator find_stable_region_mid_point(
+  std::size_t stable_period, TimeTable& time_table, bool ignore_last_two_row = true);
+
 // computes `corrected_start` for each second by calling `simple_moving_average()`
-void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period);
+void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point);
 
 /* @brief computes `avg_relative_delta` for each second using neighboring seconds.
  * @param half_width Half width of the window when computing the moving average.
@@ -53,16 +58,19 @@ void simple_moving_average(TimeTable& time_table, int half_width = 5, bool ignor
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // TimeTable time_table = prep("/work/R1392_header.root");
-  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  TimeTable time_table = prep("/work/R1392_header.root");
+  // TimeTable time_table = prep("/work/real_run_1324_header.root");
+  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   simple_moving_average(time_table);
   std::size_t stable_period = time_table.size() / 3;
-  stupid_extrapolation(time_table, stable_period);
+  TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
+  stupid_extrapolation(time_table, mid_point);
   print(time_table);
+  fprintf(stdout, "There are %lld seconds in this run.\n", 
+          std::prev(time_table.end())->first - time_table.begin()->first);
+
   plot(time_table);
-  std::cout << "duration of run: " << std::prev(time_table.end())->first - time_table.begin()->first
-            << " seconds";
 
   exit(0);
 }
@@ -100,71 +108,92 @@ template<typename T> bool approx_equal(T a, T b, T tolerance = 20)
   return diff <= tolerance;
 }
 
-void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period)
+TimeTable::iterator find_stable_region_mid_point(
+  std::size_t requested_stable_period, TimeTable& time_table, bool ignore_last_two_row) 
 {
-  // find the mid-point of a "stable region" where, for every second, its delta is approximately avg_relative_delta
-  auto mid_point = time_table.begin();
+  TimeTable::iterator mid_point = time_table.begin();
+  TimeTable::iterator stop = ignore_last_two_row ? std::prev(time_table.end(), 2) : time_table.end();
+
   std::vector<ULong64_t> stable_seconds;
-  stable_seconds.reserve(stable_period);
+  stable_seconds.reserve(requested_stable_period);
 
-  for (auto &e: time_table) 
+  for (auto it=time_table.begin(); it!=stop; ++it) 
   {
-    if (stable_seconds.size() == stable_period) break; 
+    if (stable_seconds.size() == requested_stable_period) break; 
 
-    if (approx_equal<double>(e.second.relative_delta , e.second.avg_relative_delta)) 
-      stable_seconds.emplace_back(e.first);
+    if (approx_equal<double>(it->second.relative_delta , it->second.avg_relative_delta)) 
+      stable_seconds.emplace_back(it->first);
     else stable_seconds.clear();
   }
 
-  if (stable_seconds.size() != stable_period) 
+  if (stable_seconds.size() != requested_stable_period) 
   {
     print(time_table);
-    fprintf(
+    fprintf
+    (
       stderr,
       "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
       "where `end_pps` - `start_pps` are all approximately 125 million clock counts.\n"
       "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
-      stable_period, mid_point->first
+      requested_stable_period, time_table.begin()->first
     );
   } else {
-    mid_point = time_table.find(stable_seconds.at(stable_period/2));
+    mid_point = time_table.find(stable_seconds.at(requested_stable_period/2));
   }
-  // check again, for safety
-  if (mid_point == time_table.end()) 
+
+  if (mid_point == time_table.end()) // check again, in case the find() above returns a invalid result
   {
-    fprintf(
+    fprintf
+    (
       stderr,
       "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
       "where `end_pps` - `start_pps` are all approximately 125 million clock counts.\n"
       "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
-      stable_period, mid_point->first
+      requested_stable_period, time_table.begin()->first
     );
     mid_point = time_table.begin();
   }
 
-  std::cout << "found mid_point: " << mid_point->first << '\n';
+  return mid_point;
+}
 
-  mid_point->second.corrected_start = mid_point->second.original_start;
-  mid_point->second.print_bold_green = true;
+void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point)
+{
+  anchor_point->second.corrected_start = anchor_point->second.original_start;
+  anchor_point->second.print_bold_green = true;
 
-  for (auto it = std::prev(mid_point); it!=std::prev(time_table.begin()); --it){
-    auto future = std::next(it);
-    it->second.corrected_start = 
+  // check required, since std::prev(map.begin()) is undefined behavior
+  if (anchor_point!=time_table.begin())
+  {
+    // backward extrapolation from the anchor point
+    for (auto it = std::prev(anchor_point); it!=time_table.begin(); --it)
+    {
+      auto future = std::next(it);
+      it->second.corrected_start = 
+        std::fmod(
+          future->second.corrected_start - (125000000 + it->second.avg_relative_delta) +
+          static_cast<double>(UINT32_MAX) + 1,
+          static_cast<double>(UINT32_MAX) + 1
+        );
+    }
+    // handle first row explicitly
+    TimeTable::iterator beg = time_table.begin();
+    TimeTable::iterator fut = std::next(time_table.begin());
+    beg->second.corrected_start = 
       std::fmod(
-        future->second.corrected_start - (125000000 + future->second.avg_relative_delta)
-        +static_cast<double>(UINT32_MAX) + 1 
-        ,
+        fut->second.corrected_start - (125000000 + beg->second.avg_relative_delta) +
+        static_cast<double>(UINT32_MAX) + 1,
         static_cast<double>(UINT32_MAX) + 1
       );
   }
-
-  for (auto it = std::next(mid_point); it!=time_table.end(); ++it){
+  // forward extrapolation
+  for (auto it = std::next(anchor_point); it!=time_table.end(); ++it)
+  {
     auto past = std::prev(it);
     it->second.corrected_start = 
       std::fmod(
-        past->second.corrected_start + (125000000 + past->second.avg_relative_delta)
-        +static_cast<double>(UINT32_MAX) + 1 
-        ,
+        past->second.corrected_start + (125000000 + past->second.avg_relative_delta)+
+        static_cast<double>(UINT32_MAX) + 1,
         static_cast<double>(UINT32_MAX) + 1
       );
   }
@@ -210,9 +239,8 @@ TimeTable prep(TString header_file_name)
   return encounters;
 }
 
-void print(TimeTable& encounters)
+void print(TimeTable& time_table, std::size_t num_rows)
 {
-
 
   std::cout << "\nRelative delta is defined to be 125000000 - (end_pps - start_pps)\n\n";
 
@@ -221,21 +249,29 @@ void print(TimeTable& encounters)
             << " since epoch |           |           | delta | delta   | start pps  \n"
             << " Long64_t    | UInt_t    | UInt_t    | int   | double  | double     \n"
             << "--------------------------------------------------------------------\n";
-  for (auto& e: encounters)
+  for (auto it=time_table.begin(); it!=std::next(time_table.begin(), num_rows); ++it)
   {
-    const char * space = e.second.print_bold_green ? "\033[1;32m " : "\033[0m ";
-    std::cout << space << std::setw(13) << std::left << e.first
-              << space << std::setw(11) << e.second.original_start
-              << space << std::setw(11) << e.second.original_end
-              << space << std::setw(7)  << e.second.relative_delta
-              << space << std::setw(6)  << std::fixed << std::setprecision(2) << e.second.avg_relative_delta
-              << space << std::setw(15) << std::right << std::fixed << std::setprecision(2) << e.second.corrected_start << "\n";
+    const char * space = it->second.print_bold_green ? "\033[1;32m " : "\033[0m ";
+    std::cout << space << std::setw(13) << std::left << it->first
+              << space << std::setw(11) << it->second.original_start
+              << space << std::setw(11) << it->second.original_end
+              << space << std::setw(7)  << it->second.relative_delta
+              << space << std::setw(6)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
+              << space << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_start << "\n";
+  }
+
+  if (num_rows < time_table.size()){
+    std::cout << "...\n";
+    std::cout << "...\n";
+    std::cout << "...\n";
   }
   std::cout << "------------------------------------------------------------------------------\n";
 }
 
 void plot(TimeTable& encounters, TString name)
 {
+  Long64_t t0 = encounters.begin()->first;
+
   TGraph original(encounters.size());
   TGraph corrected(encounters.size());
   TGraph diff(encounters.size());
@@ -247,17 +283,18 @@ void plot(TimeTable& encounters, TString name)
   for (auto& e: encounters){
 
     Long64_t o = e.second.original_start;
-    original.SetPoint(counter, e.first,o);
+    original.SetPoint(counter, e.first-t0,o);
     double c = e.second.corrected_start;
-    corrected.SetPoint(counter, e.first, c);
+    corrected.SetPoint(counter, e.first-t0, c);
     double d = o-c;
-    diff.SetPoint(counter, e.first, d);
+    diff.SetPoint(counter, e.first-t0, d);
 
-    original_delta.SetPoint(counter, e.first, e.second.relative_delta);
-    avg_delta.SetPoint(counter, e.first, e.second.avg_relative_delta);
+    original_delta.SetPoint(counter, e.first-t0, e.second.relative_delta);
+    avg_delta.SetPoint(counter, e.first-t0, e.second.avg_relative_delta);
 
     counter++;
   }
+
   original.RemovePoint(original.GetN()-1); // final second doesn't have a valid original_start
   diff.RemovePoint(diff.GetN()-1);         // final second doesn't have a valid original_start
   original_delta.RemovePoint(original_delta.GetN()-1); // final two seconds don't have valid deltas
@@ -275,6 +312,7 @@ void plot(TimeTable& encounters, TString name)
   original.GetYaxis()->SetTitleSize(0.1);
   original.GetYaxis()->SetTitleOffset(0.3);
   original.GetYaxis()->CenterTitle();
+  // original.GetXaxis()->SetRange(0, 1000);
   corrected.Draw("P");
   corrected.SetMarkerStyle(kCircle);
   corrected.SetMarkerColor(kRed);
@@ -285,7 +323,7 @@ void plot(TimeTable& encounters, TString name)
   line.SetLineStyle(2);   // dashed
   line.Draw();
 
-  TLegend leg(0.1, 0.8, 0.25, 0.9); // (x1,y1,x2,y2) in NDC
+  TLegend leg(0.6, 0, 0.9, 0.1); // (x1,y1,x2,y2) in NDC
   leg.AddEntry(&original, "Original", "p");
   leg.AddEntry(&corrected, "Corrected", "p");
   leg.AddEntry(&line, "UINT 32Bit MAX", "l");
@@ -301,12 +339,13 @@ void plot(TimeTable& encounters, TString name)
   original_delta.GetYaxis()->SetTitleSize(0.1);
   original_delta.GetYaxis()->SetTitleOffset(0.3);
   original_delta.GetXaxis()->SetLabelSize(0);
+  // original_delta.GetXaxis()->SetRange(0, 1000);
 
   avg_delta.Draw("P");
   avg_delta.SetMarkerStyle(kCircle);
   avg_delta.SetMarkerColor(kRed);
 
-  TLegend leg3(0.6, 0.1, 0.9, 0.3); // (x1,y1,x2,y2) in NDC
+  TLegend leg3(0.6, 0.0, 0.9, 0.1); // (x1,y1,x2,y2) in NDC
   leg3.AddEntry(&original_delta, "original (discrete) delta (uint32_t)", "p");
   leg3.AddEntry(&corrected, "smoothed (moving averaged) delta (double_t)", "p");
   leg3.Draw();
@@ -319,11 +358,11 @@ void plot(TimeTable& encounters, TString name)
   diff.GetYaxis()->CenterTitle();
   diff.GetYaxis()->SetTitleSize(0.1);
   diff.GetYaxis()->SetTitleOffset(0.3);
-  diff.GetXaxis()->SetTitle("Event Second [seconds since Unix epoch]");
+  diff.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%lld)]", t0));
   diff.GetXaxis()->SetTitleOffset(2.2);
   diff.GetXaxis()->CenterTitle();
   diff.GetXaxis()->SetLabelOffset(0.05);
-
+  // diff.GetXaxis()->SetRange(0, 1000);
 
   c1.SaveAs(name);
 }
