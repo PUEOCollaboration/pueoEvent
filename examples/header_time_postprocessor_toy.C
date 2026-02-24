@@ -10,13 +10,15 @@
 #include <iomanip>
 #include <map>
 
+// Nominally, delta = (end_pps - start_pps) should yield approximately 125M.
+// The relative_delta means delta - 125M
 struct second_boundaries 
 {
   UInt_t original_start = 0; // value of the sysclk counter (ie pps) at the start of the second
   UInt_t original_end = 0;
-  UInt_t corrected_start = 0;
-  UInt_t delta = 0; // end_pps - start_pps, with rollover taken care of
-  UInt_t avg_delta = 0; // average delta (moving average)
+  double corrected_start = 0;
+  int    relative_delta = 0; // 125M - (end_pps - start_pps), with rollover taken care of
+  double avg_relative_delta = 0; // average delta (moving average)
   bool   print_bold_green = false;
 };
 
@@ -68,20 +70,21 @@ TGraph naive_unrawp(TimeTable& time_table);
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
+  TimeTable time_table = prep("/work/real_run_1324_header.root");
+  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/real_R0813_head.root");
   // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   /****************** First Attempt *********************/
-  // simple_moving_average(time_table);
-  // std::size_t stable_period = time_table.size() / 3;
-  // stupid_extrapolation(time_table, stable_period);
-  // print(time_table);
-  // plot(time_table);
+  simple_moving_average(time_table);
+  std::size_t stable_period = time_table.size() / 3;
+  stupid_extrapolation(time_table, stable_period);
+  print(time_table);
+  plot(time_table);
 
   /****************** Second Attempt *********************/
-  linear_fit(time_table);
-  print(time_table);
-  plot(time_table, "v2_correction.svg");
+  // linear_fit(time_table);
+  // print(time_table);
+  // plot(time_table, "v2_correction.svg");
 
 
   exit(0);
@@ -168,28 +171,28 @@ void simple_moving_average(TimeTable& time_table, int half_width, bool ignore_la
                                   : std::prev(time_table.end(), half_width);
   for(auto it= start; it!=stop; ++it)
   {
-    ULong64_t sum = 0; // 64 bit, in case there's an overflow, although probably unlikely
+    double sum = 0.; // 64 bit, in case there's an overflow, although probably unlikely
 
     // it for iterator, so obviously jt is jiterator ¯\_(ツ)_/¯
     for (auto jt=std::prev(it,half_width); jt!=std::next(it,half_width+1); ++jt){
-      sum += jt->second.delta;
+      sum += jt->second.relative_delta;
     }
-    it->second.avg_delta = sum / (2*half_width+1);
+    it->second.avg_relative_delta = sum / (2*half_width+1);
   }
 
   // As for the first/last few rows in the table,
   // I could probably do something more sophisticated, but nah let's just extrapolate
   for (auto it=time_table.begin(); it!=start; ++it){
-    it->second.avg_delta = start->second.avg_delta;
+    it->second.avg_relative_delta = start->second.avg_relative_delta;
   }
   for (auto it=stop; it!=time_table.end(); ++it){
-    it->second.avg_delta = std::prev(stop)->second.avg_delta;
+    it->second.avg_relative_delta = std::prev(stop)->second.avg_relative_delta;
   }
 };
 
 void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period)
 {
-  // find the mid-point of a "stable region" where, for every second, its delta is approximately avg_delta
+  // find the mid-point of a "stable region" where, for every second, its delta is approximately avg_relative_delta
   auto mid_point = time_table.begin();
   std::vector<ULong64_t> stable_seconds;
   stable_seconds.reserve(stable_period);
@@ -198,7 +201,7 @@ void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period)
   {
     if (stable_seconds.size() == stable_period) break; 
 
-    if (approx_equal(e.second.delta , e.second.avg_delta)) stable_seconds.emplace_back(e.first);
+    if (approx_equal(e.second.relative_delta , e.second.avg_relative_delta)) stable_seconds.emplace_back(e.first);
     else stable_seconds.clear();
   }
 
@@ -235,12 +238,24 @@ void stupid_extrapolation(TimeTable& time_table, std::size_t stable_period)
 
   for (auto it = std::prev(mid_point); it!=std::prev(time_table.begin()); --it){
     auto future = std::next(it);
-    it->second.corrected_start = future->second.corrected_start - future->second.avg_delta;
+    it->second.corrected_start = 
+      std::fmod(
+        future->second.corrected_start - (125000000 + future->second.avg_relative_delta)
+        +static_cast<double>(UINT32_MAX) + 1 
+        ,
+        static_cast<double>(UINT32_MAX) + 1
+      );
   }
 
   for (auto it = std::next(mid_point); it!=time_table.end(); ++it){
     auto past = std::prev(it);
-    it->second.corrected_start = past->second.corrected_start + past->second.avg_delta;
+    it->second.corrected_start = 
+      std::fmod(
+        past->second.corrected_start + (125000000 + past->second.avg_relative_delta)
+        +static_cast<double>(UINT32_MAX) + 1 
+        ,
+        static_cast<double>(UINT32_MAX) + 1
+      );
   }
 }
 
@@ -269,8 +284,10 @@ TimeTable prep(TString header_file_name)
         // This is okay since the first two rows are set to garbage anyways.
         encounters[previous_second].original_start = lpps;
         encounters[previous_previous].original_end = lpps;
-        encounters[previous_previous].delta = lpps - encounters[previous_previous].original_start;
-        // note: for unsigned integers, wrap-around subtraction is automaticlly taken care of
+        encounters[previous_previous].relative_delta = (lpps - encounters[previous_previous].original_start) - 125000000;
+        // note: for unsigned integers, wrap-around subtraction 
+        //   `lpps - encounters[previous_previous].original_start`
+        // is automaticlly taken care of.
         
         previous_previous = previous_second;
         previous_second = evtsec;
@@ -285,19 +302,23 @@ TimeTable prep(TString header_file_name)
 void print(TimeTable& encounters)
 {
 
-  std::cout << "--------------------------------------------------------------------------\n"
-            << " seconds     | original  | original  | original  | moving    | corrected  \n"
-            << " since epoch | start pps | end pps   | pps delta | avg delta | start pps  \n"
-            << "--------------------------------------------------------------------------\n";
+
+  std::cout << "\nRelative delta is defined to be 125000000 - (end_pps - start_pps)\n\n";
+
+  std::cout << "--------------------------------------------------------------------\n"
+            << " seconds     | start pps | end pps   | rel   | avg rel | corrected  \n"
+            << " since epoch |           |           | delta | delta   | start pps  \n"
+            << " Long64_t    | UInt_t    | UInt_t    | int   | double  | double     \n"
+            << "--------------------------------------------------------------------\n";
   for (auto& e: encounters)
   {
     const char * space = e.second.print_bold_green ? "\033[1;32m " : "\033[0m ";
     std::cout << space << std::setw(13) << std::left << e.first
               << space << std::setw(11) << e.second.original_start
               << space << std::setw(11) << e.second.original_end
-              << space << std::setw(11) << e.second.delta
-              << space << std::setw(11) << e.second.avg_delta
-              << space << std::setw(11) << e.second.corrected_start << "\n";
+              << space << std::setw(7)  << e.second.relative_delta
+              << space << std::setw(6)  << std::fixed << std::setprecision(2) << e.second.avg_relative_delta
+              << space << std::setw(15) << std::right << std::fixed << std::setprecision(2) << e.second.corrected_start << "\n";
   }
   std::cout << "------------------------------------------------------------------------------\n";
 }
@@ -308,31 +329,41 @@ void plot(TimeTable& encounters, TString name)
   TGraph corrected(encounters.size());
   TGraph diff(encounters.size());
 
+  TGraph original_delta(encounters.size());
+  TGraph avg_delta(encounters.size());
+
   std::size_t counter=0;
   for (auto& e: encounters){
 
     Long64_t o = e.second.original_start;
     original.SetPoint(counter, e.first,o);
-    Long64_t c = e.second.corrected_start;
+    double c = e.second.corrected_start;
     corrected.SetPoint(counter, e.first, c);
-    Long64_t d = o-c;
+    double d = o-c;
     diff.SetPoint(counter, e.first, d);
+
+    original_delta.SetPoint(counter, e.first, e.second.relative_delta);
+    avg_delta.SetPoint(counter, e.first, e.second.avg_relative_delta);
+
     counter++;
   }
-  diff.RemovePoint(original.GetN()-1); // last second's start doesn't exist before correction
+  original.RemovePoint(original.GetN()-1); // final second doesn't have a valid original_start
+  diff.RemovePoint(diff.GetN()-1);         // final second doesn't have a valid original_start
+  original_delta.RemovePoint(original_delta.GetN()-1); // final two seconds don't have valid deltas
+  original_delta.RemovePoint(original_delta.GetN()-1); // final two seconds don't have valid deltas
 
   TCanvas c1(name, name, 1920 * 1.5, 1080 * 2);
-  c1.Divide(1,2);
+  c1.Divide(1,3);
   c1.cd(1);
   original.Draw("ALP");
   original.SetMarkerStyle(kFullCrossX);
   original.SetMarkerSize(3);
-  original.SetTitle("`Event_Second` Boundaries");
-  original.GetYaxis()->SetTitle("PPS [sysclk count]");
+  original.SetTitle("System Clock Value (uint32_t) at Start of Each Second (aka \"start pps\")");
+  original.GetXaxis()->SetLabelSize(0);
+  original.GetYaxis()->SetTitle("[sysclk counts]");
+  original.GetYaxis()->SetTitleSize(0.1);
+  original.GetYaxis()->SetTitleOffset(0.3);
   original.GetYaxis()->CenterTitle();
-  original.GetXaxis()->SetTitle("Event Second [seconds since Unix epoch]");
-  original.GetXaxis()->CenterTitle();
-  original.GetXaxis()->SetLabelOffset(0.1);
   corrected.Draw("P");
   corrected.SetMarkerStyle(kCircle);
   corrected.SetMarkerColor(kRed);
@@ -348,14 +379,40 @@ void plot(TimeTable& encounters, TString name)
   leg.AddEntry(&corrected, "Corrected", "p");
   leg.AddEntry(&line, "UINT 32Bit MAX", "l");
   leg.Draw();
-  
+
   c1.cd(2);
+  original_delta.Draw("ALP");
+  original_delta.SetMarkerStyle(kFullCrossX);
+  original_delta.SetMarkerSize(3);
+  original_delta.SetTitle("#Delta #equiv end_pps - start_pps ≈ 125,000,000");
+  original_delta.GetYaxis()->SetTitle("#Delta - 125 MHz [sysclk counts]");
+  original_delta.GetYaxis()->CenterTitle();
+  original_delta.GetYaxis()->SetTitleSize(0.1);
+  original_delta.GetYaxis()->SetTitleOffset(0.3);
+  original_delta.GetXaxis()->SetLabelSize(0);
+
+  avg_delta.Draw("P");
+  avg_delta.SetMarkerStyle(kCircle);
+  avg_delta.SetMarkerColor(kRed);
+
+  TLegend leg3(0.6, 0.1, 0.9, 0.3); // (x1,y1,x2,y2) in NDC
+  leg3.AddEntry(&original_delta, "original (discrete) delta (uint32_t)", "p");
+  leg3.AddEntry(&corrected, "smoothed (moving averaged) delta (double_t)", "p");
+  leg3.Draw();
+
+  c1.cd(3);
   diff.Draw("ALP");
-  diff.SetTitle("");
+  diff.SetTitle("(original start pps) - (corrected start pps)");
   diff.SetMarkerStyle(kCircle);
-  diff.GetXaxis()->SetLabelSize(0);
-  diff.GetYaxis()->SetTitle("abs(original-corrected) [sysclk counts]");
+  diff.GetYaxis()->SetTitle("[sysclk counts]");
   diff.GetYaxis()->CenterTitle();
+  diff.GetYaxis()->SetTitleSize(0.1);
+  diff.GetYaxis()->SetTitleOffset(0.3);
+  diff.GetXaxis()->SetTitle("Event Second [seconds since Unix epoch]");
+  diff.GetXaxis()->SetTitleOffset(2.2);
+  diff.GetXaxis()->CenterTitle();
+  diff.GetXaxis()->SetLabelOffset(0.05);
+
 
   c1.SaveAs(name);
 }
