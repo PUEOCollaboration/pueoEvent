@@ -36,7 +36,7 @@ TimeTable::iterator find_stable_region_mid_point(
 // computes `corrected_start` for each second by calling `simple_moving_average()`
 void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point);
 
-/* @brief computes `avg_relative_delta` for each second using neighboring seconds.
+/* Computes `avg_relative_delta` for each second using neighboring seconds. CRASHES if the run has too few seconds.
  * @param half_width Half width of the window when computing the moving average.
  * @note  The deltas are nominally 125 MHz, but sometimes shit can glitch.
  *        That is, for some `event_second`, the delta would overshoot,
@@ -58,19 +58,19 @@ void simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, bo
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  TimeTable time_table = prep("/work/R1392_header.root");
+  // TimeTable time_table = prep("/work/R1392_header.root");
   // TimeTable time_table = prep("/work/real_run_1324_header.root");
-  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
   simple_moving_average(time_table);
   std::size_t stable_period = time_table.size() / 3;
   TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
-  stupid_extrapolation(time_table, mid_point);
-  print(time_table);
-  fprintf(stdout, "There are %lld seconds in this run.\n", 
-          std::prev(time_table.end())->first - time_table.begin()->first);
-
-  plot(time_table);
+  // stupid_extrapolation(time_table, mid_point);
+  // print(time_table);
+  // fprintf(stdout, "There are %lld seconds in this run.\n", 
+  //         std::prev(time_table.end())->first - time_table.begin()->first);
+  //
+  // plot(time_table);
 
   exit(0);
 }
@@ -80,12 +80,19 @@ void simple_moving_average(TimeTable& time_table, std::size_t half_width, bool i
   if (half_width == 0) 
   {
     std::cerr << __PRETTY_FUNCTION__ << "\n\t bad value supplied to parameter `half_width` (" 
-              << half_width << "), resetting to 1.\n";
-    half_width=1;
+              << half_width << "), resetting it to 5 [seconds].\n";
+    half_width=5;
   }
   std::size_t valid_table_size = ignore_last_two_row ? time_table.size() - 2 : time_table.size();
 
-  if (valid_table_size / 2 < half_width) 
+  if (valid_table_size < 5)  // fuck it, if the run has less than 5 seconds, crash the program
+  {
+    std::cerr << __PRETTY_FUNCTION__ << "\n\tFatal Error: parameter `time_table` too short ("
+              << valid_table_size    << " rows).";
+    exit(1);
+  }
+
+  if (2 * half_width + 1 > valid_table_size)
   {
     std::cerr << __PRETTY_FUNCTION__ << "\n\tFatal Error: parameter `time_table` too short ("
               << valid_table_size    << " rows).";
