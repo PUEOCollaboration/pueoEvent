@@ -246,10 +246,10 @@ TimeTable prep(TString header_file_name)
         // This is okay since the first two rows are set to garbage anyways.
         encounters[previous_second].original_start = lpps;
         encounters[previous_previous].original_end = lpps;
-        encounters[previous_previous].relative_delta = (lpps - encounters[previous_previous].original_start) - 125000000;
-        // note: for unsigned integers, wrap-around subtraction 
-        //   `lpps - encounters[previous_previous].original_start`
-        // is automaticlly taken care of.
+        // note: use UInt_t so that wrap-around subtraction is automatic
+        UInt_t delta = encounters[previous_previous].original_end - encounters[previous_previous].original_start;
+        // and then convert to int so that values below nominal show up as negative
+        encounters[previous_previous].relative_delta =  static_cast<int>(delta) - 125000000;
         
         previous_previous = previous_second;
         previous_second = evtsec;
