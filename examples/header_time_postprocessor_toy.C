@@ -49,7 +49,7 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
  *        distributed into each bin is small enough.
  *        However, obviously this window shouldn't be too large, else there's no point to performing
  *        a moving average. */
-void simple_moving_average(TimeTable& time_table, int half_width = 5, bool ignore_last_two_row = true);
+void simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, bool ignore_last_two_row = true);
 
 /* @brief The "main" function.
  * @note  Some assumptions about the data are made:
@@ -75,17 +75,32 @@ void header_time_postprocessor_toy()
   exit(0);
 }
 
-void simple_moving_average(TimeTable& time_table, int half_width, bool ignore_last_two_row)
+void simple_moving_average(TimeTable& time_table, std::size_t half_width, bool ignore_last_two_row)
 {
-  // moving average, carried out for most rows in the table
-  auto start = std::next(time_table.begin(), half_width);
-  auto stop = ignore_last_two_row ? std::prev(time_table.end(), half_width+2)
-                                  : std::prev(time_table.end(), half_width);
-  for(auto it= start; it!=stop; ++it)
+  if (half_width == 0) 
   {
-    double sum = 0.; // 64 bit, in case there's an overflow, although probably unlikely
+    std::cerr << __PRETTY_FUNCTION__ << "\n\t bad value supplied to parameter `half_width` (" 
+              << half_width << "), resetting to 1.\n";
+    half_width=1;
+  }
+  std::size_t valid_table_size = ignore_last_two_row ? time_table.size() - 2 : time_table.size();
 
-    // it for iterator, so obviously jt is jiterator ¯\_(ツ)_/¯
+  if (valid_table_size / 2 < half_width) 
+  {
+    std::cerr << __PRETTY_FUNCTION__ << "\n\tFatal Error: parameter `time_table` too short ("
+              << valid_table_size    << " rows).";
+    exit(1);
+  }
+
+  TimeTable::iterator start = std::next(time_table.begin(), half_width);
+  TimeTable::iterator stop = ignore_last_two_row ? std::prev(time_table.end(), half_width+2)
+                                                 : std::prev(time_table.end(), half_width);
+
+  // first, perform moving average for the "meat" of the table (ie exclude first/last few rows)
+  for(TimeTable::iterator it = start; it!=stop; ++it)
+  {
+    double sum = 0.;
+    // it stands for iterator, so obviously jt is jiterator ¯\_(ツ)_/¯
     for (auto jt=std::prev(it,half_width); jt!=std::next(it,half_width+1); ++jt){
       sum += jt->second.relative_delta;
     }
