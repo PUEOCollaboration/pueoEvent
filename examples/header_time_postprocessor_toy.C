@@ -27,7 +27,7 @@ struct event_second_start_end
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
 TimeTable prep (TString header_file_name);
-void print(TimeTable& time_table, std::size_t num_rows = 100);
+void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
 // Finds the mid-point of a stable period;
@@ -59,30 +59,20 @@ void simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, bo
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // TimeTable time_table = prep("/work/R1392_header.root");
+  TimeTable time_table = prep("/work/R1392_header.root");
   // TimeTable time_table = prep("/work/real_run_1324_header.root");
-  TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
-  // // intentionally mess up a row
-  // auto it = std::next(time_table.begin(), 30);
-  // it->second.color=print_color::red;
-  // it->second.relative_delta += 50;
-  // it->second.original_end += 50;
-  // (++it)->second.original_start += 50;
-  // it->second.relative_delta = it->second.original_end-it->second.original_start - 125000000U;
-  print(time_table);
+  simple_moving_average(time_table);
+  std::size_t stable_period = time_table.size() / 3;
+  TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
+  stupid_extrapolation(time_table, mid_point);
+  print(time_table, 30);
+  fprintf(stdout, "There are %lld seconds in this run.\n", 
+          std::prev(time_table.end())->first - time_table.begin()->first);
 
+  plot(time_table);
 
-  // simple_moving_average(time_table);
-  // std::size_t stable_period = time_table.size() / 3;
-  // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
-  // stupid_extrapolation(time_table, mid_point);
-  // print(time_table);
-  // fprintf(stdout, "There are %lld seconds in this run.\n", 
-  //         std::prev(time_table.end())->first - time_table.begin()->first);
-  //
-  // plot(time_table);
-  //
   exit(0);
 }
 
@@ -278,6 +268,7 @@ TimeTable prep(TString header_file_name)
 
 void print(TimeTable& time_table, std::size_t num_rows)
 {
+  TimeTable::iterator stop = (num_rows < time_table.size()) ? std::next(time_table.begin(), num_rows) : time_table.end();
 
   std::cout << "\nRelative delta is defined to be (end_pps - start_pps) - 125000000\n\n";
 
@@ -288,7 +279,7 @@ void print(TimeTable& time_table, std::size_t num_rows)
             << "---------------------------------------------------------------------\n";
 
   TString color;
-  for (auto it=time_table.begin(); it!=time_table.end(); ++it)
+  for (auto it=time_table.begin(); it!=stop; ++it)
   {
     switch(it->second.color){
       case print_color::none: {
@@ -318,9 +309,9 @@ void print(TimeTable& time_table, std::size_t num_rows)
   }
 
   if (num_rows < time_table.size()){
-    std::cout << "...\n";
-    std::cout << "...\n";
-    std::cout << "...\n";
+    std::cout << " ...\n";
+    std::cout << " ...\n";
+    std::cout << " ...\n";
   }
   std::cout << "------------------------------------------------------------------------------\n";
 }
