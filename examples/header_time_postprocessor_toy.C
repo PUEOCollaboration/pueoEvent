@@ -133,6 +133,14 @@ template<typename T> bool approx_equal(T a, T b, T tolerance = 20)
 TimeTable::iterator find_stable_region_mid_point(
   std::size_t requested_stable_period, TimeTable& time_table, bool ignore_last_two_row) 
 {
+  std::size_t valid_table_size = ignore_last_two_row ? time_table.size() - 2: time_table.size();
+  if (requested_stable_period > valid_table_size)
+  {
+    std::cerr << __PRETTY_FUNCTION__ << ": requestd size too large. "
+    "Resetting `requested_stable_period` to "  << valid_table_size << "\n";
+    requested_stable_period = valid_table_size;
+  }
+
   TimeTable::iterator mid_point = time_table.begin();
   TimeTable::iterator stop = ignore_last_two_row ? std::prev(time_table.end(), 2) : time_table.end();
 
