@@ -26,7 +26,7 @@ struct event_second_start_end
 
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
-TimeTable prep (TString header_file_name);
+TimeTable prep (TString& header_file_name);
 void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
@@ -55,21 +55,38 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
 //        a moving average.
 int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, bool ignore_last_two_row = true);
 
-#define ERR_TIMETABLETOOSHORT 1
+#define ERR_EventSecondNotContiguous 1
+#define ERR_TimeTableTooShort 2
 
 // @brief The "main" function.
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  TimeTable time_table = prep("/work/R1392_header.root");
-  // TimeTable time_table = prep("/work/real_run_1324_header.root");
-  // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
+  // TString header_file_path = "/work/R1392_header.root";
+  // TString header_file_path = "/work/real_run_1324_header.root";
+  TString header_file_path = "/usr/pueoBuilder/install/bin/bfmr_r739_head.root";
+  TimeTable time_table = prep(header_file_path);
+
+  // check event second continuity
+  Long64_t sec = time_table.begin()->first;
+  for (auto it = std::next(time_table.begin(),1); it!=time_table.end();++it){
+    if (it->first != ++sec) 
+    {
+      it->second.color = print_color::red;
+      print(time_table);
+      std::cerr << "\033[1;31mFatal Error at: " << __PRETTY_FUNCTION__ 
+                << "\n\tReason: column event_second not contiguous at " << it->first << ".\033[0m\n";
+      return ERR_EventSecondNotContiguous;
+    }
+  }
+
+  print(time_table);
 
   int err_avg = simple_moving_average(time_table);
   if(err_avg) return err_avg;
-    
-  std::size_t stable_period = time_table.size() / 3;
-  TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
+
+  // std::size_t stable_period = time_table.size() / 3;
+  // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
   // stupid_extrapolation(time_table, mid_point);
   // print(time_table, 30);
   // fprintf(stdout, "There are %lld seconds in this run.\n", 
@@ -92,8 +109,10 @@ int simple_moving_average(TimeTable& time_table, std::size_t half_width, bool ig
 
   if (2 * half_width + 1 > valid_table_size)
   {
-    std::cerr << __PRETTY_FUNCTION__ << "\n\tFatal Error: time_table too short (" << valid_table_size << " rows).";
-    return ERR_TIMETABLETOOSHORT;
+    std::cerr << "\033[1;31mFatal Error at: " << __PRETTY_FUNCTION__ 
+              << "\n\tReason: time_table too short (only " << valid_table_size << " valid rows).\033[0m\n";
+    print(time_table);
+    return ERR_TimeTableTooShort;
   }
 
   TimeTable::iterator start = std::next(time_table.begin(), half_width);
@@ -216,33 +235,32 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
   }
 }
 
-TimeTable prep(TString header_file_name)
+TimeTable prep(TString& header_file_name)
 {
-  TimeTable encounters; // this table only store unique `event_second`s
-
+  TimeTable time_table;
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
   ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_name);
 
   // start by filling a table of event_second vs lpps
   auto search_and_fill = 
-    [&encounters]
+    [&time_table]
     (UInt_t event_second, UInt_t lpps)
     {
       Long64_t evtsec = (Long64_t) event_second;
-      bool new_encounter = encounters.find(evtsec) == encounters.end();
+      bool new_encounter = time_table.find(evtsec) == time_table.end();
       if (new_encounter) 
       {
-        encounters.emplace(evtsec, event_second_start_end{.last_pps=lpps});
+        time_table.emplace(evtsec, event_second_start_end{.last_pps=lpps});
       }
     };
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
 
   // Next, compute the start, end, and delta of each second, using lpps.
   // Start by inserting two garbage rows at the top of the table
-  encounters.emplace(-2, event_second_start_end{});
-  encounters.emplace(-1, event_second_start_end{});
-  for (TimeTable::iterator current=std::next(encounters.begin(),2); current!=encounters.end(); ++current)
+  time_table.emplace(-2, event_second_start_end{});
+  time_table.emplace(-1, event_second_start_end{});
+  for (TimeTable::iterator current=std::next(time_table.begin(),2); current!=time_table.end(); ++current)
   {
     TimeTable::iterator previous_previous = std::prev(current, 2);
     TimeTable::iterator previous = std::prev(current, 1);
@@ -258,10 +276,10 @@ TimeTable prep(TString header_file_name)
     // and then convert to int so that values below nominal show up as negative
     previous_previous->second.relative_delta =  static_cast<int>(delta) - 125000000;
   }
-  encounters.erase(-2); // remove the two garbage rows
-  encounters.erase(-1);
+  time_table.erase(-2); // remove the two garbage rows
+  time_table.erase(-1);
 
-  return encounters;
+  return time_table;
 }
 
 void print(TimeTable& time_table, std::size_t num_rows)
