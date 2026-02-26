@@ -9,20 +9,22 @@
 #include <iomanip>
 #include <map>
 
-/* Nominally, delta = (end_pps - start_pps) should yield approximately 125E6 
- * (unsigned integer overflow should be taken care of when computing the difference).
- * `relative_delta` is then defined as (delta - 125E6). */
-struct second_boundaries 
+enum print_color{none=0, green=1, red=2};
+// Nominally, delta := (end_pps - start_pps) should yield approximately 125E6 
+// (unsigned integer overflow should be taken care of when computing this difference).
+// `relative_delta` is then defined as (delta - 125E6).
+struct event_second_start_end 
 {
+  UInt_t last_pps = 0;           // value of the sysclk counter at the start of the previous second
   UInt_t original_start = 0;     // value of sysclk counter at start of the second (start_pps)
   UInt_t original_end = 0;       // end_pps
   int    relative_delta = 0;     // (end_pps - start_pps) - 125E6; unsigned int overflow taken care of
   double avg_relative_delta = 0; // average delta (moving average)
   double corrected_start = 0;    // to be corrected using avg_relative_delta
-  bool   print_bold_green = false;
+  print_color color = none;
 };
 
-using TimeTable=std::map<Long64_t, second_boundaries>;
+using TimeTable=std::map<Long64_t, event_second_start_end>;
 
 TimeTable prep (TString header_file_name);
 void print(TimeTable& time_table, std::size_t num_rows = 100);
@@ -50,13 +52,10 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
 //        but if the error is of size 10000, the window needs to be larger so that the error 
 //        distributed into each bin is small enough.
 //        However, obviously this window shouldn't be too large, else there's no point to performing
-//        a moving average. */
+//        a moving average.
 void simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, bool ignore_last_two_row = true);
 
 // @brief The "main" function.
-// @note  Some assumptions about the data are made:
-//        (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
-//        (b)  0 <= event_second[x] - event_second[x-1] <= 1 */
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
@@ -64,16 +63,26 @@ void header_time_postprocessor_toy()
   // TimeTable time_table = prep("/work/real_run_1324_header.root");
   TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
-  simple_moving_average(time_table);
-  std::size_t stable_period = time_table.size() / 3;
-  TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
-  stupid_extrapolation(time_table, mid_point);
+  // // intentionally mess up a row
+  // auto it = std::next(time_table.begin(), 30);
+  // it->second.color=print_color::red;
+  // it->second.relative_delta += 50;
+  // it->second.original_end += 50;
+  // (++it)->second.original_start += 50;
+  // it->second.relative_delta = it->second.original_end-it->second.original_start - 125000000U;
   print(time_table);
-  fprintf(stdout, "There are %lld seconds in this run.\n", 
-          std::prev(time_table.end())->first - time_table.begin()->first);
 
-  plot(time_table);
 
+  // simple_moving_average(time_table);
+  // std::size_t stable_period = time_table.size() / 3;
+  // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
+  // stupid_extrapolation(time_table, mid_point);
+  // print(time_table);
+  // fprintf(stdout, "There are %lld seconds in this run.\n", 
+  //         std::prev(time_table.end())->first - time_table.begin()->first);
+  //
+  // plot(time_table);
+  //
   exit(0);
 }
 
@@ -192,7 +201,7 @@ TimeTable::iterator find_stable_region_mid_point(
 void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point)
 {
   anchor_point->second.corrected_start = anchor_point->second.original_start;
-  anchor_point->second.print_bold_green = true;
+  anchor_point->second.color = print_color::green;
 
   // backward extrapolation from the anchor point
   for (auto rit = std::make_reverse_iterator(anchor_point); rit!=time_table.rend(); ++rit)
@@ -227,57 +236,85 @@ TimeTable prep(TString header_file_name)
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
   ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_name);
 
-  Long64_t previous_previous = -2; // initialize first row of the table to garbage
-  Long64_t previous_second   = -1;
+  // start by filling a table of event_second vs lpps
   auto search_and_fill = 
-    [&encounters, &previous_second, &previous_previous]
+    [&encounters]
     (UInt_t event_second, UInt_t lpps)
     {
       Long64_t evtsec = (Long64_t) event_second;
       bool new_encounter = encounters.find(evtsec) == encounters.end();
       if (new_encounter) 
       {
-        encounters.emplace(evtsec, second_boundaries{});
-        // the start of the previous second is the lpps of the current second
-        // note that this inserts garbage into `encounters` during the first two iterations, 
-        // since the first second doesn't have a valid lpps.
-        // This is okay since the first two rows are set to garbage anyways.
-        encounters[previous_second].original_start = lpps;
-        encounters[previous_previous].original_end = lpps;
-        // note: use UInt_t so that wrap-around subtraction is automatic
-        UInt_t delta = encounters[previous_previous].original_end - encounters[previous_previous].original_start;
-        // and then convert to int so that values below nominal show up as negative
-        encounters[previous_previous].relative_delta =  static_cast<int>(delta) - 125000000;
-        
-        previous_previous = previous_second;
-        previous_second = evtsec;
+        encounters.emplace(evtsec, event_second_start_end{.last_pps=lpps});
       }
     };
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
-  encounters.erase(-2);  // erase the garbage
+
+  // Next, compute the start, end, and delta of each second, using lpps.
+  // Start by inserting two garbage rows at the top of the table
+  encounters.emplace(-2, event_second_start_end{});
+  encounters.emplace(-1, event_second_start_end{});
+  for (TimeTable::iterator current=std::next(encounters.begin(),2); current!=encounters.end(); ++current)
+  {
+    TimeTable::iterator previous_previous = std::prev(current, 2);
+    TimeTable::iterator previous = std::prev(current, 1);
+
+    // the start of the previous second is the last_pps of the current second
+    previous->second.original_start = current->second.last_pps;
+
+    previous_previous->second.original_end = current->second.last_pps;
+
+    // note: use UInt_t so that wrap-around subtraction is automatic
+    UInt_t delta = previous_previous->second.original_end - previous_previous->second.original_start;
+
+    // and then convert to int so that values below nominal show up as negative
+    previous_previous->second.relative_delta =  static_cast<int>(delta) - 125000000;
+  }
+  encounters.erase(-2); // remove the two garbage rows
   encounters.erase(-1);
+
   return encounters;
 }
 
 void print(TimeTable& time_table, std::size_t num_rows)
 {
 
-  std::cout << "\nRelative delta is defined to be 125000000 - (end_pps - start_pps)\n\n";
+  std::cout << "\nRelative delta is defined to be (end_pps - start_pps) - 125000000\n\n";
 
-  std::cout << "--------------------------------------------------------------------\n"
-            << " seconds     | start pps | end pps   | rel   | avg rel | corrected  \n"
-            << " since epoch |           |           | delta | delta   | start pps  \n"
-            << " Long64_t    | UInt_t    | UInt_t    | int   | double  | double     \n"
-            << "--------------------------------------------------------------------\n";
-  for (auto it=time_table.begin(); it!=std::next(time_table.begin(), num_rows); ++it)
+  std::cout << "---------------------------------------------------------------------\n"
+            << " seconds     | start pps | end pps   | rel   | avg rel | corrected   \n"
+            << " since epoch |           |           | delta | delta   | start pps   \n"
+            << " Long64_t    | UInt_t    | UInt_t    | int   | double  | double      \n"
+            << "---------------------------------------------------------------------\n";
+
+  TString color;
+  for (auto it=time_table.begin(); it!=time_table.end(); ++it)
   {
-    const char * space = it->second.print_bold_green ? "\033[1;32m " : "\033[0m ";
-    std::cout << space << std::setw(13) << std::left << it->first
-              << space << std::setw(11) << it->second.original_start
-              << space << std::setw(11) << it->second.original_end
-              << space << std::setw(7)  << it->second.relative_delta
-              << space << std::setw(6)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
-              << space << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_start << "\n";
+    switch(it->second.color){
+      case print_color::none: {
+        color = "\033[0m "; 
+        break;
+      }
+      case print_color::green: {
+        color = "\033[1;32m "; 
+        break;
+      }
+      case print_color::red: {
+        color = "\033[1;31m "; 
+        break;
+      }
+      default: {
+        color = "\033[0m "; 
+        break;
+      }
+    }
+
+    std::cout << color << std::setw(13) << std::left << it->first
+              << color << std::setw(11) << it->second.original_start
+              << color << std::setw(11) << it->second.original_end
+              << color << std::setw(7)  << it->second.relative_delta
+              << color << std::setw(6)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
+              << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_start << "\n";
   }
 
   if (num_rows < time_table.size()){
