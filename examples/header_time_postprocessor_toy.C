@@ -28,33 +28,35 @@ TimeTable prep (TString header_file_name);
 void print(TimeTable& time_table, std::size_t num_rows = 100);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-// Finds the mid-point of a "stable region" where, for every second, its delta is approximately avg_relative_delta.
+// Finds the mid-point of a stable period;
+// for every second in this period, delta ≈ avg_relative_delta.
 // Returns time_table.begin() if a stable region couldn't be found
-TimeTable::iterator find_stable_region_mid_point(
-  std::size_t stable_period, TimeTable& time_table, bool ignore_last_two_row = true);
+TimeTable::iterator find_stable_region_mid_point(std::size_t len, TimeTable& t, bool ignore_last_two_row = true);
 
-// computes `corrected_start` for each second by calling `simple_moving_average()`
+// Calls `simple_moving_average()` to compute `avg_relative_delta` for each second,
+// then extrapolates from `anchor_point` to compute the `corrected_start` for every second using
+// `avg_relative_delta` of each second.
 void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point);
 
-/* Computes `avg_relative_delta` for each second using neighboring seconds. CRASHES if the run has too few seconds.
- * @param half_width Half width of the window when computing the moving average.
- * @note  The deltas are nominally 125 MHz, but sometimes shit can glitch.
- *        That is, for some `event_second`, the delta would overshoot,
- *        and at a later `event_second`, its delta would undershoot.
- *        In other words, the former `event_second` is too long and the latter is too short.
- *        The opposite could also happen.
- *        The size of `half_width` depends on the magnitude of the over/undershoot that we would expect.
- *        e.g. If we can expect an error of size 100, then half_width of 5 seconds is probably fine,
- *        but if the error is of size 10000, the window needs to be larger so that the error 
- *        distributed into each bin is small enough.
- *        However, obviously this window shouldn't be too large, else there's no point to performing
- *        a moving average. */
+// Computes `avg_relative_delta` for each second using neighboring seconds. CRASHES if the run has too few seconds.
+// @param half_width Half width of the window when computing the moving average.
+// @note  The deltas are nominally 125 MHz, but sometimes shit can glitch.
+//        That is, for some `event_second`, the delta would overshoot,
+//        and at a later `event_second`, its delta would undershoot.
+//        In other words, the former `event_second` is too long and the latter is too short.
+//        The opposite could also happen.
+//        The size of `half_width` depends on the magnitude of the over/undershoot that we would expect.
+//        e.g. If we can expect an error of size 100, then half_width of 5 seconds is probably fine,
+//        but if the error is of size 10000, the window needs to be larger so that the error 
+//        distributed into each bin is small enough.
+//        However, obviously this window shouldn't be too large, else there's no point to performing
+//        a moving average. */
 void simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, bool ignore_last_two_row = true);
 
-/* @brief The "main" function.
- * @note  Some assumptions about the data are made:
- *        (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
- *        (b)  0 <= event_second[x] - event_second[x-1] <= 1 */
+// @brief The "main" function.
+// @note  Some assumptions about the data are made:
+//        (a)  The column `event_second` (aka `triggerTime`) is monotonically increasing, ie "sorted"
+//        (b)  0 <= event_second[x] - event_second[x-1] <= 1 */
 void header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
