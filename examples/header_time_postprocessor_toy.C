@@ -65,12 +65,12 @@ void header_time_postprocessor_toy()
   simple_moving_average(time_table);
   std::size_t stable_period = time_table.size() / 3;
   TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
-  // stupid_extrapolation(time_table, mid_point);
-  // print(time_table);
-  // fprintf(stdout, "There are %lld seconds in this run.\n", 
-  //         std::prev(time_table.end())->first - time_table.begin()->first);
-  //
-  // plot(time_table);
+  stupid_extrapolation(time_table, mid_point);
+  print(time_table);
+  fprintf(stdout, "There are %lld seconds in this run.\n", 
+          std::prev(time_table.end())->first - time_table.begin()->first);
+
+  plot(time_table);
 
   exit(0);
 }
@@ -192,30 +192,18 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
   anchor_point->second.corrected_start = anchor_point->second.original_start;
   anchor_point->second.print_bold_green = true;
 
-  // check required, since std::prev(map.begin()) is undefined behavior
-  if (anchor_point!=time_table.begin())
+  // backward extrapolation from the anchor point
+  for (auto rit = std::make_reverse_iterator(anchor_point); rit!=time_table.rend(); ++rit)
   {
-    // backward extrapolation from the anchor point
-    for (auto it = std::prev(anchor_point); it!=time_table.begin(); --it)
-    {
-      auto future = std::next(it);
-      it->second.corrected_start = 
-        std::fmod(
-          future->second.corrected_start - (125000000 + it->second.avg_relative_delta) +
-          static_cast<double>(UINT32_MAX) + 1,
-          static_cast<double>(UINT32_MAX) + 1
-        );
-    }
-    // handle first row explicitly
-    TimeTable::iterator beg = time_table.begin();
-    TimeTable::iterator fut = std::next(time_table.begin());
-    beg->second.corrected_start = 
+    auto future = std::prev(rit);
+    rit->second.corrected_start = 
       std::fmod(
-        fut->second.corrected_start - (125000000 + beg->second.avg_relative_delta) +
+        future->second.corrected_start - (125000000 + rit->second.avg_relative_delta) +
         static_cast<double>(UINT32_MAX) + 1,
         static_cast<double>(UINT32_MAX) + 1
       );
   }
+
   // forward extrapolation
   for (auto it = std::next(anchor_point); it!=time_table.end(); ++it)
   {
