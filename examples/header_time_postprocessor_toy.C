@@ -53,30 +53,34 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
 //        distributed into each bin is small enough.
 //        However, obviously this window shouldn't be too large, else there's no point to performing
 //        a moving average.
-void simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, bool ignore_last_two_row = true);
+int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, bool ignore_last_two_row = true);
+
+#define ERR_TIMETABLETOOSHORT 1
 
 // @brief The "main" function.
-void header_time_postprocessor_toy()
+int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
   TimeTable time_table = prep("/work/R1392_header.root");
   // TimeTable time_table = prep("/work/real_run_1324_header.root");
   // TimeTable time_table = prep("/usr/pueoBuilder/install/bin/bfmr_r739_head.root");
 
-  simple_moving_average(time_table);
+  int err_avg = simple_moving_average(time_table);
+  if(err_avg) return err_avg;
+    
   std::size_t stable_period = time_table.size() / 3;
   TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
-  stupid_extrapolation(time_table, mid_point);
-  print(time_table, 30);
-  fprintf(stdout, "There are %lld seconds in this run.\n", 
-          std::prev(time_table.end())->first - time_table.begin()->first);
+  // stupid_extrapolation(time_table, mid_point);
+  // print(time_table, 30);
+  // fprintf(stdout, "There are %lld seconds in this run.\n", 
+  //         std::prev(time_table.end())->first - time_table.begin()->first);
+  //
+  // plot(time_table);
 
-  plot(time_table);
-
-  exit(0);
+  return 0;
 }
 
-void simple_moving_average(TimeTable& time_table, std::size_t half_width, bool ignore_last_two_row)
+int simple_moving_average(TimeTable& time_table, std::size_t half_width, bool ignore_last_two_row)
 {
   if (half_width == 0) 
   {
@@ -86,18 +90,10 @@ void simple_moving_average(TimeTable& time_table, std::size_t half_width, bool i
   }
   std::size_t valid_table_size = ignore_last_two_row ? time_table.size() - 2 : time_table.size();
 
-  if (valid_table_size < 5)  // fuck it, if the run has less than 5 seconds, crash the program
-  {
-    std::cerr << __PRETTY_FUNCTION__ << "\n\tFatal Error: parameter `time_table` too short ("
-              << valid_table_size    << " rows).";
-    exit(1);
-  }
-
   if (2 * half_width + 1 > valid_table_size)
   {
-    std::cerr << __PRETTY_FUNCTION__ << "\n\tFatal Error: parameter `time_table` too short ("
-              << valid_table_size    << " rows).";
-    exit(1);
+    std::cerr << __PRETTY_FUNCTION__ << "\n\tFatal Error: time_table too short (" << valid_table_size << " rows).";
+    return ERR_TIMETABLETOOSHORT;
   }
 
   TimeTable::iterator start = std::next(time_table.begin(), half_width);
@@ -112,7 +108,7 @@ void simple_moving_average(TimeTable& time_table, std::size_t half_width, bool i
     for (auto jt=std::prev(it,half_width); jt!=std::next(it,half_width+1); ++jt){
       sum += jt->second.relative_delta;
     }
-    it->second.avg_relative_delta = sum / (2*half_width+1);
+    it->second.avg_relative_delta = sum / ( 2. * half_width + 1.);
   }
 
   // As for the first/last few rows in the table,
@@ -123,6 +119,8 @@ void simple_moving_average(TimeTable& time_table, std::size_t half_width, bool i
   for (auto it=stop; it!=time_table.end(); ++it){
     it->second.avg_relative_delta = std::prev(stop)->second.avg_relative_delta;
   }
+
+  return 0;
 };
 
 template<typename T> bool approx_equal(T a, T b, T tolerance = 20)
