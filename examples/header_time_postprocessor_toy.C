@@ -26,7 +26,7 @@ struct event_second_start_end
 
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
-TimeTable prep (TString& header_file_name);
+int  prep (TimeTable& time_table, TString& header_file_name); // returns the run number
 void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
@@ -65,7 +65,8 @@ int header_time_postprocessor_toy()
   // TString header_file_path = "/work/R1392_header.root";
   // TString header_file_path = "/work/real_run_1324_header.root";
   TString header_file_path = "/usr/pueoBuilder/install/bin/bfmr_r739_head.root";
-  TimeTable time_table = prep(header_file_path);
+  TimeTable time_table;
+  auto run = prep(time_table, header_file_path);
 
   // check event second continuity
   Long64_t sec = time_table.begin()->first;
@@ -74,25 +75,26 @@ int header_time_postprocessor_toy()
     {
       it->second.color = print_color::red;
       print(time_table);
-      std::cerr << "\033[1;31mFatal Error at: " << __PRETTY_FUNCTION__ 
-                << "\n\tReason: column event_second not contiguous at " << it->first << ".\033[0m\n";
+      fprintf(stderr, 
+              "\033[1;31mFatal Error at: %s"
+              "\n\tReason: (run %d) column event_second not contiguous at %llu.\033[0m\n",
+              __PRETTY_FUNCTION__, run, it->first);
       return ERR_EventSecondNotContiguous;
     }
   }
 
-  print(time_table);
-
   int err_avg = simple_moving_average(time_table);
   if(err_avg) return err_avg;
 
-  // std::size_t stable_period = time_table.size() / 3;
-  // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
-  // stupid_extrapolation(time_table, mid_point);
-  // print(time_table, 30);
-  // fprintf(stdout, "There are %lld seconds in this run.\n", 
-  //         std::prev(time_table.end())->first - time_table.begin()->first);
-  //
-  // plot(time_table);
+  std::size_t stable_period = time_table.size() / 3;
+  TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
+  stupid_extrapolation(time_table, mid_point);
+
+
+  print(time_table);
+  fprintf(stdout, "Run %d duration: %lld seconds.\n", 
+          run, std::prev(time_table.end())->first - time_table.begin()->first);
+  plot(time_table);
 
   return 0;
 }
@@ -189,7 +191,7 @@ TimeTable::iterator find_stable_region_mid_point(
     mid_point = time_table.find(stable_seconds.at(requested_stable_period/2));
   }
 
-  if (mid_point == time_table.end()) // check again, in case the find() above returns a invalid result
+  if (mid_point == time_table.end()) // check again, in case the find() above returns an invalid result
   {
     fprintf
     (
@@ -235,12 +237,12 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
   }
 }
 
-TimeTable prep(TString& header_file_name)
+int prep(TimeTable& time_table, TString& header_file_name)
 {
-  TimeTable time_table;
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
   ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_name);
+  auto run = tmp_header_rdf.Take<Int_t>("run"); // will return the first element in this vector
 
   // start by filling a table of event_second vs lpps
   auto search_and_fill = 
@@ -279,7 +281,7 @@ TimeTable prep(TString& header_file_name)
   time_table.erase(-2); // remove the two garbage rows
   time_table.erase(-1);
 
-  return time_table;
+  return run->front();
 }
 
 void print(TimeTable& time_table, std::size_t num_rows)
