@@ -1,5 +1,5 @@
 /****************************************************************************************
-*  pueo/Daqhsk.h             PUEO Nav Storage
+*  pueo/Daqhsk.h             PUEO DAQ HSK
 *  
 *  Daqhsk storage classes
 * 
@@ -123,4 +123,4 @@ namespace pueo
 }
 
 
-#endif //ADU5PAT_H
+#endif 
