@@ -36,8 +36,30 @@
 #pragma link C++ class pueo::nav::Attitude+;
 #pragma link C++ class pueo::nav::Sat+;
 #pragma link C++ class pueo::nav::Sats+;
+#pragma link C++ class pueo::nav::SunSensor+;
+#pragma link C++ class pueo::nav::SunSensors+;
+
+#pragma link C++ class pueo::hsk::Sensor+;
+#pragma link C++ class pueo::daqhsk::DaqHsk+;
+#pragma link C++ class pueo::daqhsk::Surf+;
+#pragma link C++ class pueo::daqhsk::Beam+;
+
+#pragma read \
+  targetClass = "pueo::RawEvent"\
+  sourceClass = "pueo::RawEvent"\
+  target = "data" \
+  version =  "[1]" \
+  source = " std::vector<int16_t> data[208]; "\
+  code = "{ int iin = 0; for (int i = 0; i < 216; i++) { if (i> 160 && i < 168) { continue; } std::copy(onfile.data[iin].begin(), onfile.data[iin].end(), data[i].begin()); iin++; }}"
 
 
+#pragma read \
+  targetClass = "pueo::UsefulEvent"\
+  sourceClass = "pueo::UsefulEvent"\
+  target = "volts" \
+  version =  "[1]" \
+  source = " std::vector<double> volts[208]; "\
+  code = "{ int iin = 0; for (int i = 0; i < 208; i++) { std::copy(onfile.volts[iin].begin(), onfile.volts[iin].end(), volts[i].begin()); iin++; }}"
 
 
 #else

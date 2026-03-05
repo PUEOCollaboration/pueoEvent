@@ -93,32 +93,9 @@ namespace pueo
     }
 
 
-    /** 
-     * @brief Get the run that contains the eventNumber.
-     * 
-     * Uses AnitaVersion::get(), if it's not correct you won't get the right answer!
-     * 
-     * @param eventNumber is the eventNumber
-     * 
-     * @return the run
-     */
-     static int getRunContainingEventNumber(UInt_t eventNumber);
-
 
       /** Get the data directory for the anita version based on environmental variables.  */
       static const char * getDataDir(DataDirectory dir = PUEO_ROOT_DATA);
-
-      /** Returns the run at the requested time */ 
-      static int getRunAtTime(double t);
-
-   /** 
-     * Check against the list of known Hi-Cal events.
-     * @param eventNumber the eventNumber
-     * @param anita which ANITA flight? (optional: uses AnitaVersion::get() if not supplied.)
-     * 
-     * @return true if the event is on the list, false otherwise.
-     */
-      static bool isKnownHiCalEvent(UInt_t eventNumber, Int_t flight=version::get()) { (void) eventNumber; (void) flight; return false; }
 
 
       /** Constructor loading a run with calibration type and anita version.  If decimated is true, the decimated header file is read and you only have access to the 10% dataset.
@@ -271,10 +248,10 @@ namespace pueo
       bool maybeInvertPolarity(UInt_t eventNumber);
 
       /* Where was HiCal at a particular time?*/
-      static void hiCal(UInt_t unixTime, Double_t& longitude,  Double_t& latitude, Double_t& altitude);
+      static void hiCal(char which, UInt_t unixTime, Double_t& longitude,  Double_t& latitude, Double_t& altitude);
 
       /* Where was hical? Uses the current header realTime*/ 
-      void hiCal(Double_t& longitude,  Double_t& latitude, Double_t& altitude);
+      void hiCal(char which, Double_t& longitude,  Double_t& latitude, Double_t& altitude);
 
     protected:
       void unloadRun();
@@ -306,14 +283,15 @@ namespace pueo
       TEventList * fCutList;
       int fCutIndex;
 
-      static void loadRunToEv(int anita); // read runToEvA*.txt
-      static void loadHiCalGps(); /// Where was HiCal?
+      static void loadHiCalGps(char which); /// Where was HiCal?
       int loadPlaylist(const char* playlist);
       int fPlaylistIndex;
-      std::vector<std::vector<long> > fPlaylist;
-      int getPlaylistRun() { return fPlaylist[fPlaylistIndex][0]; }
-      Long64_t getPlaylistEvent() { return fPlaylist[fPlaylistIndex][1]; }
+      std::vector<std::pair<int,int> > fPlaylist;
+      int getPlaylistRun() { return fPlaylist[fPlaylistIndex].first; }
+      Long64_t getPlaylistEvent() { return fPlaylist[fPlaylistIndex].second; }
 
+
+      int getRunAtTime(double t);
 
       /* Blinding stuff */ 
       void zeroBlindPointers();

@@ -87,7 +87,7 @@ namespace  pueo
      * If geometry_source is "", will use default geometry source for that version. 
      * The default can be cahnged with the helper function below. 
      */
-    static const GeomTool & Instance( Int_t pueo_version = 0, const std::string & geometry_source = "" );
+    static const GeomTool & Instance( Int_t pueo_version = 0, const char * geometry_source = "" );
 
     static void setDefaultGeometry(Int_t pueo_version, const std::string & default_source); 
     static const std::string & getDefaultGeometry(Int_t pueo_version = 0); 

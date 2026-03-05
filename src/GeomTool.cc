@@ -125,14 +125,14 @@ const std::string & pueo::GeomTool::getDefaultGeometry(Int_t v)
 /// Generates an instance of pueo::GeomTool, required for non-static functions.
 //TODO:  unordered_map is slow and I make a copy... 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
-const pueo::GeomTool&  pueo::GeomTool::Instance(Int_t v, const std::string &  geometry_source )
+const pueo::GeomTool&  pueo::GeomTool::Instance(Int_t v, const char *  geometry_source )
 {
 
   if (v < 0 || v > k::NUM_PUEO) v = 0; 
   if (!v) v = version::get(); 
 
 
-  const std::string & p = geometry_source == "" ? getDefaultGeometry(v) : geometry_source; 
+  std::string  p = geometry_source == 0 || geometry_source[0] == 0 ? getDefaultGeometry(v) : geometry_source; 
 
   if (!instances[v-1].count(p)) 
   {

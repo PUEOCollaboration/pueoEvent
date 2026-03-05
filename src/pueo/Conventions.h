@@ -50,9 +50,11 @@ namespace  pueo
     constexpr int NUM_PUEO = 1;
     constexpr int NUM_PHI = 24;
     constexpr int NUM_CHANS_PER_SURF = 8;
-    constexpr int ACTIVE_SURFS = 28;
-    constexpr int NUM_DIGITZED_CHANNELS = ACTIVE_SURFS * NUM_CHANS_PER_SURF;
-    constexpr int MAX_NUMBER_SAMPLES = 1024;
+    constexpr int NUM_SURF_SLOTS = 28;
+    constexpr int NUM_DIGITIZED_CHANNELS = NUM_SURF_SLOTS * NUM_CHANS_PER_SURF;
+    constexpr int NUM_RF_CHANNELS = NUM_POLS *NUM_ANTS;
+    constexpr int NUM_SAMPLES= 1024; // always 1024 for PUEO now
+    constexpr int NUM_BEAMS = 48;
   }
 
 //Now some geometry and polarisation considerations
