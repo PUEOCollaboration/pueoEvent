@@ -28,7 +28,7 @@
 #include "pueo/RawEvent.h"
 #include "pueo/RawHeader.h"
 #include "pueo/Nav.h"
-#include "pueo/Daqhsk.h"
+#include "pueo/DaqHsk.h"
 #include "pueo/Hsk.h"
 
 

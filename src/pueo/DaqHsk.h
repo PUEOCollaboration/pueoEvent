@@ -76,14 +76,14 @@ namespace pueo
     // per class there will be a surf array that has the surf information and beam array inside it
 
     // then totally different class for the trigger information and l2 readout time, etc
-    class Daqhsk: public TObject
+    class DaqHsk: public TObject
     {
      public:
-       Daqhsk() {;}
+       DaqHsk() {;}
 #ifdef HAVE_PUEORAWDATA
-       Daqhsk(const pueo_daq_hsk_t *daqhsk);
+       DaqHsk(const pueo_daq_hsk_t *daqhsk);
 #endif
-       virtual ~Daqhsk(){;}
+       virtual ~DaqHsk(){;}
        UInt_t l2_readout_time = 0;
        UInt_t l2_readout_timeNsecs = 0;
        std::array<UInt_t,12> H_scalers;
@@ -117,10 +117,10 @@ namespace pueo
        UShort_t offset = 0;
        UShort_t pps_trig_offset = 0;
        std::array<daqhsk::Surf, pueo::k::NUM_SURF_SLOTS> Surfs;
-      ClassDef(Daqhsk,1);
+      ClassDef(DaqHsk,1);
     };
   }
 }
 
 
-#endif 
+#endif

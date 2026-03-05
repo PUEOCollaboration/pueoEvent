@@ -72,7 +72,7 @@ PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,
 PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attitude,  /*|*/ nullptr,    /*|*/ 0           )\
 PUEO_CONVERT_TYPE(/*|*/ sunsensors,/*|*/  ss,             /*|*/ pueo::nav::SunSensors,/*|*/ nullptr,    /*|*/ 0           )\
 PUEO_CONVERT_TYPE(/*|*/ hsk,       /*|*/  sensors_disk,   /*|*/ pueo::hsk::Sensor,    /*|*/ nullptr,    /*|*/ 1           )\
-PUEO_CONVERT_TYPE(/*|*/ daqhsk,    /*|*/  daq_hsk,        /*|*/ pueo::daqhsk::Daqhsk, /*|*/ nullptr,    /*|*/ 0           )\
+PUEO_CONVERT_TYPE(/*|*/ daqhsk,    /*|*/  daq_hsk,        /*|*/ pueo::daqhsk::DaqHsk, /*|*/ nullptr,    /*|*/ 0           )\
 
 
 

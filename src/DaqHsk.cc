@@ -1,5 +1,5 @@
 /****************************************************************************************
-*  Daqhsk.cc            Implementation of the PUEO Daqhsk classes
+*  DaqHsk.cc            Implementation of the PUEO Daqhsk classes
 * 
 *  Kevin McBride <kmcbride@uchicago.edu>
 *
@@ -23,15 +23,15 @@
 
 
 
-#include "pueo/Daqhsk.h" 
+#include "pueo/DaqHsk.h" 
 
-ClassImp(pueo::daqhsk::Daqhsk); 
+ClassImp(pueo::daqhsk::DaqHsk); 
 ClassImp(pueo::daqhsk::Beam); 
 ClassImp(pueo::daqhsk::Surf); 
 
 #ifdef HAVE_PUEORAWDATA
 
-pueo::daqhsk::Daqhsk::Daqhsk(const pueo_daq_hsk_t *daqhsk) :
+pueo::daqhsk::DaqHsk::DaqHsk(const pueo_daq_hsk_t *daqhsk) :
   l2_readout_time(daqhsk->l2_readout_time.utc_secs),
   l2_readout_timeNsecs(daqhsk->l2_readout_time.utc_nsecs),
   scaler_readout_time(daqhsk->scaler_readout_time.utc_secs),
