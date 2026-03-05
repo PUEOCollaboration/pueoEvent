@@ -61,7 +61,7 @@ namespace pueo
       Double_t        weight = 0;             ///< Weight assigned by icemc
 
 
-      std::vector<double> signal[k::NUM_DIGITZED_CHANNELS];  ///<Noise-less signal
+      std::vector<double> signal[k::NUM_DIGITIZED_CHANNELS];  ///<Noise-less signal
 
     ClassDef(TruthEvent,1); 
   }; 

@@ -82,7 +82,7 @@ TGraph * pueo::UsefulEvent::makeGraph(int surf, int chan) const
 
 TGraph * pueo::UsefulEvent::makeGraph(size_t chanIndex) const
 {
-  if (chanIndex >= k::NUM_DIGITZED_CHANNELS) return 0; 
+  if (chanIndex >= k::NUM_DIGITIZED_CHANNELS) return 0; 
   TGraph * g = new TGraph(volts[chanIndex].size()); 
   int ant; 
   pol::pol_t pol; 

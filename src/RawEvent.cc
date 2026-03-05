@@ -32,7 +32,7 @@ ClassImp(pueo::RawEvent);
 pueo::RawEvent::RawEvent(const pueo_full_waveforms_t * raw)
   : eventNumber(raw->event), runNumber(raw->run)
 {
-  static_assert(PUEO_NCHAN == pueo::k::NUM_DIGITZED_CHANNELS);
+  static_assert(PUEO_NCHAN == pueo::k::NUM_DIGITIZED_CHANNELS);
 
   for (size_t i = 0; i < PUEO_NCHAN; i++)
   {
