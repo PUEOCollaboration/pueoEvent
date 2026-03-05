@@ -71,6 +71,8 @@ PUEO_CONVERT_TYPE(/*|*/ event,     /*|*/  full_waveforms, /*|*/ pueo::RawEvent, 
 PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,      /*|*/ nullptr,    /*|*/ 0           )\
 PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attitude,  /*|*/ nullptr,    /*|*/ 0           )\
 PUEO_CONVERT_TYPE(/*|*/ sunsensors,/*|*/  ss,             /*|*/ pueo::nav::SunSensors,/*|*/ nullptr,    /*|*/ 0           )\
+PUEO_CONVERT_TYPE(/*|*/ hsk,       /*|*/  sensors_disk,   /*|*/ pueo::hsk::Sensor,    /*|*/ nullptr,    /*|*/ 1           )\
+PUEO_CONVERT_TYPE(/*|*/ daqhsk,    /*|*/  daq_hsk,        /*|*/ pueo::daqhsk::Daqhsk, /*|*/ nullptr,    /*|*/ 0           )\
 
 
 
@@ -78,7 +80,7 @@ PUEO_CONVERT_TYPE(/*|*/ sunsensors,/*|*/  ss,             /*|*/ pueo::nav::SunSe
 // and then define an appropriate template specialization here
 template <typename T> int arity(const T * t) { (void) t ; return -1; }
 #ifdef HAVE_PUEORAWDATA
-template <> inline int arity<pueo_sensors_telem_t> (const pueo_sensors_telem_t * telem) { return telem->num_packets; }
+//template <> inline int arity<pueo_sensors_telem_t> (const pueo_sensors_telem_t * telem) { return telem->num_packets; }
 template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * disk) { return disk->num_packets; }
 #endif
 
@@ -133,6 +135,7 @@ template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * d
     //TODO
     int postprocess_headers(const char * infile, const char * outfile, const char * args);
     int postprocess_attitudes(const char * infile, const char * outfile, const char * args) ;
+    int postprocess_hsks(const char * infile, const char * outfile, const char * args) ;
   }
 }
 
