@@ -1,7 +1,7 @@
 /****************************************************************************************
-*  RawEvent.cc            Implementation of the PUEO Raw Event
+*  pueo/Hsk.h            Implementation of the PUEO hsk sensor class
 * 
-*  Cosmin Deaconu <cozzyd@kicp.uchicago.edu>
+*  Keith McBride <kmcbride@uchicago.edu>
 *
 *  (C) 2023-, The Payload for Ultrahigh Energy Observations (PUEO) Collaboration
 * 
@@ -22,24 +22,26 @@
 ****************************************************************************************/ 
 
 
-#include "pueo/RawEvent.h" 
+#include "pueo/Hsk.h" 
 
-ClassImp(pueo::RawEvent);
-
+ClassImp(pueo::hsk::Sensor); 
 
 #ifdef HAVE_PUEORAWDATA
-
-pueo::RawEvent::RawEvent(const pueo_full_waveforms_t * raw)
-  : eventNumber(raw->event), runNumber(raw->run)
+pueo::hsk::Sensor::Sensor(const pueo_sensors_disk_t *hsk,int whichsensor) :
+  which_sensor(whichsensor),
+  sensor_id(hsk->sensors[whichsensor].sensor_id),
+  time_ms(hsk->sensors[whichsensor].time_ms),
+  time_secs(hsk->sensors[whichsensor].time_secs),
+  fval((Float_t) hsk->sensors[whichsensor].val.fval),
+  ival((Int_t) hsk->sensors[whichsensor].val.ival),
+  uval((UInt_t) hsk->sensors[whichsensor].val.uval),
+  subsys(pueo_sensor_id_get_subsystem(hsk->sensors[whichsensor].sensor_id)),
+  sens_name(pueo_sensor_id_get_name(hsk->sensors[whichsensor].sensor_id)),
+  typetag(pueo_sensor_id_get_type_tag(hsk->sensors[whichsensor].sensor_id)),
+  kind_unit(pueo_sensor_id_get_kind(hsk->sensors[whichsensor].sensor_id))
 {
-  static_assert(PUEO_NCHAN == pueo::k::NUM_DIGITZED_CHANNELS);
-
-  for (size_t i = 0; i < PUEO_NCHAN; i++)
-  {
-    std::copy(raw->wfs[i].data, raw->wfs[i].data+pueo::k::NUM_SAMPLES, data[i].begin());
-  }
+    // Implementation to initialize Hsk from pueo_sensor_disk_t
 }
 
 
 #endif
-

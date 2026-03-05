@@ -30,6 +30,10 @@
 //Includes
 #include <TObject.h>
 
+#include <array>
+#ifdef HAVE_PUEORAWDATA
+#include "pueo/rawdata.h"
+#endif
 namespace pueo 
 {
 
@@ -76,33 +80,39 @@ namespace pueo
     {
      public:
        Attitude() {;}
+#ifdef HAVE_PUEORAWDATA
+       Attitude(const pueo_nav_att_t *att);
+#endif
        virtual ~Attitude(){;}
-
-       Int_t           run = 0; 
-       UInt_t          realTime = 0; ///<Time from the GPS unit
-       UInt_t          timeOfDay = 0; ///<in ms since the start of the day
-       UShort_t        nSatsVis = 0; 
-       UShort_t        nSatsTracked = 0; 
-       UInt_t          payloadTime = 0;
-       UInt_t          payloadTimeUs = 0;
+       char source;
+       ULong_t         realTime = 0; ///<Time from the GPS unit
+       UInt_t          realTimeNsecs = 0;
+       UShort_t        nSats= 0;
+       ULong_t         readoutTime = 0;
+       UInt_t          readoutTimeNsecs = 0;
        Float_t         latitude = 0; ///< In degrees
        Float_t         longitude = 0; ///<In degrees
        Float_t         altitude = 0; ///<In metres, WGS84
        Float_t         heading = 0; ///<In degrees
        Float_t         pitch = 0; ///<In degreess
        Float_t         roll = 0; ///<In degreess
-       Float_t         mrms = 0; 
-       Float_t         brms = 0; 
-       Int_t           flag = 0; 
+       Float_t         headingSigma = -1;
+       Float_t         pitchSigma = -1;
+       Float_t         rollSigma = -1;
+       Float_t         vdop = 0;
+       Float_t         hdop = 0;
+       Int_t           flag = 0;
+       std::array<UShort_t, 3> antennaCurrents;
+       Short_t        temperature = 0;
        
-      ClassDef(Attitude,1);
+      ClassDef(Attitude,2);
     };
 
     class Sat:  public TObject
     {
       public: 
         Sat() { used=0; } 
-        int id =-1; // constellation + prn or soething
+        int id =-1; // constellation + prn or something
         int8_t elevation=0;
         uint8_t azimuth=0; 
         uint8_t snr=0; 
@@ -123,8 +133,80 @@ namespace pueo
 
        ClassDef(Sats,1); 
     }; 
+
+    class SunSensor : public TObject
+    {
+      public:
+        SunSensor() {; }
+        virtual ~SunSensor() {;}
+        UInt_t x1 = 0;
+        UInt_t x2 = 0;
+        UInt_t y1 = 0;
+        UInt_t y2 = 0;
+        UInt_t tempADS1220 = 0;
+        UInt_t tempSS = 0;
+
+      ClassDef(SunSensor,1);
+    };
+    
+    class SunSensors : public TObject
+    {
+      public:
+        SunSensors() {; }
+        #ifdef HAVE_PUEORAWDATA
+        SunSensors(const pueo_ss *ss);
+        #endif
+        virtual ~SunSensors() {;}
+        // UInt_t SS0_x1;
+        // UInt_t SS0_x2;
+        // UInt_t SS0_y1;
+        // UInt_t SS0_y2;
+        // UInt_t SS1_x1;
+        // UInt_t SS1_x2;
+        // UInt_t SS1_y1;
+        // UInt_t SS1_y2;
+        // UInt_t SS2_x1;
+        // UInt_t SS2_x2;
+        // UInt_t SS2_y1;
+        // UInt_t SS2_y2;
+        // UInt_t SS3_x1;
+        // UInt_t SS3_x2;
+        // UInt_t SS3_y1;
+        // UInt_t SS3_y2;
+        // UInt_t SS4_x1;
+        // UInt_t SS4_x2;
+        // UInt_t SS4_y1;
+        // UInt_t SS4_y2;
+        // UInt_t SS5_x1;
+        // UInt_t SS5_x2;
+        // UInt_t SS5_y1;
+        // UInt_t SS5_y2;
+        // UInt_t SS6_x1;
+        // UInt_t SS6_x2;
+        // UInt_t SS6_y1;
+        // UInt_t SS6_y2;
+        // UInt_t SS7_x1;
+        // UInt_t SS7_x2;
+        // UInt_t SS7_y1;
+        // UInt_t SS7_y2;
+        SunSensor SS0;
+        SunSensor SS1;
+        SunSensor SS2;
+        SunSensor SS3;
+        SunSensor SS4;
+        SunSensor SS5;
+        SunSensor SS6;
+        SunSensor SS7;
+        ULong_t readoutTime = 0;
+        UInt_t readoutTimeNsecs = 0; 
+        UInt_t sequence_number = 0;
+        UInt_t flags = 0;
+
+      ClassDef(SunSensors,1); 
+    }; 
+
   }
 }
 
 
-#endif //ADU5PAT_H
+#endif //PUEO_NAV_H

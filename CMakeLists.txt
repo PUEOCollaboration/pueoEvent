@@ -1,12 +1,17 @@
 cmake_minimum_required(VERSION 3.23.0)
 project(pueoEvent VERSION 1.0.0)
 add_library(${PROJECT_NAME} SHARED)
+include(GNUInstallDirs)
+
 
 set(HEADER_FILES
   src/pueo/Conventions.h
+  src/pueo/Converter.h
   src/pueo/Dataset.h
   src/pueo/GeomTool.h
   src/pueo/Nav.h
+  src/pueo/DaqHsk.h
+  src/pueo/Hsk.h
   src/pueo/RawEvent.h
   src/pueo/RawHeader.h
   src/pueo/TruthEvent.h
@@ -15,15 +20,19 @@ set(HEADER_FILES
 )
 target_sources(${PROJECT_NAME} PRIVATE
   src/Conventions.cc
+  src/Converter.cc
   src/Dataset.cc
   src/GeomTool.cc
   src/Nav.cc
+  src/Hsk.cc
+  src/DaqHsk.cc
   src/RawEvent.cc
   src/RawHeader.cc
   src/TruthEvent.cc
   src/UsefulEvent.cc
   src/Version.cc
 )
+
 
 #================================================================================================
 #                                       HOUSEKEEPING
@@ -32,19 +41,22 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE) 
 endif()
 
+#look for libpueorawdata, and enable converting if it's found
+find_package(pueorawdata CONFIG)
+
 # note: * This provides pueo-data_VERSION and GeometryReader.h 
 find_package(pueo-data 1.0.0 REQUIRED)  
 
 find_package(ROOT REQUIRED COMPONENTS TreePlayer Physics)
 
 #================================================================================================
-#                                       CERN ROOT FLAGS
+#                                       CERN ROOT C++ Standard
 #================================================================================================
 # note: copied from RootFftwWrapper's CERN ROOT FLAGS but with PUBLIC->PRIVATE
 
 # obtain the C++ standard that ROOT is compiled with
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/getRootStandard.cmake)
-# setting C++ standard
+# setting C++ standard accordingly for this project
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_${ROOT_CXX_STANDARD})
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
 
@@ -69,6 +81,20 @@ target_link_libraries(${PROJECT_NAME}
   PUBLIC  PUEO::pueo-data ROOT::TreePlayer ROOT::Physics
 )
 
+if (pueorawdata_FOUND)
+  message(STATUS "Found libpueorawdata")
+  target_compile_options(${PROJECT_NAME} PRIVATE -DHAVE_PUEORAWDATA)
+  target_link_libraries(${PROJECT_NAME} PRIVATE PUEO::pueorawdata)
+
+  add_executable(pueo-convert src/pueo-convert.cc)
+  target_link_libraries(pueo-convert ${PROJECT_NAME})
+  install(
+    TARGETS pueo-convert
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+endif()
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "This creates compile_commands.json, useful for LSP" FORCE)
+
 # CERN ROOT dictionary generation
 set(DICTNAME G__${PROJECT_NAME})
 root_generate_dictionary(${DICTNAME} ${HEADER_FILES} MODULE ${PROJECT_NAME} LINKDEF LinkDef.h)
@@ -84,22 +110,27 @@ write_basic_package_version_file(
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY AnyNewerVersion
 )
-# Install the Config and ConfigVersion files
-include(GNUInstallDirs)
+
+# Install the Config and ConfigVersion files; the config file tells downstream projects how to find
+# the Targets.config file of this project, as well as how to find the dependencies of this project
 install(
   FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
   DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
 )
 
-# Install the library and its header files
+# Install the library and its header files and group all that into one export
 install(
-  TARGETS ${PROJECT_NAME} 
+  TARGETS ${PROJECT_NAME}
   EXPORT ${PROJECT_NAME}Targets 
   FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   LIBRARY DESTINATION lib
 )
 
+install(PROGRAMS scripts/pueo-convert-run.sh DESTINATION bin RENAME pueo-convert-run)
+
+# generate a Targets.config from the export; install the file dirrectly to the install path
+# this file lets downstream projects know how to interact with the package that is this project.
 install(
   EXPORT ${PROJECT_NAME}Targets
   NAMESPACE PUEO::

@@ -1,8 +1,9 @@
 /****************************************************************************************
-*  pueo/RawEvent.h              Raw waveform data
+*  pueo/Hsk.h             PUEO Hsk sensors
 *  
+*  Housekeeping sensor class
 * 
-*  Cosmin Deaconu <cozzyd@kicp.uchicago.edu.edu>    
+*  Keith McBride <kmcbride@uchicago.edu> based on Cosmin Deaconu's work on the attitude class
 *
 *  (C) 2023-, The Payload for Ultrahigh Energy Observations (PUEO) Collaboration
 * 
@@ -23,45 +24,52 @@
 ****************************************************************************************/ 
 
 
-#ifndef PUEO_RAW_EVENT_H
-#define PUEO_RAW_EVENT_H
+#ifndef PUEO_HSK_H
+#define PUEO_HSK_H
 
 //Includes
 #include <TObject.h>
-#include "pueo/Conventions.h"
 
+#include <array>
 #ifdef HAVE_PUEORAWDATA
 #include "pueo/rawdata.h"
 #endif
-
-#include <array>
-
-//!  pueo::RawEvent -- The Raw PUEO Event Data
-/*!
-  The ROOT implementation of the raw PUEO event data
-  \ingroup rootclasses
-*/
-namespace pueo
+namespace pueo 
 {
 
-  class RawEvent: public TObject
+
+
+  namespace hsk 
   {
-   public:
-     RawEvent(){;} ///< Default constructor
+    /** @defgroup rootclasses The ROOT Classes
+     * These are the ROOT clases that make up the event reader
+     */
+    // per obj there will be a sensor that has values and time for measurement
+    class Sensor: public TObject
+    {
+     public:
+       Sensor() {;}
 #ifdef HAVE_PUEORAWDATA
-     RawEvent(const pueo_full_waveforms_t * raw); ///< Constructor from raw type
+       Sensor(const pueo_sensors_disk_t *hsk, int whichsensor);
 #endif
-     virtual ~RawEvent() {;} ///< Destructor
-
-     ULong_t eventNumber = 0; ///< Event number from software
-
-     Int_t runNumber = 0;   ///< Run number from software
-
-     std::array<std::array<Short_t, pueo::k::NUM_SAMPLES>, pueo::k::NUM_DIGITZED_CHANNELS> data;
-
-    ClassDef(RawEvent,2);
-  };
-
+       virtual ~Sensor() {;}
+       int which_sensor=0;
+       UShort_t sensor_id=0;
+       UShort_t time_ms=0;
+       UInt_t time_secs=0;
+       //union { // expanded to 32 bits 
+       Float_t fval;
+       Int_t ival;
+       UInt_t uval;
+       std::string subsys;
+       std::string sens_name;
+       char typetag;
+       char kind_unit;
+       //} val;
+       ClassDef(Sensor,2);
+    };
+  }
 }
 
-#endif 
+
+#endif //
