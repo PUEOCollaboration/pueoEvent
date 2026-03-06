@@ -8,8 +8,15 @@
 #include <iostream>
 #include <iomanip>
 #include <map>
+#include <filesystem>
+#include <regex>
 
-enum print_color{none=0, green=1, red=2};
+namespace fs = std::filesystem;
+
+enum print_color{none=0, green=1, yellow=2, red=3};
+
+constexpr int NOMINAL_CLOCK_FREQ=125000000;
+
 // Nominally, delta := (end_pps - start_pps) should yield approximately 125E6 
 // (unsigned integer overflow should be taken care of when computing this difference).
 // `relative_delta` is then defined as (delta - 125E6).
@@ -27,8 +34,10 @@ struct event_second_start_end
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
 int  prep (TimeTable& time_table, TString& header_file_name); // returns the run number
+void fix_missing_rows(TimeTable& t, Long64_t start, Long64_t end);
 void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
+int analyze(TString header_file_path, int * r = nullptr);
 
 // Finds the mid-point of a stable period;
 // for every second in this period, delta ≈ avg_relative_delta.
@@ -62,39 +71,76 @@ int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, boo
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // TString header_file_path = "/work/R1392_header.root";
-  // TString header_file_path = "/work/real_run_1324_header.root";
-  TString header_file_path = "/usr/pueoBuilder/install/bin/bfmr_r739_head.root";
+  fs::recursive_directory_iterator run_dir("/work/headers/");
+  const std::regex pattern(R"(headFile(\d+))");
+  std::smatch run_match;
+  
+  // for(auto const& entry: run_dir)
+  // {
+  //   if (entry.is_regular_file())
+  //   {
+  //     std::string name = entry.path().stem().string(); 
+  //     if (std::regex_match(name, run_match, pattern))
+  //     {
+  //       // std::cout << "run is " << run_match[1] << "\n";
+  //       std::cout << entry.path() << "\n";
+  //       int actual_run;
+  //       int error = analyze(entry.path().c_str(), &actual_run);
+  //       int attempt_run = std::atoi(run_match[1].str().c_str());
+  //
+  //       if (actual_run != attempt_run)
+  //       {
+  //         fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
+  //       }
+  //       if (error) {
+  //         std::cerr << "Error occurred during run " << actual_run << " (code: " << error << ")\n";
+  //       }
+  //     }
+  //
+  //   }
+  //   else
+  //     continue;
+  // }
+  int run = 1332;
+  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
+  return 0;
+}
+
+int analyze(TString header_file_path, int * r)
+{
+
+  // TString header_file_path = "/work/bfmr_r739_head.root";
   TimeTable time_table;
-  auto run = prep(time_table, header_file_path);
-
-  // check event second continuity
-  Long64_t sec = time_table.begin()->first;
-  for (auto it = std::next(time_table.begin(),1); it!=time_table.end();++it){
-    if (it->first != ++sec) 
-    {
-      it->second.color = print_color::red;
-      print(time_table);
-      fprintf(stderr, 
-              "\033[1;31mFatal Error at: %s"
-              "\n\tReason: (run %d) column event_second not contiguous at %llu.\033[0m\n",
-              __PRETTY_FUNCTION__, run, it->first);
-      return ERR_EventSecondNotContiguous;
-    }
-  }
-
-  int err_avg = simple_moving_average(time_table);
-  if(err_avg) return err_avg;
-
-  std::size_t stable_period = time_table.size() / 3;
-  TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
-  stupid_extrapolation(time_table, mid_point);
-
-
-  print(time_table);
-  fprintf(stdout, "Run %d duration: %lld seconds.\n", 
-          run, std::prev(time_table.end())->first - time_table.begin()->first);
-  plot(time_table);
+  int run = prep(time_table, header_file_path);
+  // if (r) *r = run;
+  //
+  // // check event second continuity
+  // Long64_t sec = time_table.begin()->first;
+  // for (auto it = std::next(time_table.begin(),1); it!=time_table.end();++it){
+  //   if (it->first != ++sec) 
+  //   {
+  //     it->second.color = print_color::red;
+  //     print(time_table);
+  //     fprintf(stderr, 
+  //             "\033[1;31mFatal Error at: %s"
+  //             "\n\tReason: (run %d) column event_second not contiguous at %llu.\033[0m\n",
+  //             __PRETTY_FUNCTION__, run, it->first);
+  //     return ERR_EventSecondNotContiguous;
+  //   }
+  // }
+  //
+  // int err_avg = simple_moving_average(time_table);
+  // if(err_avg) return err_avg;
+  //
+  // std::size_t stable_period = time_table.size() / 3;
+  // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
+  // stupid_extrapolation(time_table, mid_point);
+  //
+  //
+  // print(time_table);
+  // fprintf(stdout, "Run %d duration: %lld seconds.\n", 
+  //         run, std::prev(time_table.end())->first - time_table.begin()->first);
+  // plot(time_table);
 
   return 0;
 }
@@ -218,7 +264,7 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
     auto future = std::prev(rit);
     rit->second.corrected_start = 
       std::fmod(
-        future->second.corrected_start - (125000000 + rit->second.avg_relative_delta) +
+        future->second.corrected_start - (NOMINAL_CLOCK_FREQ + rit->second.avg_relative_delta) +
         static_cast<double>(UINT32_MAX) + 1,
         static_cast<double>(UINT32_MAX) + 1
       );
@@ -230,7 +276,7 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
     auto past = std::prev(it);
     it->second.corrected_start = 
       std::fmod(
-        past->second.corrected_start + (125000000 + past->second.avg_relative_delta)+
+        past->second.corrected_start + (NOMINAL_CLOCK_FREQ + past->second.avg_relative_delta)+
         static_cast<double>(UINT32_MAX) + 1,
         static_cast<double>(UINT32_MAX) + 1
       );
@@ -276,12 +322,63 @@ int prep(TimeTable& time_table, TString& header_file_name)
     UInt_t delta = previous_previous->second.original_end - previous_previous->second.original_start;
 
     // and then convert to int so that values below nominal show up as negative
-    previous_previous->second.relative_delta =  static_cast<int>(delta) - 125000000;
+    previous_previous->second.relative_delta =  static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
   }
   time_table.erase(-2); // remove the two garbage rows
   time_table.erase(-1);
 
+  for (auto it = time_table.begin(); it!=time_table.end();){
+    Long64_t sec=it->first;
+    if (sec < 1767933857 || sec > 1767933870){
+      ++it;
+      time_table.erase(sec);
+    } else {
+      ++it;
+    }
+  }
+  time_table.erase(1767933864);
+
+  // event_second continuity check 
+  Long64_t sec = time_table.begin()->first; // `sec` always increments by 1 second,
+  //   but `it` could "jump" by more than 1 second.
+  for (auto it = std::next(time_table.begin(),1); it!=time_table.end();it++)
+  {
+    Long64_t attempt = sec + 1;
+    if (it->first != attempt)
+    {
+      // the two rows above the missing row would have been affected by this discontinuity;
+      Long64_t two_above = sec-2; 
+       std::cout << two_above;
+      if (two_above < time_table.begin()->first){
+        std::cerr << "I can't fix a table this bad, sorry." << std::endl;
+        exit(1);
+      }
+      fprintf(stderr, 
+              "\033[1;31mError at: %s"
+              "\n\tReason: (run %d) column event_second not contiguous at %llu."
+              "\n\tInserting the missing second(s) into the table...\033[0m\n",
+              __PRETTY_FUNCTION__, run->front(), attempt);
+
+      // start fixing the table from two rows above.
+      fix_missing_rows(time_table, two_above, it->first);
+      sec = it->first;
+    }
+
+  }
+  print(time_table);
+
   return run->front();
+}
+
+void fix_missing_rows(TimeTable& t, Long64_t start, Long64_t stop)
+{
+  TimeTable::iterator s = t.find(start);
+  TimeTable::iterator e = t.find(stop);
+  std::cout << std::boolalpha << (s==t.end()) << "\n";
+  for (auto it = s; it!=e; ++it)
+  {
+    std::cout << "wee! I'm fixing second " << it->first << "\n";
+  }
 }
 
 void print(TimeTable& time_table, std::size_t num_rows)
@@ -290,11 +387,11 @@ void print(TimeTable& time_table, std::size_t num_rows)
 
   std::cout << "\nRelative delta is defined to be (end_pps - start_pps) - 125000000\n\n";
 
-  std::cout << "---------------------------------------------------------------------\n"
-            << " seconds     | start pps | end pps   | rel   | avg rel | corrected   \n"
-            << " since epoch |           |           | delta | delta   | start pps   \n"
-            << " Long64_t    | UInt_t    | UInt_t    | int   | double  | double      \n"
-            << "---------------------------------------------------------------------\n";
+  std::cout << "--------------------------------------------------------------------------------\n"
+            << " seconds     | last pps | start pps | end pps   | rel   | avg rel | corrected   \n"
+            << " since epoch |          |           |           | delta | delta   | start pps   \n"
+            << " Long64_t    | UInt_t   | UInt_t    | UInt_t    | int   | double  | double      \n"
+            << "--------------------------------------------------------------------------------\n";
 
   TString color;
   for (auto it=time_table.begin(); it!=stop; ++it)
@@ -308,6 +405,10 @@ void print(TimeTable& time_table, std::size_t num_rows)
         color = "\033[1;32m "; 
         break;
       }
+      case print_color::yellow: {
+        color = "\033[1;33m "; 
+        break;
+      }
       case print_color::red: {
         color = "\033[1;31m "; 
         break;
@@ -319,6 +420,7 @@ void print(TimeTable& time_table, std::size_t num_rows)
     }
 
     std::cout << color << std::setw(13) << std::left << it->first
+              << color << std::setw(11) << it->second.last_pps
               << color << std::setw(11) << it->second.original_start
               << color << std::setw(11) << it->second.original_end
               << color << std::setw(7)  << it->second.relative_delta
