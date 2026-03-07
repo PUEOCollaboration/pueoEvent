@@ -1,4 +1,5 @@
 #include "ROOT/RDataFrame.hxx"
+#include "ROOT/RVec.hxx"
 #include "TAttMarker.h"
 #include "TSystem.h"
 #include "TGraph.h"
@@ -26,13 +27,14 @@ struct event_second_start_end
   int    relative_delta = 0;     // (next_pps - this_pps) - 125E6; unsigned int overflow taken care of
   double avg_relative_delta = 0; // average delta (moving average)
   double corrected_pps = 0;      // corrected this_pps (correction via avg_relative_delta)
-  bool   error_flag = false;     // set to true if the second is problematic somehow 
+  // bool   error_flag = false;     // set to true if the second is problematic somehow 
                                  // (e.g. can't compute `relative_delta` due to missing seconds)
 };
 
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
-int  prep (TimeTable& time_table, TString& header_file_name); // returns the run number
+// prep returns the run number
+int  prep (TString& header_file_name, TimeTable& t, ROOT::RVecLL& invalid_rows);
 void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 int analyze(TString header_file_path, int * r = nullptr);
@@ -60,7 +62,7 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
 //        distributed into each bin is small enough.
 //        However, obviously this window shouldn't be too large, else there's no point to performing
 //        a moving average.
-int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5, bool ignore_last_two_row = true);
+int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5);
 
 #define ERR_EventSecondNotContiguous 1
 #define ERR_TimeTableTooShort 2
@@ -109,27 +111,14 @@ int analyze(TString header_file_path, int * r)
 
   // TString header_file_path = "/work/bfmr_r739_head.root";
   TimeTable time_table;
-  int run = prep(time_table, header_file_path);
-  // if (r) *r = run;
-  //
-  // // check event second continuity
-  // Long64_t sec = time_table.begin()->first;
-  // for (auto it = std::next(time_table.begin(),1); it!=time_table.end();++it){
-  //   if (it->first != ++sec) 
-  //   {
-  //     it->second.color = print_color::red;
-  //     print(time_table);
-  //     fprintf(stderr, 
-  //             "\033[1;31mFatal Error at: %s"
-  //             "\n\tReason: (run %d) column event_second not contiguous at %llu.\033[0m\n",
-  //             __PRETTY_FUNCTION__, run, it->first);
-  //     return ERR_EventSecondNotContiguous;
-  //   }
-  // }
-  //
-  // int err_avg = simple_moving_average(time_table);
-  // if(err_avg) return err_avg;
-  //
+  ROOT::RVecLL invalid_seconds;
+  int run = prep(header_file_path, time_table, invalid_seconds);
+  if (r) *r = run;
+
+  int err_avg = simple_moving_average(time_table);
+  if(err_avg) return err_avg;
+  print(time_table);
+
   // std::size_t stable_period = time_table.size() / 3;
   // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
   // stupid_extrapolation(time_table, mid_point);
@@ -143,27 +132,29 @@ int analyze(TString header_file_path, int * r)
   return 0;
 }
 
-int simple_moving_average(TimeTable& time_table, std::size_t half_width, bool ignore_last_two_row)
+int simple_moving_average(TimeTable& time_table, std::size_t half_width)
 {
   if (half_width == 0) 
   {
-    std::cerr << __PRETTY_FUNCTION__ << "\n\t bad value supplied to parameter `half_width` (" 
-              << half_width << "), resetting it to 5 [seconds].\n";
+    fprintf(stderr,
+      "Error at %s:\n\t bad value supplied to parameter `half_width` (%lu), resetting it to 5 [seconds].\n",
+      __PRETTY_FUNCTION__ , half_width
+    );
     half_width=5;
   }
-  std::size_t valid_table_size = ignore_last_two_row ? time_table.size() - 2 : time_table.size();
 
-  if (2 * half_width + 1 > valid_table_size)
+  if (2 * half_width + 1 > time_table.size())
   {
-    std::cerr << "\033[1;31mFatal Error at: " << __PRETTY_FUNCTION__ 
-              << "\n\tReason: time_table too short (only " << valid_table_size << " valid rows).\033[0m\n";
+    fprintf(stderr,
+      "\033[1;31mFatal Error at: %s\n\tReason: time_table too short (only %lu valid rows).\033[0m\n",
+      __PRETTY_FUNCTION__ , time_table.size()
+    );
     print(time_table);
     return ERR_TimeTableTooShort;
   }
 
   TimeTable::iterator start = std::next(time_table.begin(), half_width);
-  TimeTable::iterator stop = ignore_last_two_row ? std::prev(time_table.end(), half_width+2)
-                                                 : std::prev(time_table.end(), half_width);
+  TimeTable::iterator stop =  std::prev(time_table.end(), half_width);
 
   // first, perform moving average for the "meat" of the table (ie exclude first/last few rows)
   for(TimeTable::iterator it = start; it!=stop; ++it)
@@ -280,7 +271,7 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
   }
 }
 
-int prep(TimeTable& time_table, TString& header_file_name)
+int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds)
 {
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
@@ -303,16 +294,17 @@ int prep(TimeTable& time_table, TString& header_file_name)
 
   // for (auto it = time_table.begin(); it!=time_table.end();){
   //   Long64_t sec=it->first;
-  //   if (sec < 1767933857 || sec > 1767933870){
+  //   if (sec < 1767933854 || sec > 1767933873){
   //     ++it;
   //     time_table.erase(sec);
   //   } else {
   //     ++it;
   //   }
   // }
+  // // time_table.erase(1767933864);
 
   // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
-  for (TimeTable::iterator current=time_table.begin(); current!=std::prev(time_table.end(),2); ++current)
+  for (TimeTable::iterator current=time_table.begin(); current!=std::prev(time_table.end(),2);)
   {
     TimeTable::iterator next_next = std::next(current, 2);
     TimeTable::iterator next = std::next(current, 1);
@@ -328,13 +320,19 @@ int prep(TimeTable& time_table, TString& header_file_name)
       UInt_t delta =  npps - tpps;
       // And then convert to int so that values below nominal show up as negative
       current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
+      ++current;
     } else {
-      current->second.error_flag = true;
+      // current->second.error_flag = true;
+      invalid_seconds.emplace_back(current->first);
+      current = time_table.erase(current);
     }
   }
   // The final two rows will never be valid
-  time_table.rbegin()->second.error_flag = true;
-  std::next(time_table.rbegin())->second.error_flag = true;
+  invalid_seconds.emplace_back((--time_table.end())->first);
+  time_table.erase(--time_table.end());
+  invalid_seconds.emplace_back((--time_table.end())->first);
+  time_table.erase(--time_table.end());
+
 
   return run->front();
 }
@@ -354,15 +352,15 @@ void print(TimeTable& time_table, std::size_t num_rows)
   TString color;
   for (auto it=time_table.begin(); it!=stop; ++it)
   {
-    auto color = it->second.error_flag ? "\033[1;31m " : "\033[0m ";
+    // auto color = it->second.error_flag ? "\033[1;31m " : "\033[0m ";
 
-    std::cout << color << std::setw(13) << std::left << it->first
-              << color << std::setw(11) << it->second.last_pps
-              << color << std::setw(11) << it->second.this_pps
-              << color << std::setw(11) << it->second.next_pps
-              << color << std::setw(11)  << it->second.relative_delta
-              << color << std::setw(6)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
-              << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\n";
+    std::cout << " " << std::setw(13) << std::left << it->first
+              << " " << std::setw(11) << it->second.last_pps
+              << " " << std::setw(11) << it->second.this_pps
+              << " " << std::setw(11) << it->second.next_pps
+              << " " << std::setw(11)  << it->second.relative_delta
+              << " " << std::setw(6)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
+              << " " << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\n";
   }
 
   if (num_rows < time_table.size()){
@@ -370,7 +368,7 @@ void print(TimeTable& time_table, std::size_t num_rows)
     std::cout << " ...\n";
     std::cout << " ...\n";
   }
-  std::cout << "\033[0m------------------------------------------------------------------------------\n";
+  std::cout << "------------------------------------------------------------------------------\n";
 }
 
 void plot(TimeTable& encounters, TString name)
