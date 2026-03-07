@@ -346,7 +346,7 @@ void print(TimeTable& time_table, std::size_t num_rows)
   std::cout << "\nRelative delta is defined to be (next_pps - this_pps) - 125000000\n\n";
 
   std::cout << "-------------------------------------------------------------------\n"
-            << " seconds     | last pps  | start_pps | next_pps  | rel             \n"
+            << " seconds     | last pps  | this_pps  | next_pps  | rel             \n"
             << " since epoch |           |           |           | delta           \n"
             << " Long64_t    | UInt_t    | UInt_t    | UInt_t    | int             \n"
             << "-------------------------------------------------------------------\n";
@@ -411,7 +411,7 @@ void plot(TimeTable& encounters, TString name)
   original.Draw("ALP");
   original.SetMarkerStyle(kFullCrossX);
   original.SetMarkerSize(3);
-  original.SetTitle("System Clock Value (uint32_t) at Start of Each Second (aka \"start_pps\")");
+  original.SetTitle("System Clock Value (uint32_t) at Start of Each Second (aka \"this_pps\")");
   original.GetXaxis()->SetLabelSize(0);
   original.GetYaxis()->SetTitle("[sysclk counts]");
   original.GetYaxis()->SetTitleSize(0.1);
@@ -457,7 +457,7 @@ void plot(TimeTable& encounters, TString name)
 
   c1.cd(3);
   diff.Draw("ALP");
-  diff.SetTitle("(original start_pps) - (corrected start_pps)");
+  diff.SetTitle("(original this_pps) - (corrected_pps)");
   diff.SetMarkerStyle(kCircle);
   diff.GetYaxis()->SetTitle("[sysclk counts]");
   diff.GetYaxis()->CenterTitle();
