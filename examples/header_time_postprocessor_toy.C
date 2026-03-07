@@ -13,39 +13,37 @@
 
 namespace fs = std::filesystem;
 
-enum print_color{none=0, green=1, yellow=2, red=3};
-
 constexpr int NOMINAL_CLOCK_FREQ=125000000;
 
-// Nominally, delta := (end_pps - start_pps) should yield approximately 125E6 
+// Nominally, delta := (next_pps - this_pps) should yield approximately 125E6 
 // (unsigned integer overflow should be taken care of when computing this difference).
 // `relative_delta` is then defined as (delta - 125E6).
 struct event_second_start_end 
 {
   UInt_t last_pps = 0;           // value of the sysclk counter at the start of the previous second
-  UInt_t original_start = 0;     // value of sysclk counter at start of the second (start_pps)
-  UInt_t original_end = 0;       // end_pps
-  int    relative_delta = 0;     // (end_pps - start_pps) - 125E6; unsigned int overflow taken care of
+  UInt_t this_pps = 0;           // extracted from the last_pps of the next second.
+  UInt_t next_pps = 0;           // extracted from the last_pps of the second after next second.
+  int    relative_delta = 0;     // (next_pps - this_pps) - 125E6; unsigned int overflow taken care of
   double avg_relative_delta = 0; // average delta (moving average)
-  double corrected_start = 0;    // to be corrected using avg_relative_delta
-  print_color color = none;
+  double corrected_pps = 0;      // corrected this_pps (correction via avg_relative_delta)
+  bool   error_flag = false;     // set to true if the second is problematic somehow 
+                                 // (e.g. can't compute `relative_delta` due to missing seconds)
 };
 
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
 int  prep (TimeTable& time_table, TString& header_file_name); // returns the run number
-void fix_missing_rows(TimeTable& t, Long64_t start, Long64_t end);
 void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 int analyze(TString header_file_path, int * r = nullptr);
 
 // Finds the mid-point of a stable period;
 // for every second in this period, delta ≈ avg_relative_delta.
-// Returns time_table.begin() if a stable region couldn't be found
+// Returns iterator `anchor_point`, or time_table.begin() if a stable region couldn't be found.
 TimeTable::iterator find_stable_region_mid_point(std::size_t len, TimeTable& t, bool ignore_last_two_row = true);
 
 // Calls `simple_moving_average()` to compute `avg_relative_delta` for each second,
-// then extrapolates from `anchor_point` to compute the `corrected_start` for every second using
+// then extrapolates from `anchor_point` to compute the `corrected_pps` for every second using
 // `avg_relative_delta` of each second.
 void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point);
 
@@ -229,7 +227,7 @@ TimeTable::iterator find_stable_region_mid_point(
     (
       stderr,
       "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
-      "where `end_pps` - `start_pps` are all approximately 125 million clock counts.\n"
+      "where `next_pps` - `this_pps` are all approximately 125 million clock counts.\n"
       "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
       requested_stable_period, time_table.begin()->first
     );
@@ -243,7 +241,7 @@ TimeTable::iterator find_stable_region_mid_point(
     (
       stderr,
       "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
-      "where `end_pps` - `start_pps` are all approximately 125 million clock counts.\n"
+      "where `next_pps` - `this_pps` are all approximately 125 million clock counts.\n"
       "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
       requested_stable_period, time_table.begin()->first
     );
@@ -255,16 +253,15 @@ TimeTable::iterator find_stable_region_mid_point(
 
 void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point)
 {
-  anchor_point->second.corrected_start = anchor_point->second.original_start;
-  anchor_point->second.color = print_color::green;
+  anchor_point->second.corrected_pps = anchor_point->second.this_pps;
 
   // backward extrapolation from the anchor point
   for (auto rit = std::make_reverse_iterator(anchor_point); rit!=time_table.rend(); ++rit)
   {
     auto future = std::prev(rit);
-    rit->second.corrected_start = 
+    rit->second.corrected_pps = 
       std::fmod(
-        future->second.corrected_start - (NOMINAL_CLOCK_FREQ + rit->second.avg_relative_delta) +
+        future->second.corrected_pps - (NOMINAL_CLOCK_FREQ + rit->second.avg_relative_delta) +
         static_cast<double>(UINT32_MAX) + 1,
         static_cast<double>(UINT32_MAX) + 1
       );
@@ -274,9 +271,9 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
   for (auto it = std::next(anchor_point); it!=time_table.end(); ++it)
   {
     auto past = std::prev(it);
-    it->second.corrected_start = 
+    it->second.corrected_pps = 
       std::fmod(
-        past->second.corrected_start + (NOMINAL_CLOCK_FREQ + past->second.avg_relative_delta)+
+        past->second.corrected_pps + (NOMINAL_CLOCK_FREQ + past->second.avg_relative_delta)+
         static_cast<double>(UINT32_MAX) + 1,
         static_cast<double>(UINT32_MAX) + 1
       );
@@ -304,136 +301,76 @@ int prep(TimeTable& time_table, TString& header_file_name)
     };
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
 
-  // Next, compute the start, end, and delta of each second, using lpps.
-  // Start by inserting two garbage rows at the top of the table
-  time_table.emplace(-2, event_second_start_end{});
-  time_table.emplace(-1, event_second_start_end{});
-  for (TimeTable::iterator current=std::next(time_table.begin(),2); current!=time_table.end(); ++current)
+  // for (auto it = time_table.begin(); it!=time_table.end();){
+  //   Long64_t sec=it->first;
+  //   if (sec < 1767933857 || sec > 1767933870){
+  //     ++it;
+  //     time_table.erase(sec);
+  //   } else {
+  //     ++it;
+  //   }
+  // }
+
+  // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
+  for (TimeTable::iterator current=time_table.begin(); current!=std::prev(time_table.end(),2); ++current)
   {
-    TimeTable::iterator previous_previous = std::prev(current, 2);
-    TimeTable::iterator previous = std::prev(current, 1);
-
-    // the start of the previous second is the last_pps of the current second
-    previous->second.original_start = current->second.last_pps;
-
-    previous_previous->second.original_end = current->second.last_pps;
-
-    // note: use UInt_t so that wrap-around subtraction is automatic
-    UInt_t delta = previous_previous->second.original_end - previous_previous->second.original_start;
-
-    // and then convert to int so that values below nominal show up as negative
-    previous_previous->second.relative_delta =  static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
-  }
-  time_table.erase(-2); // remove the two garbage rows
-  time_table.erase(-1);
-
-  for (auto it = time_table.begin(); it!=time_table.end();){
-    Long64_t sec=it->first;
-    if (sec < 1767933857 || sec > 1767933870){
-      ++it;
-      time_table.erase(sec);
-    } else {
-      ++it;
-    }
-  }
-  time_table.erase(1767933864);
-
-  // event_second continuity check 
-  Long64_t sec = time_table.begin()->first; // `sec` always increments by 1 second,
-  //   but `it` could "jump" by more than 1 second.
-  for (auto it = std::next(time_table.begin(),1); it!=time_table.end();it++)
-  {
-    Long64_t attempt = sec + 1;
-    if (it->first != attempt)
+    TimeTable::iterator next_next = std::next(current, 2);
+    TimeTable::iterator next = std::next(current, 1);
+    // ie, if the next two seconds actually exist in the table
+    if(next_next->first == current->first+2 && next->first == current->first + 1)
     {
-      // the two rows above the missing row would have been affected by this discontinuity;
-      Long64_t two_above = sec-2; 
-       std::cout << two_above;
-      if (two_above < time_table.begin()->first){
-        std::cerr << "I can't fix a table this bad, sorry." << std::endl;
-        exit(1);
-      }
-      fprintf(stderr, 
-              "\033[1;31mError at: %s"
-              "\n\tReason: (run %d) column event_second not contiguous at %llu."
-              "\n\tInserting the missing second(s) into the table...\033[0m\n",
-              __PRETTY_FUNCTION__, run->front(), attempt);
-
-      // start fixing the table from two rows above.
-      fix_missing_rows(time_table, two_above, it->first);
-      sec = it->first;
+      // the last_pps of next second is the current second's this_pps
+      UInt_t tpps = next->second.last_pps;
+      current->second.this_pps = tpps;
+      UInt_t npps = next_next->second.last_pps;
+      current->second.next_pps =  npps;
+      // Explicitly use UInt_t so that wrap-around subtraction is automatic
+      UInt_t delta =  npps - tpps;
+      // And then convert to int so that values below nominal show up as negative
+      current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
+    } else {
+      current->second.error_flag = true;
     }
-
   }
-  print(time_table);
+  // The final two rows will never be valid
+  time_table.rbegin()->second.error_flag = true;
+  std::next(time_table.rbegin())->second.error_flag = true;
 
   return run->front();
-}
-
-void fix_missing_rows(TimeTable& t, Long64_t start, Long64_t stop)
-{
-  TimeTable::iterator s = t.find(start);
-  TimeTable::iterator e = t.find(stop);
-  std::cout << std::boolalpha << (s==t.end()) << "\n";
-  for (auto it = s; it!=e; ++it)
-  {
-    std::cout << "wee! I'm fixing second " << it->first << "\n";
-  }
 }
 
 void print(TimeTable& time_table, std::size_t num_rows)
 {
   TimeTable::iterator stop = (num_rows < time_table.size()) ? std::next(time_table.begin(), num_rows) : time_table.end();
 
-  std::cout << "\nRelative delta is defined to be (end_pps - start_pps) - 125000000\n\n";
+  std::cout << "\nRelative delta is defined to be (next_pps - this_pps) - 125000000\n\n";
 
-  std::cout << "--------------------------------------------------------------------------------\n"
-            << " seconds     | last pps | start pps | end pps   | rel   | avg rel | corrected   \n"
-            << " since epoch |          |           |           | delta | delta   | start pps   \n"
-            << " Long64_t    | UInt_t   | UInt_t    | UInt_t    | int   | double  | double      \n"
-            << "--------------------------------------------------------------------------------\n";
+  std::cout << "-------------------------------------------------------------------\n"
+            << " seconds     | last pps  | start_pps | next_pps  | rel             \n"
+            << " since epoch |           |           |           | delta           \n"
+            << " Long64_t    | UInt_t    | UInt_t    | UInt_t    | int             \n"
+            << "-------------------------------------------------------------------\n";
 
   TString color;
   for (auto it=time_table.begin(); it!=stop; ++it)
   {
-    switch(it->second.color){
-      case print_color::none: {
-        color = "\033[0m "; 
-        break;
-      }
-      case print_color::green: {
-        color = "\033[1;32m "; 
-        break;
-      }
-      case print_color::yellow: {
-        color = "\033[1;33m "; 
-        break;
-      }
-      case print_color::red: {
-        color = "\033[1;31m "; 
-        break;
-      }
-      default: {
-        color = "\033[0m "; 
-        break;
-      }
-    }
+    auto color = it->second.error_flag ? "\033[1;31m " : "\033[0m ";
 
     std::cout << color << std::setw(13) << std::left << it->first
               << color << std::setw(11) << it->second.last_pps
-              << color << std::setw(11) << it->second.original_start
-              << color << std::setw(11) << it->second.original_end
-              << color << std::setw(7)  << it->second.relative_delta
+              << color << std::setw(11) << it->second.this_pps
+              << color << std::setw(11) << it->second.next_pps
+              << color << std::setw(11)  << it->second.relative_delta
               << color << std::setw(6)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
-              << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_start << "\n";
+              << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\n";
   }
 
   if (num_rows < time_table.size()){
-    std::cout << " ...\n";
+    std::cout << "\033[0 ...\n";
     std::cout << " ...\n";
     std::cout << " ...\n";
   }
-  std::cout << "------------------------------------------------------------------------------\n";
+  std::cout << "\033[0m------------------------------------------------------------------------------\n";
 }
 
 void plot(TimeTable& encounters, TString name)
@@ -450,9 +387,9 @@ void plot(TimeTable& encounters, TString name)
   std::size_t counter=0;
   for (auto& e: encounters){
 
-    Long64_t o = e.second.original_start;
+    Long64_t o = e.second.this_pps;
     original.SetPoint(counter, e.first-t0,o);
-    double c = e.second.corrected_start;
+    double c = e.second.corrected_pps;
     corrected.SetPoint(counter, e.first-t0, c);
     double d = o-c;
     diff.SetPoint(counter, e.first-t0, d);
@@ -463,8 +400,8 @@ void plot(TimeTable& encounters, TString name)
     counter++;
   }
 
-  original.RemovePoint(original.GetN()-1); // final second doesn't have a valid original_start
-  diff.RemovePoint(diff.GetN()-1);         // final second doesn't have a valid original_start
+  original.RemovePoint(original.GetN()-1); // final second doesn't have a valid this_pps
+  diff.RemovePoint(diff.GetN()-1);         // final second doesn't have a valid this_pps
   original_delta.RemovePoint(original_delta.GetN()-1); // final two seconds don't have valid deltas
   original_delta.RemovePoint(original_delta.GetN()-1); // final two seconds don't have valid deltas
 
@@ -474,7 +411,7 @@ void plot(TimeTable& encounters, TString name)
   original.Draw("ALP");
   original.SetMarkerStyle(kFullCrossX);
   original.SetMarkerSize(3);
-  original.SetTitle("System Clock Value (uint32_t) at Start of Each Second (aka \"start pps\")");
+  original.SetTitle("System Clock Value (uint32_t) at Start of Each Second (aka \"start_pps\")");
   original.GetXaxis()->SetLabelSize(0);
   original.GetYaxis()->SetTitle("[sysclk counts]");
   original.GetYaxis()->SetTitleSize(0.1);
@@ -501,7 +438,7 @@ void plot(TimeTable& encounters, TString name)
   original_delta.Draw("ALP");
   original_delta.SetMarkerStyle(kFullCrossX);
   original_delta.SetMarkerSize(3);
-  original_delta.SetTitle("#Delta #equiv end_pps - start_pps ≈ 125,000,000");
+  original_delta.SetTitle("#Delta #equiv next_pps - this_pps ≈ 125,000,000");
   original_delta.GetYaxis()->SetTitle("#Delta - 125E6 [sysclk counts]");
   original_delta.GetYaxis()->CenterTitle();
   original_delta.GetYaxis()->SetTitleSize(0.1);
@@ -520,7 +457,7 @@ void plot(TimeTable& encounters, TString name)
 
   c1.cd(3);
   diff.Draw("ALP");
-  diff.SetTitle("(original start pps) - (corrected start pps)");
+  diff.SetTitle("(original start_pps) - (corrected start_pps)");
   diff.SetMarkerStyle(kCircle);
   diff.GetYaxis()->SetTitle("[sysclk counts]");
   diff.GetYaxis()->CenterTitle();
