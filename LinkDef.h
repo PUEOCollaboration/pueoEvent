@@ -39,6 +39,10 @@
 #pragma link C++ class pueo::nav::SunSensor+;
 #pragma link C++ class pueo::nav::SunSensors+;
 
+#pragma link C++ class pueo::hsk::Sensor+;
+#pragma link C++ class pueo::daqhsk::DaqHsk+;
+#pragma link C++ class pueo::daqhsk::Surf+;
+#pragma link C++ class pueo::daqhsk::Beam+;
 
 #pragma read \
   targetClass = "pueo::RawEvent"\

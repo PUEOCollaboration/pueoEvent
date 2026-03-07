@@ -331,7 +331,7 @@ pueo::UsefulEvent * pueo::Dataset::useful(bool force_load)
   if ((theStrat & kRandomizePolarity) && maybeInvertPolarity(fUsefulEvent->eventNumber))
   {
     // std::cerr << "Inverting event " << fUsefulEvent->eventNumber << std::endl;
-    for(int ichan=0; ichan < k::NUM_DIGITZED_CHANNELS; ichan++)
+    for(int ichan=0; ichan < k::NUM_DIGITIZED_CHANNELS; ichan++)
     {
       for(size_t samp=0; samp < fUsefulEvent->volts[ichan].size(); samp++)
       {

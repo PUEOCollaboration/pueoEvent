@@ -28,6 +28,8 @@
 #include "pueo/RawEvent.h"
 #include "pueo/RawHeader.h"
 #include "pueo/Nav.h"
+#include "pueo/DaqHsk.h"
+#include "pueo/Hsk.h"
 
 
 #include "TFile.h"
@@ -50,6 +52,7 @@
 #ifdef HAVE_PUEORAWDATA
 
 #include "pueo/rawdata.h"
+#include "pueo/sensor_ids.h"
 #include "pueo/rawio.h"
 
 template <typename T> const char * getName() { return "unnamed"; } 
