@@ -27,27 +27,19 @@ struct event_second_start_end
   int    relative_delta = 0;     // (next_pps - this_pps) - 125E6; unsigned int overflow taken care of
   double avg_relative_delta = 0; // average delta (moving average)
   double corrected_pps = 0;      // corrected this_pps (correction via avg_relative_delta)
-  // bool   error_flag = false;     // set to true if the second is problematic somehow 
-                                 // (e.g. can't compute `relative_delta` due to missing seconds)
+  bool   missing = false;        // set to true if the second is a missing second (or neighbors one)
 };
 
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
-// prep returns the run number
-int  prep (TString& header_file_name, TimeTable& t, ROOT::RVecLL& invalid_rows);
-void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
-void plot (TimeTable& time_table, TString name="pps_correction.svg");
 int analyze(TString header_file_path, int * r = nullptr);
 
-// Finds the mid-point of a stable period;
-// for every second in this period, delta ≈ avg_relative_delta.
-// Returns iterator `anchor_point`, or time_table.begin() if a stable region couldn't be found.
-TimeTable::iterator find_stable_region_mid_point(std::size_t len, TimeTable& t, bool ignore_last_two_row = true);
+// Prepare a TimeTable, returns the run number.
+int prep (TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds);
 
-// Calls `simple_moving_average()` to compute `avg_relative_delta` for each second,
-// then extrapolates from `anchor_point` to compute the `corrected_pps` for every second using
-// `avg_relative_delta` of each second.
-void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point);
+// Removes duplicate entries in `invalid_seconds` and sort ascending.
+// Returns an error if there are too many consecutive invalid seconds.
+int prune_and_check_missing_seconds(ROOT::RVecLL& invalid_seconds, std::size_t TOLERANCE = 10);
 
 // Computes `avg_relative_delta` for each second using neighboring seconds. CRASHES if the run has too few seconds.
 // @param half_width Half width of the window when computing the moving average.
@@ -64,7 +56,20 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
 //        a moving average.
 int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5);
 
-#define ERR_EventSecondNotContiguous 1
+// Finds the mid-point of a stable period;
+// for every second in this period, delta ≈ avg_relative_delta.
+// Returns iterator `anchor_point`, or time_table.begin() if a stable region couldn't be found.
+TimeTable::iterator find_stable_region_mid_point(std::size_t len, TimeTable& t, bool ignore_last_two_row = true);
+
+// Calls `simple_moving_average()` to compute `avg_relative_delta` for each second,
+// then extrapolates from `anchor_point` to compute the `corrected_pps` for every second using
+// `avg_relative_delta` of each second.
+void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point);
+
+void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
+void plot (TimeTable& time_table, TString name="pps_correction.svg");
+
+#define ERR_TooManyConsecutiveInvalid 1
 #define ERR_TimeTableTooShort 2
 
 // @brief The "main" function.
@@ -115,9 +120,14 @@ int analyze(TString header_file_path, int * r)
   int run = prep(header_file_path, time_table, invalid_seconds);
   if (r) *r = run;
 
+  int err_health = prune_and_check_missing_seconds(invalid_seconds);
+  if (err_health) return err_health;
+
   int err_avg = simple_moving_average(time_table);
   if(err_avg) return err_avg;
   print(time_table);
+
+
 
   // std::size_t stable_period = time_table.size() / 3;
   // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
@@ -129,6 +139,32 @@ int analyze(TString header_file_path, int * r)
   //         run, std::prev(time_table.end())->first - time_table.begin()->first);
   // plot(time_table);
 
+  return 0;
+}
+
+int prune_and_check_missing_seconds(ROOT::RVecLL& invalid_seconds, std::size_t TOLERANCE)
+{
+  std::sort(invalid_seconds.begin(), invalid_seconds.end());
+  auto dup = std::unique(invalid_seconds.begin(), invalid_seconds.end());
+  invalid_seconds.erase(dup, invalid_seconds.end());
+
+  if (TOLERANCE < 2) // since the final two seconds are always invalid, TOLERANCE should be lenient enough
+  {
+    fprintf(stderr, "%s\n\tBad TOLERANCE: %lu, resetting to 10\n", __PRETTY_FUNCTION__, TOLERANCE);
+    TOLERANCE = 10;
+  }
+  if (invalid_seconds.size() <= TOLERANCE) return 0;
+
+  std::size_t invalid_chunk_size = 1;
+  for (std::size_t i=0; i+1<invalid_seconds.size(); ++i)
+  {
+    if (invalid_seconds[i+1] != invalid_seconds[i]+1) invalid_chunk_size = 1;
+    else 
+    {
+      invalid_chunk_size++;
+      if (invalid_chunk_size > TOLERANCE) return ERR_TooManyConsecutiveInvalid;
+    }
+  }
   return 0;
 }
 
@@ -292,24 +328,37 @@ int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid
     };
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
 
-  // for (auto it = time_table.begin(); it!=time_table.end();){
-  //   Long64_t sec=it->first;
-  //   if (sec < 1767933854 || sec > 1767933873){
-  //     ++it;
-  //     time_table.erase(sec);
-  //   } else {
-  //     ++it;
-  //   }
-  // }
-  // // time_table.erase(1767933864);
+  for (auto it = time_table.begin(); it!=time_table.end();){
+    Long64_t sec=it->first;
+    if (sec < 1767933854 || sec > 1767933873){
+      ++it;
+      time_table.erase(sec);
+    } else {
+      ++it;
+    }
+  }
+  // time_table.erase(1767933864);
 
   // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
   for (TimeTable::iterator current=time_table.begin(); current!=std::prev(time_table.end(),2);)
   {
     TimeTable::iterator next_next = std::next(current, 2);
     TimeTable::iterator next = std::next(current, 1);
-    // ie, if the next two seconds actually exist in the table
-    if(next_next->first == current->first+2 && next->first == current->first + 1)
+
+    // ie, check if the next two seconds actually exist in the table
+    if(next->first != current->first+1)
+    {
+      invalid_seconds.emplace_back(current->first);
+      invalid_seconds.emplace_back(current->first+1);
+      current = time_table.erase(current);
+    }
+    else if (next_next->first != current->first+2)
+    {
+      invalid_seconds.emplace_back(current->first);
+      invalid_seconds.emplace_back(current->first+2);
+      current = time_table.erase(current);
+    }
+    else // success case
     {
       // the last_pps of next second is the current second's this_pps
       UInt_t tpps = next->second.last_pps;
@@ -321,18 +370,13 @@ int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid
       // And then convert to int so that values below nominal show up as negative
       current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
       ++current;
-    } else {
-      // current->second.error_flag = true;
-      invalid_seconds.emplace_back(current->first);
-      current = time_table.erase(current);
-    }
+    }  
   }
   // The final two rows will never be valid
   invalid_seconds.emplace_back((--time_table.end())->first);
   time_table.erase(--time_table.end());
   invalid_seconds.emplace_back((--time_table.end())->first);
   time_table.erase(--time_table.end());
-
 
   return run->front();
 }
