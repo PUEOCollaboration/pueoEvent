@@ -141,6 +141,69 @@ int analyze(TString header_file_path, int * r)
   return 0;
 }
 
+int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds)
+{
+  // default already disables this so no need to explicitly disable
+  // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
+  ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_name);
+  auto run = tmp_header_rdf.Take<Int_t>("run"); // will return the first element in this vector
+
+  // start by filling a table of event_second vs lpps
+  auto search_and_fill = 
+    [&time_table]
+    (UInt_t event_second, UInt_t lpps)
+    {
+      Long64_t evtsec = (Long64_t) event_second;
+      bool new_encounter = time_table.find(evtsec) == time_table.end();
+      if (new_encounter) 
+      {
+        time_table.emplace(evtsec, event_second_start_end{.last_pps=lpps});
+      }
+    };
+  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
+
+  // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
+  for (TimeTable::iterator current=time_table.begin(); current!=std::prev(time_table.end(),2);)
+  {
+    TimeTable::iterator next_next = std::next(current, 2);
+    TimeTable::iterator next = std::next(current, 1);
+
+    // ie, check if the next two seconds actually exist in the table
+    if(next->first != current->first+1)
+    {
+      invalid_seconds.emplace_back(current->first);
+      invalid_seconds.emplace_back(current->first+1);
+      current = time_table.erase(current);
+    }
+    else if (next_next->first != current->first+2)
+    {
+      invalid_seconds.emplace_back(current->first);
+      invalid_seconds.emplace_back(current->first+2);
+      current = time_table.erase(current);
+    }
+    else // success case
+    {
+      // the last_pps of next second is the current second's this_pps
+      UInt_t tpps = next->second.last_pps;
+      current->second.this_pps = tpps;
+      UInt_t npps = next_next->second.last_pps;
+      current->second.next_pps =  npps;
+      // Explicitly use UInt_t so that wrap-around subtraction is automatic
+      UInt_t delta =  npps - tpps;
+      // And then convert to int so that values below nominal show up as negative
+      current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
+      ++current;
+    }  
+  }
+  // The final two rows will never be valid
+  invalid_seconds.emplace_back((--time_table.end())->first);
+  time_table.erase(--time_table.end());
+  invalid_seconds.emplace_back((--time_table.end())->first);
+  time_table.erase(--time_table.end());
+
+  return run->front();
+}
+
 int prune_and_check_invalid_seconds(ROOT::RVecLL& invalid_seconds, std::size_t TOLERANCE)
 {
   std::sort(invalid_seconds.begin(), invalid_seconds.end());
@@ -320,69 +383,6 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
         static_cast<double>(UINT32_MAX) + 1
       );
   }
-}
-
-int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds)
-{
-  // default already disables this so no need to explicitly disable
-  // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
-  ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_name);
-  auto run = tmp_header_rdf.Take<Int_t>("run"); // will return the first element in this vector
-
-  // start by filling a table of event_second vs lpps
-  auto search_and_fill = 
-    [&time_table]
-    (UInt_t event_second, UInt_t lpps)
-    {
-      Long64_t evtsec = (Long64_t) event_second;
-      bool new_encounter = time_table.find(evtsec) == time_table.end();
-      if (new_encounter) 
-      {
-        time_table.emplace(evtsec, event_second_start_end{.last_pps=lpps});
-      }
-    };
-  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
-
-  // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
-  for (TimeTable::iterator current=time_table.begin(); current!=std::prev(time_table.end(),2);)
-  {
-    TimeTable::iterator next_next = std::next(current, 2);
-    TimeTable::iterator next = std::next(current, 1);
-
-    // ie, check if the next two seconds actually exist in the table
-    if(next->first != current->first+1)
-    {
-      invalid_seconds.emplace_back(current->first);
-      invalid_seconds.emplace_back(current->first+1);
-      current = time_table.erase(current);
-    }
-    else if (next_next->first != current->first+2)
-    {
-      invalid_seconds.emplace_back(current->first);
-      invalid_seconds.emplace_back(current->first+2);
-      current = time_table.erase(current);
-    }
-    else // success case
-    {
-      // the last_pps of next second is the current second's this_pps
-      UInt_t tpps = next->second.last_pps;
-      current->second.this_pps = tpps;
-      UInt_t npps = next_next->second.last_pps;
-      current->second.next_pps =  npps;
-      // Explicitly use UInt_t so that wrap-around subtraction is automatic
-      UInt_t delta =  npps - tpps;
-      // And then convert to int so that values below nominal show up as negative
-      current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
-      ++current;
-    }  
-  }
-  // The final two rows will never be valid
-  invalid_seconds.emplace_back((--time_table.end())->first);
-  time_table.erase(--time_table.end());
-  invalid_seconds.emplace_back((--time_table.end())->first);
-  time_table.erase(--time_table.end());
-
-  return run->front();
 }
 
 void print(TimeTable& time_table, std::size_t num_rows)
