@@ -74,7 +74,6 @@ void plot (TimeTable& time_table, TString name="pps_correction.svg");
 #define ERR_TooManyConsecutiveInvalid 1
 #define ERR_TimeTableTooShort 2
 
-// @brief The "main" function.
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
@@ -82,37 +81,44 @@ int header_time_postprocessor_toy()
   const std::regex pattern(R"(headFile(\d+))");
   std::smatch run_match;
   
-  // for(auto const& entry: run_dir)
-  // {
-  //   if (entry.is_regular_file())
-  //   {
-  //     std::string name = entry.path().stem().string(); 
-  //     if (std::regex_match(name, run_match, pattern))
-  //     {
-  //       // std::cout << "run is " << run_match[1] << "\n";
-  //       std::cout << entry.path() << "\n";
-  //       int actual_run;
-  //       int error = analyze(entry.path().c_str(), &actual_run);
-  //       int attempt_run = std::atoi(run_match[1].str().c_str());
-  //
-  //       if (actual_run != attempt_run)
-  //       {
-  //         fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
-  //       }
-  //       if (error) {
-  //         std::cerr << "Error occurred during run " << actual_run << " (code: " << error << ")\n";
-  //       }
-  //     }
-  //
-  //   }
-  //   else
-  //     continue;
-  // }
-  int run = 1332;
-  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
+  for(auto const& entry: run_dir)
+  {
+    if (entry.is_regular_file())
+    {
+      std::string name = entry.path().stem().string(); 
+      if (std::regex_match(name, run_match, pattern))
+      {
+        auto r = std::atoi(run_match[1].str().c_str());
+        if (r == 1365 || r==1286 || r==1180 || r==1315 || r==1138 || r==1108 ||
+            r==1029 || r==1020 || r==1222 || r==1345 || r==1122) 
+        {
+          continue;
+        }
+        std::cout << entry.path() << "\n";
+        int actual_run;
+        int error = analyze(entry.path().c_str(), &actual_run);
+        int attempt_run = std::atoi(run_match[1].str().c_str());
+
+        if (actual_run != attempt_run)
+        {
+          fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
+        }
+        if (error) 
+        {
+          std::cerr << "Error occurred during run " << actual_run << " (code: " << error << ")\n";
+        }
+      }
+
+    }
+    else
+      continue;
+  }
+  // int run = 1122;
+  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
   return 0;
 }
 
+// @brief The "main" function.
 int analyze(TString header_file_path, int * r)
 {
   // TString header_file_path = "/work/bfmr_r739_head.root";
@@ -133,10 +139,10 @@ int analyze(TString header_file_path, int * r)
   insert_invalid_seconds_back(time_table, invalid_seconds);
   stupid_extrapolation(time_table, mid_point);
 
-  print(time_table);
-  fprintf(stdout, "Run %d duration: %lld seconds.\n", 
-          run, std::prev(time_table.end())->first - time_table.begin()->first);
-  plot(time_table);
+  // print(time_table);
+  // fprintf(stdout, "Run %d duration: %lld seconds.\n", 
+  //         run, std::prev(time_table.end())->first - time_table.begin()->first);
+  // plot(time_table);
 
   return 0;
 }
@@ -161,6 +167,7 @@ int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid
       }
     };
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
+  // print(time_table);
 
   // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
   for (TimeTable::iterator current=time_table.begin(); current!=std::prev(time_table.end(),2);)
