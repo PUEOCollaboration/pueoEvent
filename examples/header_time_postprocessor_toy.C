@@ -41,7 +41,7 @@ int prepare_table (const TString & header_file_name, TimeTable * time_table, Key
 
 // Removes duplicate entries in `invalid_seconds` and sort ascending.
 // Returns an error if there are too many consecutive invalid seconds.
-int prune_and_check_invalid_seconds(ROOT::RVecLL& invalid_seconds, std::size_t TOLERANCE = 10);
+int prune_and_check_invalid_seconds(const Keys * invalid_seconds, std::size_t TOLERANCE = 10);
 
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
 // Returns error (code ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
@@ -54,7 +54,7 @@ int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5);
 // returns success (0) or ERR_EmptyTable.
 int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anchor_point);
 
-void insert_invalid_seconds_back(TimeTable& time_table, const ROOT::RVecLL& invalid_seconds);
+void insert_invalid_seconds_back(TimeTable* time_table, const Keys* invalid_seconds);
 
 // Calls `simple_moving_average()` to compute `avg_relative_delta` for each second,
 // then extrapolates from `anchor_point` to compute the `corrected_pps` for every second using
@@ -97,7 +97,7 @@ int header_time_postprocessor_toy()
   //   }
   //
   // }
-  auto run=889;
+  auto run=840;
   analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
   return 0;
 }
@@ -109,16 +109,17 @@ int analyze(const TString header_file_path)
   int run = prepare_table(header_file_path, &time_table, &invalid_seconds);
   if (run == ERR_EmptyTable) return run;
 
-  // if (prune_and_check_invalid_seconds(invalid_seconds) == ERR_TooManyConsecutiveInvalid)
-  //   return ERR_TooManyConsecutiveInvalid;
+  if (prune_and_check_invalid_seconds(&invalid_seconds) == ERR_TooManyConsecutiveInvalid)
+    return ERR_TooManyConsecutiveInvalid;
   //
   // if(simple_moving_average(time_table)) return ERR_TimeTableTooShort;
   //
   // TimeTable::iterator anchor_point;
   // if(find_stable_region_mid_point(time_table, anchor_point)) return ERR_EmptyTable;
   //
-  // insert_invalid_seconds_back(time_table, invalid_seconds);
+  insert_invalid_seconds_back(&time_table, &invalid_seconds);
   // stupid_extrapolation(time_table, anchor_point);
+  print(&time_table);
 
   return run;
 }
@@ -204,29 +205,28 @@ int prepare_table(const TString& header_file_name, TimeTable* time_table, Keys* 
   return run->front();
 }
 
-int prune_and_check_invalid_seconds(ROOT::RVecLL& invalid_seconds, std::size_t TOLERANCE)
+int prune_and_check_invalid_seconds(const Keys* invalid_seconds, std::size_t TOLERANCE)
 {
-  std::sort(invalid_seconds.begin(), invalid_seconds.end());
-  auto dup = std::unique(invalid_seconds.begin(), invalid_seconds.end());
-  invalid_seconds.erase(dup, invalid_seconds.end());
-
   if (TOLERANCE < 2) // since the final two seconds are always invalid, TOLERANCE should be lenient enough
   {
     fprintf(stderr, "%s\n\tBad TOLERANCE: %lu, resetting to 10\n", __PRETTY_FUNCTION__, TOLERANCE);
     TOLERANCE = 10;
   }
-  if (invalid_seconds.size() <= TOLERANCE) return 0;
+  if (invalid_seconds->size() <= TOLERANCE) return 0;
 
   std::size_t invalid_chunk_size = 1;
-  for (std::size_t i=0; i+1<invalid_seconds.size(); ++i)
+
+  for (Keys::iterator it=invalid_seconds->begin(); it!=std::prev(invalid_seconds->end()); ++it)
   {
-    if (invalid_seconds[i+1] != invalid_seconds[i]+1) invalid_chunk_size = 1;
-    else 
+    // check if the next invalid second is (current+1), if not, reset invalid chunk size
+    if (*(std::next(it)) != *it + 1) invalid_chunk_size = 1;
+    else
     {
       invalid_chunk_size++;
       if (invalid_chunk_size > TOLERANCE) return ERR_TooManyConsecutiveInvalid;
     }
   }
+
   return 0;
 }
 
@@ -324,20 +324,20 @@ int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anc
   return 0;
 }
 
-void insert_invalid_seconds_back(TimeTable& time_table, const ROOT::RVecLL& invalid_seconds)
+void insert_invalid_seconds_back(TimeTable* time_table, const Keys* invalid_seconds)
 {
-  for(auto& sec: invalid_seconds)
+  for(auto& sec: *invalid_seconds)
   {
-    time_table[sec].invalid = true;
-    TimeTable::iterator past   = time_table.find(sec-1);
-    TimeTable::iterator future = time_table.find(sec+1);
-    if (past != time_table.end())
+    (*time_table)[sec].invalid = true;
+    TimeTable::iterator past   = time_table->find(sec-1);
+    TimeTable::iterator future = time_table->find(sec+1);
+    if (past != time_table->end())
     {
-      time_table[sec].avg_relative_delta = past->second.avg_relative_delta;
+      (*time_table)[sec].avg_relative_delta = past->second.avg_relative_delta;
     } 
-    else if (future != time_table.end())
+    else if (future != time_table->end())
     {
-      time_table[sec].avg_relative_delta = future->second.avg_relative_delta;
+      (*time_table)[sec].avg_relative_delta = future->second.avg_relative_delta;
     } 
   }
 }
