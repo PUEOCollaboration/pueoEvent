@@ -82,12 +82,6 @@ int header_time_postprocessor_toy()
     // skip other root files in the run folder
     if (!std::regex_match(name, run_match, pattern)) continue;
 
-    // auto r = std::atoi(run_match[1].str().c_str());
-    // if (r == 1365 || r==1286 || r==1180 || r==1315 || r==1138 || r==1108 ||
-    //     r==1029 || r==1020 || r==1222 || r==1345 || r==1122) 
-    // {
-    //   continue;
-    // }
     std::cout << entry.path() << "\n";
     int actual_run = analyze(entry.path().c_str());
     int attempt_run = std::atoi(run_match[1].str().c_str());
