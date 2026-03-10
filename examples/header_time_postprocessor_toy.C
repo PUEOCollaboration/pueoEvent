@@ -36,8 +36,8 @@ using Keys=std::set<Long64_t>;
 // The "main" function. Returns the run number or error code
 int analyze(const TString header_file_path);
 
-// Prepare a TimeTable (invalid rows not included). Returns the run number or error code
-int prepare_table (const TString & header_file_name, TimeTable * time_table, Keys * invalid_seconds);
+// Prepare a TimeTable (invalid rows not included in the table). Returns the run number and error code
+int prepare_table (const TString & header_file_name, int * run, TimeTable * time_table, Keys * invalid_seconds);
 
 // Removes duplicate entries in `invalid_seconds` and sort ascending.
 // Returns an error if there are too many consecutive invalid seconds.
@@ -65,8 +65,9 @@ void print(const TimeTable* time_table, std::ostream& stream = std::cout, std::s
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
 #define ERR_EmptyTable -1
-#define ERR_TooManyConsecutiveInvalid -2
-#define ERR_TimeTableTooShort -3
+#define ERR_MissingSecond -2
+#define ERR_TooManyConsecutiveInvalid -3
+#define ERR_TimeTableTooShort -4
 
 int header_time_postprocessor_toy()
 {
@@ -75,30 +76,27 @@ int header_time_postprocessor_toy()
   const std::regex pattern(R"(headFile(\d+))");
   std::smatch run_match;
 
-  // for(auto const& entry: run_dir)
-  // {
-  //   if (!entry.is_regular_file()) continue;
-  //
-  //   std::string name = entry.path().stem().string(); 
-  //   // skip other root files in the run folder
-  //   if (!std::regex_match(name, run_match, pattern)) continue;
-  //
-  //   std::cout << entry.path() << "\n";
-  //   int actual_run = analyze(entry.path().c_str());
-  //   int attempt_run = std::atoi(run_match[1].str().c_str());
-  //
-  //   if (actual_run < 0)
-  //   {
-  //     std::cerr << "Error occurred during run " << attempt_run << " (code: " << actual_run << ")\n";
-  //   }
-  //   else if (actual_run >= 0 && actual_run != attempt_run)
-  //   {
-  //     fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
-  //   }
-  //
-  // }
-  auto run=840;
-  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
+  for(auto const& entry: run_dir)
+  {
+    if (!entry.is_regular_file()) continue;
+
+    std::string name = entry.path().stem().string(); 
+    // skip other root files in the run folder
+    if (!std::regex_match(name, run_match, pattern)) continue;
+
+    std::cout << entry.path() << "\n";
+    int actual_run = analyze(entry.path().c_str());
+    int attempt_run = std::atoi(run_match[1].str().c_str());
+
+    if (actual_run >= 0 && actual_run != attempt_run)
+    {
+      fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
+    }
+
+  }
+  // auto run=840;
+  // auto run=1393;
+  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
   return 0;
 }
 
@@ -106,30 +104,45 @@ int analyze(const TString header_file_path)
 {
   TimeTable time_table;
   Keys invalid_seconds;
-  int run = prepare_table(header_file_path, &time_table, &invalid_seconds);
-  if (run == ERR_EmptyTable) return run;
+  int run;
+  if (prepare_table(header_file_path, &run, &time_table, &invalid_seconds))
+  {
+    print(&time_table, std::cerr);
+    fprintf(stderr, "\033[1;31mFatal Error: time table too short (run %d).\n\n\n\033[0m", run);
+    return ERR_EmptyTable;
+  }
 
-  if (prune_and_check_invalid_seconds(&invalid_seconds) == ERR_TooManyConsecutiveInvalid)
-    return ERR_TooManyConsecutiveInvalid;
-  //
+  switch(prune_and_check_invalid_seconds(&invalid_seconds)){
+    case ERR_MissingSecond: {
+      std::cerr << "Error occurred during run " << run << "\n";
+      return ERR_MissingSecond;
+    }
+    case ERR_TooManyConsecutiveInvalid: {
+      std::cerr << "Error occurred during run " << run << "\n";
+      return ERR_TooManyConsecutiveInvalid;
+    }
+    default:
+      break;
+  }
+
   // if(simple_moving_average(time_table)) return ERR_TimeTableTooShort;
   //
   // TimeTable::iterator anchor_point;
   // if(find_stable_region_mid_point(time_table, anchor_point)) return ERR_EmptyTable;
   //
-  insert_invalid_seconds_back(&time_table, &invalid_seconds);
+  // insert_invalid_seconds_back(&time_table, &invalid_seconds);
   // stupid_extrapolation(time_table, anchor_point);
-  print(&time_table);
+  // print(&time_table);
 
   return run;
 }
 
-int prepare_table(const TString& header_file_name, TimeTable* time_table, Keys* invalid_seconds)
+int prepare_table(const TString& header_file_name, int* run, TimeTable* time_table, Keys* invalid_seconds)
 {
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
   ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_name);
-  auto run = tmp_header_rdf.Take<Int_t>("run"); // will return the first element in this vector
+  auto rvec = tmp_header_rdf.Take<Int_t>("run"); // will return the first element in this vector
 
   // start by filling a table of event_second vs lpps
   auto search_and_fill = 
@@ -144,23 +157,20 @@ int prepare_table(const TString& header_file_name, TimeTable* time_table, Keys* 
       }
     };
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
+  *run = rvec->front();
 
   if (time_table->size() < 3) 
   { // It only makes sense if we have at least one valid second,
     // and since the final two seconds of any run are invalid (can't compute their pps delta),
     // really we need at least 3 seconds in a run.
-    print(time_table, std::cerr);
-    fprintf(stderr, 
-            "\033[1;31mFatal Error at %s.\n\tReason: time table too short (run %d).\n\033[0m",
-            __PRETTY_FUNCTION__, run->front());
     return ERR_EmptyTable;
   }  
 
-  if (time_table->size() < 20) // Mar 10 2026: I manually figured out the shortest run is 889 at 20 seconds
-  {
+  if (time_table->size() < 20)
+  { // Mar 10 2026: I manually figured out the shortest run is 889 at 20 seconds
     print(time_table, std::cerr);
     fprintf(stderr, "\033[1;33mWarning at %s.\n\tReason: small table (run %d).\n\033[0m",
-            __PRETTY_FUNCTION__, run->front());
+            __PRETTY_FUNCTION__, *run);
   }  
 
   // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
@@ -202,31 +212,37 @@ int prepare_table(const TString& header_file_name, TimeTable* time_table, Keys* 
   invalid_seconds->emplace((--time_table->end())->first);
   time_table->erase(--time_table->end());
 
-  return run->front();
+  return 0;
 }
 
 int prune_and_check_invalid_seconds(const Keys* invalid_seconds, std::size_t TOLERANCE)
 {
-  if (TOLERANCE < 2) // since the final two seconds are always invalid, TOLERANCE should be lenient enough
+  if (invalid_seconds->size() > 2) 
   {
-    fprintf(stderr, "%s\n\tBad TOLERANCE: %lu, resetting to 10\n", __PRETTY_FUNCTION__, TOLERANCE);
-    TOLERANCE = 10;
+    fprintf(stderr, "\033[1;33mWarning at: %s\n\tReason: Invalid seconds detected.\033[0m\n",
+            __PRETTY_FUNCTION__);
+    return ERR_MissingSecond;
   }
-  if (invalid_seconds->size() <= TOLERANCE) return 0;
-
-  std::size_t invalid_chunk_size = 1;
-
-  for (Keys::iterator it=invalid_seconds->begin(); it!=std::prev(invalid_seconds->end()); ++it)
-  {
-    // check if the next invalid second is (current+1), if not, reset invalid chunk size
-    if (*(std::next(it)) != *it + 1) invalid_chunk_size = 1;
-    else
-    {
-      invalid_chunk_size++;
-      if (invalid_chunk_size > TOLERANCE) return ERR_TooManyConsecutiveInvalid;
-    }
-  }
-
+  // if (TOLERANCE < 2) // since the final two seconds are always invalid, TOLERANCE should be lenient enough
+  // {
+  //   fprintf(stderr, "%s\n\tBad TOLERANCE: %lu, resetting to 10\n", __PRETTY_FUNCTION__, TOLERANCE);
+  //   TOLERANCE = 10;
+  // }
+  // if (invalid_seconds->size() <= TOLERANCE) return 0;
+  //
+  // std::size_t invalid_chunk_size = 1;
+  //
+  // for (Keys::iterator it=invalid_seconds->begin(); it!=std::prev(invalid_seconds->end()); ++it)
+  // {
+  //   // check if the next invalid second is (current+1), if not, reset invalid chunk size
+  //   if (*(std::next(it)) != *it + 1) invalid_chunk_size = 1;
+  //   else
+  //   {
+  //     invalid_chunk_size++;
+  //     if (invalid_chunk_size > TOLERANCE) return ERR_TooManyConsecutiveInvalid;
+  //   }
+  // }
+  //
   return 0;
 }
 
