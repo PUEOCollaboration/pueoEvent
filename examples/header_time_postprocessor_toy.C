@@ -36,25 +36,15 @@ using TimeTable=std::map<Long64_t, event_second_start_end>;
 int analyze(TString header_file_path);
 
 // Prepare a TimeTable (invalid rows not included). Returns the run number or error code
-int prep (TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds);
+int prepare_table (TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds);
 
 // Removes duplicate entries in `invalid_seconds` and sort ascending.
 // Returns an error if there are too many consecutive invalid seconds.
 int prune_and_check_invalid_seconds(ROOT::RVecLL& invalid_seconds, std::size_t TOLERANCE = 10);
 
-// Computes `avg_relative_delta` for each second using neighboring seconds. CRASHES if the run has too few seconds.
-// @param half_width Half width of the window when computing the moving average.
-// @note  The deltas are nominally 125 MHz, but sometimes shit can glitch.
-//        That is, for some `event_second`, the delta would overshoot,
-//        and at a later `event_second`, its delta would undershoot.
-//        In other words, the former `event_second` is too long and the latter is too short.
-//        The opposite could also happen.
-//        The size of `half_width` depends on the magnitude of the over/undershoot that we would expect.
-//        e.g. If we can expect an error of size 100, then half_width of 5 seconds is probably fine,
-//        but if the error is of size 10000, the window needs to be larger so that the error 
-//        distributed into each bin is small enough.
-//        However, obviously this window shouldn't be too large, else there's no point to performing
-//        a moving average.
+// Computes `avg_relative_delta` for each second using neighboring seconds. 
+// Returns error (code ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
+// @todo figure out a reasonable default `half_width`
 int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5);
 
 // Finds the mid-point of a stable period;
@@ -69,7 +59,7 @@ void insert_invalid_seconds_back(TimeTable& time_table, const ROOT::RVecLL& inva
 // `avg_relative_delta` of each second.
 void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point);
 
-void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
+void print(TimeTable& time_table, std::ostream& stream = std::cout, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
 #define ERR_EmptyTable -1
@@ -91,12 +81,12 @@ int header_time_postprocessor_toy()
     // skip other root files in the run folder
     if (!std::regex_match(name, run_match, pattern)) continue;
 
-    auto r = std::atoi(run_match[1].str().c_str());
-    if (r == 1365 || r==1286 || r==1180 || r==1315 || r==1138 || r==1108 ||
-        r==1029 || r==1020 || r==1222 || r==1345 || r==1122) 
-    {
-      continue;
-    }
+    // auto r = std::atoi(run_match[1].str().c_str());
+    // if (r == 1365 || r==1286 || r==1180 || r==1315 || r==1138 || r==1108 ||
+    //     r==1029 || r==1020 || r==1222 || r==1345 || r==1122) 
+    // {
+    //   continue;
+    // }
     std::cout << entry.path() << "\n";
     int actual_run = analyze(entry.path().c_str());
     int attempt_run = std::atoi(run_match[1].str().c_str());
@@ -118,15 +108,15 @@ int analyze(TString header_file_path)
 {
   TimeTable time_table;
   ROOT::RVecLL invalid_seconds;
-  int run = prep(header_file_path, time_table, invalid_seconds);
+  int run = prepare_table(header_file_path, time_table, invalid_seconds);
   if (run == ERR_EmptyTable) return run;
 
   if (prune_and_check_invalid_seconds(invalid_seconds) == ERR_TooManyConsecutiveInvalid)
     return ERR_TooManyConsecutiveInvalid;
-  //
-  // int err_avg = simple_moving_average(time_table);
-  // if(err_avg) return err_avg;
-  //
+
+  if(simple_moving_average(time_table))
+    return ERR_TimeTableTooShort;
+
   // std::size_t stable_period = time_table.size() / 5;
   // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
   //
@@ -141,7 +131,7 @@ int analyze(TString header_file_path)
   return run;
 }
 
-int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds)
+int prepare_table(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds)
 {
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
@@ -166,17 +156,18 @@ int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid
   { // It only makes sense if we have at least one valid second,
     // and since the final two seconds of any run are invalid (can't compute their pps delta),
     // really we need at least 3 seconds in a run.
-    print(time_table);
-    fprintf(stderr, "\033[1;31mFatal Error at %s.\n\tReason: time table too short.\n\033[0m",
-            __PRETTY_FUNCTION__);
+    print(time_table, std::cerr);
+    fprintf(stderr, 
+            "\033[1;31mFatal Error at %s.\n\tReason: time table too short (run %d).\n\033[0m",
+            __PRETTY_FUNCTION__, run->front());
     return ERR_EmptyTable;
   }  
 
   if (time_table.size() < 20) // Mar 10 2026: I manually figured out the shortest run is 889 at 20 seconds
   {
-    print(time_table);
-    fprintf(stderr, "\033[1;33mWarning at %s.\n\tReason: small table.\n\033[0m",
-            __PRETTY_FUNCTION__);
+    print(time_table, std::cerr);
+    fprintf(stderr, "\033[1;33mWarning at %s.\n\tReason: small table (run %d).\n\033[0m",
+            __PRETTY_FUNCTION__, run->front());
   }  
 
   // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
@@ -264,7 +255,7 @@ int simple_moving_average(TimeTable& time_table, std::size_t half_width)
       "\033[1;31mFatal Error at: %s\n\tReason: time_table too short (only %lu valid rows).\033[0m\n",
       __PRETTY_FUNCTION__ , time_table.size()
     );
-    print(time_table);
+    print(time_table, std::cerr);
     return ERR_TimeTableTooShort;
   }
 
@@ -326,7 +317,7 @@ TimeTable::iterator find_stable_region_mid_point(std::size_t requested_stable_pe
 
   if (stable_seconds.size() != requested_stable_period) 
   {
-    print(time_table);
+    print(time_table, std::cerr);
     fprintf
     (
       stderr,
@@ -402,38 +393,38 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
   }
 }
 
-void print(TimeTable& time_table, std::size_t num_rows)
+void print(TimeTable& time_table, std::ostream& stream, std::size_t num_rows)
 {
   TimeTable::iterator stop = (num_rows < time_table.size()) ? std::next(time_table.begin(), num_rows) : time_table.end();
 
-  std::cout << "\nRelative delta is defined to be (next_pps - this_pps) - 125000000\n\n";
+  stream << "\nRelative delta is defined to be (next_pps - this_pps) - 125000000\n\n";
 
-  std::cout << "---------------------------------------------------------------------------------------\n"
-            << " seconds     | last pps  | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
-            << " since epoch |           |           |           | delta    | delta     | this_pps   \n"
-            << " Long64_t    | UInt_t    | UInt_t    | UInt_t    | int      | double    | double     \n"
-            << "---------------------------------------------------------------------------------------\n";
+  stream << "---------------------------------------------------------------------------------------\n"
+         << " seconds     | last pps  | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
+         << " since epoch |           |           |           | delta    | delta     | this_pps   \n"
+         << " Long64_t    | UInt_t    | UInt_t    | UInt_t    | int      | double    | double     \n"
+         << "---------------------------------------------------------------------------------------\n";
 
   TString color;
   for (auto it=time_table.begin(); it!=stop; ++it)
   {
     auto color = it->second.invalid ? "\033[1;31m " : "\033[0m ";
 
-    std::cout << color << std::setw(13) << std::left << it->first
-              << color << std::setw(11) << it->second.last_pps
-              << color << std::setw(11) << it->second.this_pps
-              << color << std::setw(11) << it->second.next_pps
-              << color << std::setw(10)  << it->second.relative_delta
-              << color << std::setw(9)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
-              << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\033[0m\n";
+    stream << color << std::setw(13) << std::left << it->first
+           << color << std::setw(11) << it->second.last_pps
+           << color << std::setw(11) << it->second.this_pps
+           << color << std::setw(11) << it->second.next_pps
+           << color << std::setw(10)  << it->second.relative_delta
+           << color << std::setw(9)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
+           << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\033[0m\n";
   }
 
   if (num_rows < time_table.size()){
-    std::cout << " ...\n";
-    std::cout << " ...\n";
-    std::cout << " ...\n";
+    stream << " ...\n";
+    stream << " ...\n";
+    stream << " ...\n";
   }
-  std::cout << "\033[0m---------------------------------------------------------------------------------------\n";
+  stream << "\033[0m---------------------------------------------------------------------------------------\n";
 }
 
 void plot(TimeTable& encounters, TString name)
