@@ -58,7 +58,7 @@ void insert_invalid_seconds_back(TimeTable& time_table, const ROOT::RVecLL& inva
 // Calls `simple_moving_average()` to compute `avg_relative_delta` for each second,
 // then extrapolates from `anchor_point` to compute the `corrected_pps` for every second using
 // `avg_relative_delta` of each second.
-void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point);
+void stupid_extrapolation(TimeTable& time_table, const TimeTable::iterator anchor_point);
 
 void print(TimeTable& time_table, std::ostream& stream = std::cout, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
@@ -119,14 +119,9 @@ int analyze(TString header_file_path)
 
   TimeTable::iterator anchor_point;
   if(find_stable_region_mid_point(time_table, anchor_point)) return ERR_EmptyTable;
-  //
-  // insert_invalid_seconds_back(time_table, invalid_seconds);
-  // stupid_extrapolation(time_table, mid_point);
-  //
-  // print(time_table);
-  // fprintf(stdout, "Run %d duration: %lld seconds.\n", 
-  //         run, std::prev(time_table.end())->first - time_table.begin()->first);
-  // plot(time_table);
+
+  insert_invalid_seconds_back(time_table, invalid_seconds);
+  stupid_extrapolation(time_table, anchor_point);
 
   return run;
 }
@@ -352,7 +347,7 @@ void insert_invalid_seconds_back(TimeTable& time_table, const ROOT::RVecLL& inva
   }
 }
 
-void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_point)
+void stupid_extrapolation(TimeTable& time_table, const TimeTable::iterator anchor_point)
 {
   anchor_point->second.corrected_pps = anchor_point->second.this_pps;
 
