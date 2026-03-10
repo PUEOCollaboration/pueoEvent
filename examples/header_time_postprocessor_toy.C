@@ -72,31 +72,30 @@ void plot (TimeTable& time_table, TString name="pps_correction.svg");
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  fs::recursive_directory_iterator run_dir("/work/headers/");
-  const std::regex pattern(R"(headFile(\d+))");
-  std::smatch run_match;
-
-  for(auto const& entry: run_dir)
-  {
-    if (!entry.is_regular_file()) continue;
-
-    std::string name = entry.path().stem().string(); 
-    // skip other root files in the run folder
-    if (!std::regex_match(name, run_match, pattern)) continue;
-
-    std::cout << entry.path() << "\n";
-    int actual_run = analyze(entry.path().c_str());
-    int attempt_run = std::atoi(run_match[1].str().c_str());
-
-    if (actual_run >= 0 && actual_run != attempt_run)
-    {
-      fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
-    }
-
-  }
-  // auto run=840;
-  // auto run=1393;
-  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
+  // fs::recursive_directory_iterator run_dir("/work/headers/");
+  // const std::regex pattern(R"(headFile(\d+))");
+  // std::smatch run_match;
+  //
+  // for(auto const& entry: run_dir)
+  // {
+  //   if (!entry.is_regular_file()) continue;
+  //
+  //   std::string name = entry.path().stem().string(); 
+  //   // skip other root files in the run folder
+  //   if (!std::regex_match(name, run_match, pattern)) continue;
+  //
+  //   std::cout << entry.path() << "\n";
+  //   int actual_run = analyze(entry.path().c_str());
+  //   int attempt_run = std::atoi(run_match[1].str().c_str());
+  //
+  //   if (actual_run >= 0 && actual_run != attempt_run)
+  //   {
+  //     fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
+  //   }
+  //
+  // }
+  auto run=840;
+  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
   return 0;
 }
 
@@ -113,14 +112,17 @@ int analyze(const TString header_file_path)
   }
 
   switch(prune_and_check_invalid_seconds(&invalid_seconds)){
-    case ERR_MissingSecond: {
-      std::cerr << "Error occurred during run " << run << "\n";
-      return ERR_MissingSecond;
-    }
-    case ERR_TooManyConsecutiveInvalid: {
-      std::cerr << "Error occurred during run " << run << "\n";
-      return ERR_TooManyConsecutiveInvalid;
-    }
+    case ERR_MissingSecond: // should be recoverable
+      {
+        fprintf(stderr, "\033[1;33mWarning: missing seconds in run %d.\033[0m\n", run);
+        break;
+      }
+    case ERR_TooManyConsecutiveInvalid: 
+      {
+        std::cerr << "Error occurred during run " << run << "\n";
+        return ERR_TooManyConsecutiveInvalid;
+        break;
+      }
     default:
       break;
   }
@@ -130,9 +132,9 @@ int analyze(const TString header_file_path)
   // TimeTable::iterator anchor_point;
   // if(find_stable_region_mid_point(time_table, anchor_point)) return ERR_EmptyTable;
   //
-  // insert_invalid_seconds_back(&time_table, &invalid_seconds);
+  insert_invalid_seconds_back(&time_table, &invalid_seconds);
+  print(&time_table, std::cerr);
   // stupid_extrapolation(time_table, anchor_point);
-  // print(&time_table);
 
   return run;
 }
@@ -219,8 +221,6 @@ int prune_and_check_invalid_seconds(const Keys* invalid_seconds, std::size_t TOL
 {
   if (invalid_seconds->size() > 2) 
   {
-    fprintf(stderr, "\033[1;33mWarning at: %s\n\tReason: Invalid seconds detected.\033[0m\n",
-            __PRETTY_FUNCTION__);
     return ERR_MissingSecond;
   }
   // if (TOLERANCE < 2) // since the final two seconds are always invalid, TOLERANCE should be lenient enough
