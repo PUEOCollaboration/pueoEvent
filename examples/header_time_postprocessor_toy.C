@@ -163,53 +163,52 @@ int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
 
   if (time_table.size() < 3) 
-  {
-    // It only makes sense if we have at least one valid second,
+  { // It only makes sense if we have at least one valid second,
     // and since the final two seconds of any run are invalid (can't compute their pps delta),
     // really we need at least 3 seconds in a run.
     fprintf(stderr, "\033[1;31mYou really messed up at %s\n", __PRETTY_FUNCTION__);
     return ERR_EmptyTable;
+  }  
 
-  } else {
-    // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
-    for (TimeTable::iterator current=time_table.begin(); current!=std::prev(time_table.end(),2);)
+  // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
+  for (TimeTable::iterator current=time_table.begin(); current!=std::prev(time_table.end(),2);)
+  {
+    TimeTable::iterator next_next = std::next(current, 2);
+    TimeTable::iterator next = std::next(current, 1);
+
+    // ie, check if the next two seconds actually exist in the table
+    if(next->first != current->first+1)
     {
-      TimeTable::iterator next_next = std::next(current, 2);
-      TimeTable::iterator next = std::next(current, 1);
-
-      // ie, check if the next two seconds actually exist in the table
-      if(next->first != current->first+1)
-      {
-        invalid_seconds.emplace_back(current->first);
-        invalid_seconds.emplace_back(current->first+1);
-        current = time_table.erase(current);
-      }
-      else if (next_next->first != current->first+2)
-      {
-        invalid_seconds.emplace_back(current->first);
-        invalid_seconds.emplace_back(current->first+2);
-        current = time_table.erase(current);
-      }
-      else // success case
-      {
-        // the last_pps of next second is the current second's this_pps
-        UInt_t tpps = next->second.last_pps;
-        current->second.this_pps = tpps;
-        UInt_t npps = next_next->second.last_pps;
-        current->second.next_pps =  npps;
-        // Explicitly use UInt_t so that wrap-around subtraction is automatic
-        UInt_t delta =  npps - tpps;
-        // And then convert to int so that values below nominal show up as negative
-        current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
-        ++current;
-      }  
+      invalid_seconds.emplace_back(current->first);
+      invalid_seconds.emplace_back(current->first+1);
+      current = time_table.erase(current);
     }
-    // The final 2 seconds will never be valid
-    invalid_seconds.emplace_back((--time_table.end())->first);
-    time_table.erase(--time_table.end());
-    invalid_seconds.emplace_back((--time_table.end())->first);
-    time_table.erase(--time_table.end());
-  } 
+    else if (next_next->first != current->first+2)
+    {
+      invalid_seconds.emplace_back(current->first);
+      invalid_seconds.emplace_back(current->first+2);
+      current = time_table.erase(current);
+    }
+    else // success case
+    {
+      // the last_pps of next second is the current second's this_pps
+      UInt_t tpps = next->second.last_pps;
+      current->second.this_pps = tpps;
+      UInt_t npps = next_next->second.last_pps;
+      current->second.next_pps =  npps;
+      // Explicitly use UInt_t so that wrap-around subtraction is automatic
+      UInt_t delta =  npps - tpps;
+      // And then convert to int so that values below nominal show up as negative
+      current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
+      ++current;
+    }  
+  }
+  // The final 2 seconds will never be valid
+  invalid_seconds.emplace_back((--time_table.end())->first);
+  time_table.erase(--time_table.end());
+  invalid_seconds.emplace_back((--time_table.end())->first);
+  time_table.erase(--time_table.end());
+
   return run->front();
 }
 
