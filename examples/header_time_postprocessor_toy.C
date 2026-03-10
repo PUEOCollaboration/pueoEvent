@@ -34,7 +34,7 @@ using TimeTable=std::map<Long64_t, event_second_start_end>;
 
 int analyze(TString header_file_path, int * r = nullptr);
 
-// Prepare a TimeTable (invalid rows not included). Returns the run number.
+// Prepare a TimeTable (invalid rows not included). Returns the run number or error code
 int prep (TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds);
 
 // Removes duplicate entries in `invalid_seconds` and sort ascending.
@@ -71,8 +71,9 @@ void stupid_extrapolation(TimeTable& time_table, TimeTable::iterator anchor_poin
 void print(TimeTable& time_table, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-#define ERR_TooManyConsecutiveInvalid 1
-#define ERR_TimeTableTooShort 2
+#define ERR_EmptyTable -1
+#define ERR_TooManyConsecutiveInvalid -2
+#define ERR_TimeTableTooShort -3
 
 int header_time_postprocessor_toy()
 {
