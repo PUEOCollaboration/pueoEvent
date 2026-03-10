@@ -49,8 +49,9 @@ int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5);
 
 // Finds the mid-point of a stable period;
 // for every second in this period, delta ≈ avg_relative_delta.
-// Returns iterator `anchor_point`, or time_table.begin() if a stable region couldn't be found.
-TimeTable::iterator find_stable_region_mid_point(std::size_t len, TimeTable& t);
+// returns iterator `anchor_point` (or time_table.begin() if a stable region couldn't be found).
+// returns success (0) or ERR_EmptyTable.
+int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anchor_point);
 
 void insert_invalid_seconds_back(TimeTable& time_table, const ROOT::RVecLL& invalid_seconds);
 
@@ -291,59 +292,47 @@ template<typename T> bool approx_equal(T a, T b, T tolerance = 20)
   return diff <= tolerance;
 }
 
-TimeTable::iterator find_stable_region_mid_point(std::size_t requested_stable_period, TimeTable& time_table) 
+int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anchor_point) 
 {
-  if (requested_stable_period > time_table.size())
-  {
-    std::cerr << __PRETTY_FUNCTION__ << ": requestd size too large. "
-    "Resetting `requested_stable_period` to 10.\n";
-    requested_stable_period = 10;
+  if (time_table.empty())
+  { // ideally this would never happen,
+    // because post-processing should have stopped before we even reach this function call.
+    fprintf(stderr,
+            "\033[1;31mFatal Error at %s.\n\tReason: empty table.\n\033[0m",
+            __PRETTY_FUNCTION__);
+    print(time_table, std::cerr);
+    return ERR_EmptyTable;
   }
+  // some arbitrarily decided values for the length of this "stable period".
+  std::size_t stable_length = time_table.size() < 50 ? 10 : time_table.size() / 5;
 
-  TimeTable::iterator mid_point = time_table.begin();
+  anchor_point = time_table.begin();
   TimeTable::iterator stop = time_table.end();
 
-  std::vector<ULong64_t> stable_seconds;
-  stable_seconds.reserve(requested_stable_period);
+  std::vector<TimeTable::iterator> stable_seconds;
+  stable_seconds.reserve(stable_length);
 
   for (auto it=time_table.begin(); it!=stop; ++it) 
   {
-    if (stable_seconds.size() == requested_stable_period) break; 
+    if (stable_seconds.size() == stable_length) break; 
 
     if (approx_equal<double>(it->second.relative_delta , it->second.avg_relative_delta)) 
-      stable_seconds.emplace_back(it->first);
+      stable_seconds.emplace_back(it);
     else stable_seconds.clear();
   }
 
-  if (stable_seconds.size() != requested_stable_period) 
+  if (stable_seconds.size() == stable_length) 
+    anchor_point = stable_seconds.at(stable_length/2);
+  else 
   {
     print(time_table, std::cerr);
-    fprintf
-    (
-      stderr,
-      "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
-      "where `next_pps` - `this_pps` are all approximately 125 million clock counts.\n"
-      "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
-      requested_stable_period, time_table.begin()->first
-    );
-  } else {
-    mid_point = time_table.find(stable_seconds.at(requested_stable_period/2));
+    fprintf(stderr,
+            "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
+            "where `next_pps` - `this_pps` are all approximately 125 million clock counts.\n"
+            "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
+            stable_length, time_table.begin()->first);
   }
-
-  if (mid_point == time_table.end()) // check again, in case the find() above returns an invalid result
-  {
-    fprintf
-    (
-      stderr,
-      "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
-      "where `next_pps` - `this_pps` are all approximately 125 million clock counts.\n"
-      "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
-      requested_stable_period, time_table.begin()->first
-    );
-    mid_point = time_table.begin();
-  }
-
-  return mid_point;
+  return 0;
 }
 
 void insert_invalid_seconds_back(TimeTable& time_table, const ROOT::RVecLL& invalid_seconds)
