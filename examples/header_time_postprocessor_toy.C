@@ -82,7 +82,7 @@ int header_time_postprocessor_toy()
   fs::recursive_directory_iterator run_dir("/work/headers/");
   const std::regex pattern(R"(headFile(\d+))");
   std::smatch run_match;
-  
+
   for(auto const& entry: run_dir)
   {
     if (!entry.is_regular_file()) continue;
@@ -166,8 +166,17 @@ int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid
   { // It only makes sense if we have at least one valid second,
     // and since the final two seconds of any run are invalid (can't compute their pps delta),
     // really we need at least 3 seconds in a run.
-    fprintf(stderr, "\033[1;31mYou really messed up at %s\n", __PRETTY_FUNCTION__);
+    print(time_table);
+    fprintf(stderr, "\033[1;31mFatal Error at %s.\n\tReason: time table too short.\n\033[0m",
+            __PRETTY_FUNCTION__);
     return ERR_EmptyTable;
+  }  
+
+  if (time_table.size() < 20) // Mar 10 2026: I manually figured out the shortest run is 889 at 20 seconds
+  {
+    print(time_table);
+    fprintf(stderr, "\033[1;33mWarning at %s.\n\tReason: small table.\n\033[0m",
+            __PRETTY_FUNCTION__);
   }  
 
   // Next, compute this_pps, next_pps, and delta of each second, using last_pps.
