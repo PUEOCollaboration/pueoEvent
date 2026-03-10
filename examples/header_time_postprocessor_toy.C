@@ -32,7 +32,8 @@ struct event_second_start_end
 
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
-int analyze(TString header_file_path, int * r = nullptr);
+// The "main" function. Returns the run number or error code
+int analyze(TString header_file_path);
 
 // Prepare a TimeTable (invalid rows not included). Returns the run number or error code
 int prep (TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds);
@@ -84,68 +85,60 @@ int header_time_postprocessor_toy()
   
   for(auto const& entry: run_dir)
   {
-    if (entry.is_regular_file())
+    if (!entry.is_regular_file()) continue;
+
+    std::string name = entry.path().stem().string(); 
+    // skip other root files in the run folder
+    if (!std::regex_match(name, run_match, pattern)) continue;
+
+    auto r = std::atoi(run_match[1].str().c_str());
+    if (r == 1365 || r==1286 || r==1180 || r==1315 || r==1138 || r==1108 ||
+        r==1029 || r==1020 || r==1222 || r==1345 || r==1122) 
     {
-      std::string name = entry.path().stem().string(); 
-      if (std::regex_match(name, run_match, pattern))
-      {
-        auto r = std::atoi(run_match[1].str().c_str());
-        if (r == 1365 || r==1286 || r==1180 || r==1315 || r==1138 || r==1108 ||
-            r==1029 || r==1020 || r==1222 || r==1345 || r==1122) 
-        {
-          continue;
-        }
-        std::cout << entry.path() << "\n";
-        int actual_run;
-        int error = analyze(entry.path().c_str(), &actual_run);
-        int attempt_run = std::atoi(run_match[1].str().c_str());
-
-        if (actual_run != attempt_run)
-        {
-          fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
-        }
-        if (error) 
-        {
-          std::cerr << "Error occurred during run " << actual_run << " (code: " << error << ")\n";
-        }
-      }
-
-    }
-    else
       continue;
+    }
+    std::cout << entry.path() << "\n";
+    int actual_run = analyze(entry.path().c_str());
+    int attempt_run = std::atoi(run_match[1].str().c_str());
+
+    if (actual_run < 0)
+    {
+      std::cerr << "Error occurred during run " << attempt_run << " (code: " << actual_run << ")\n";
+    }
+    else if (actual_run >= 0 && actual_run != attempt_run)
+    {
+      fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
+    }
+
   }
-  // int run = 1122;
-  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
   return 0;
 }
 
-// @brief The "main" function.
-int analyze(TString header_file_path, int * r)
+int analyze(TString header_file_path)
 {
-  // TString header_file_path = "/work/bfmr_r739_head.root";
   TimeTable time_table;
   ROOT::RVecLL invalid_seconds;
   int run = prep(header_file_path, time_table, invalid_seconds);
-  if (r) *r = run;
+  if (run == ERR_EmptyTable) return run;
 
-  int err_tooManyInavlid = prune_and_check_invalid_seconds(invalid_seconds);
-  if (err_tooManyInavlid) return err_tooManyInavlid;
-
-  int err_avg = simple_moving_average(time_table);
-  if(err_avg) return err_avg;
-
-  std::size_t stable_period = time_table.size() / 5;
-  TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
-
-  insert_invalid_seconds_back(time_table, invalid_seconds);
-  stupid_extrapolation(time_table, mid_point);
-
+  if (prune_and_check_invalid_seconds(invalid_seconds) == ERR_TooManyConsecutiveInvalid)
+    return ERR_TooManyConsecutiveInvalid;
+  //
+  // int err_avg = simple_moving_average(time_table);
+  // if(err_avg) return err_avg;
+  //
+  // std::size_t stable_period = time_table.size() / 5;
+  // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
+  //
+  // insert_invalid_seconds_back(time_table, invalid_seconds);
+  // stupid_extrapolation(time_table, mid_point);
+  //
   // print(time_table);
   // fprintf(stdout, "Run %d duration: %lld seconds.\n", 
   //         run, std::prev(time_table.end())->first - time_table.begin()->first);
   // plot(time_table);
 
-  return 0;
+  return run;
 }
 
 int prep(TString& header_file_name, TimeTable& time_table, ROOT::RVecLL& invalid_seconds)
