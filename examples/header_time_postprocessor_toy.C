@@ -115,11 +115,10 @@ int analyze(TString header_file_path)
   if (prune_and_check_invalid_seconds(invalid_seconds) == ERR_TooManyConsecutiveInvalid)
     return ERR_TooManyConsecutiveInvalid;
 
-  if(simple_moving_average(time_table))
-    return ERR_TimeTableTooShort;
+  if(simple_moving_average(time_table)) return ERR_TimeTableTooShort;
 
-  // std::size_t stable_period = time_table.size() / 5;
-  // TimeTable::iterator mid_point = find_stable_region_mid_point(stable_period, time_table);
+  TimeTable::iterator anchor_point;
+  if(find_stable_region_mid_point(time_table, anchor_point)) return ERR_EmptyTable;
   //
   // insert_invalid_seconds_back(time_table, invalid_seconds);
   // stupid_extrapolation(time_table, mid_point);
