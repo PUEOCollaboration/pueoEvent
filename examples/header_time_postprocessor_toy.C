@@ -74,28 +74,30 @@ int header_time_postprocessor_toy()
   const std::regex pattern(R"(headFile(\d+))");
   std::smatch run_match;
 
-  for(auto const& entry: run_dir)
-  {
-    if (!entry.is_regular_file()) continue;
-
-    std::string name = entry.path().stem().string(); 
-    // skip other root files in the run folder
-    if (!std::regex_match(name, run_match, pattern)) continue;
-
-    std::cout << entry.path() << "\n";
-    int actual_run = analyze(entry.path().c_str());
-    int attempt_run = std::atoi(run_match[1].str().c_str());
-
-    if (actual_run < 0)
-    {
-      std::cerr << "Error occurred during run " << attempt_run << " (code: " << actual_run << ")\n";
-    }
-    else if (actual_run >= 0 && actual_run != attempt_run)
-    {
-      fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
-    }
-
-  }
+  // for(auto const& entry: run_dir)
+  // {
+  //   if (!entry.is_regular_file()) continue;
+  //
+  //   std::string name = entry.path().stem().string(); 
+  //   // skip other root files in the run folder
+  //   if (!std::regex_match(name, run_match, pattern)) continue;
+  //
+  //   std::cout << entry.path() << "\n";
+  //   int actual_run = analyze(entry.path().c_str());
+  //   int attempt_run = std::atoi(run_match[1].str().c_str());
+  //
+  //   if (actual_run < 0)
+  //   {
+  //     std::cerr << "Error occurred during run " << attempt_run << " (code: " << actual_run << ")\n";
+  //   }
+  //   else if (actual_run >= 0 && actual_run != attempt_run)
+  //   {
+  //     fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
+  //   }
+  //
+  // }
+  auto run=889;
+  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
   return 0;
 }
 
@@ -285,9 +287,7 @@ int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anc
   if (time_table.empty())
   { // ideally this would never happen,
     // because post-processing should have stopped before we even reach this function call.
-    fprintf(stderr,
-            "\033[1;31mFatal Error at %s.\n\tReason: empty table.\n\033[0m",
-            __PRETTY_FUNCTION__);
+    fprintf(stderr, "\033[1;31mFatal Error at %s.\n\tReason: empty table.\n\033[0m", __PRETTY_FUNCTION__);
     print(time_table, std::cerr);
     return ERR_EmptyTable;
   }
