@@ -151,8 +151,8 @@ int analyze(const TString header_file_path)
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
   stupid_extrapolation(&time_table, anchor_point);
-  // print(&time_table, std::cerr);
-  // plot(time_table);
+  print(&time_table, std::cerr);
+  plot(time_table);
 
   return run;
 }
@@ -371,8 +371,8 @@ void print(const TimeTable* time_table, std::ostream& stream, std::size_t num_ro
   auto stop = (num_rows < time_table->size()) ? std::next(time_table->begin(), num_rows) 
                                               : time_table->end();
 
-  stream << "\nRelative delta is defined to be (next_pps - this_pps) - 125000000\n\n";
-
+  stream << "\nColor: \e[1;34mMissing \e[1;33m Invalid Delta \e[1;31m Missing and Invalid Delta\e[0m\n";
+  stream << "Relative delta is defined to be (next_pps - this_pps) - 125000000\n";
   stream << "---------------------------------------------------------------------------------------\n"
          << " seconds     | last pps  | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
          << " since epoch |           |           |           | delta    | delta     | this_pps   \n"
@@ -382,8 +382,9 @@ void print(const TimeTable* time_table, std::ostream& stream, std::size_t num_ro
   TString color;
   for (auto it=time_table->begin(); it!=stop; ++it)
   {
-    if (it->second.invalid_delta) color = "\033[1;31m "; // red 
-    else if (it->second.missing) color = "\033[1;33m ";  // yellow
+    if (it->second.missing && it->second.invalid_delta) color = "\033[1;31m ";  // red
+    else if (it->second.missing) color = "\033[1;34m ";  // blue
+    else if (it->second.invalid_delta) color = "\033[1;33m "; // yellow
     else color = "\033[0m ";
 
     stream << color << std::setw(13) << std::left << it->first
@@ -449,7 +450,7 @@ void plot(TimeTable& encounters, TString name)
   original.GetYaxis()->SetTitleSize(0.1);
   original.GetYaxis()->SetTitleOffset(0.3);
   original.GetYaxis()->CenterTitle();
-  original.GetXaxis()->SetRangeUser(1400, 2100);
+  // original.GetXaxis()->SetRangeUser(1400, 2100);
   corrected.Draw("P");
   corrected.SetMarkerStyle(kCircle);
   corrected.SetMarkerColor(kRed);
@@ -476,8 +477,8 @@ void plot(TimeTable& encounters, TString name)
   original_delta.GetYaxis()->SetTitleSize(0.1);
   original_delta.GetYaxis()->SetTitleOffset(0.3);
   original_delta.GetXaxis()->SetLabelSize(0);
-  original_delta.GetXaxis()->SetRangeUser(1400, 2100);
-  original_delta.GetYaxis()->SetRangeUser(30, 40);
+  // original_delta.GetXaxis()->SetRangeUser(1400, 2100);
+  // original_delta.GetYaxis()->SetRangeUser(30, 40);
 
   avg_delta.Draw("P");
   avg_delta.SetMarkerStyle(kCircle);
@@ -501,7 +502,7 @@ void plot(TimeTable& encounters, TString name)
   diff.GetXaxis()->CenterTitle();
   diff.GetXaxis()->SetLabelOffset(0.05);
   diff.GetYaxis()->SetRangeUser(-10, 10);
-  diff.GetXaxis()->SetRangeUser(1400, 2100);
+  // diff.GetXaxis()->SetRangeUser(1400, 2100);
 
   c1.SaveAs(name);
 }
