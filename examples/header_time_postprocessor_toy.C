@@ -58,11 +58,10 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anch
 void print(const TimeTable* time_table, std::ostream& stream = std::cout, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-#define ERR_TinyTable -1
-#define ERR_MissingSecond -2
-#define ERR_TimeTableTooShort -3
+#define ERR_TimeTableTooShort -1
+#define ERR_MissingSecond -2 // recoverable
 #define ERR_EmptyTable -4
-#define ERR_NoStableRegion -5
+#define ERR_NoStableRegion -5 // recoverable
 
 int header_time_postprocessor_toy()
 {
@@ -102,22 +101,28 @@ int analyze(const TString header_file_path)
 
   switch(prepare_table(header_file_path, &run, &time_table, &invalid_seconds))
   {
-    case ERR_TinyTable: 
+    case ERR_TimeTableTooShort: 
       {
         print(&time_table, std::cerr);
-        fprintf(stderr, "\033[1;31mFatal Error: time table too short (run %d).\n\n\n\033[0m", run);
-        return ERR_TinyTable;
+        fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", run);
+        return ERR_TimeTableTooShort;
       }
     case ERR_MissingSecond: 
       {
-        fprintf(stderr, "\033[1;33mWarning: missing seconds inserted (run %d).\n\n\n\033[0m", run);
+        fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\n\n\e[0m", run);
         break;
       }
     default:
       break;
   }
 
-  if(simple_moving_average(&time_table)) return ERR_TimeTableTooShort;
+  if(simple_moving_average(&time_table))
+  {
+    print(&time_table, std::cerr);
+    fprintf(stderr, "\e[1;31mFatal Error: can't compute average delta -"
+            "time table too short (run %d).\n\n\n\e[0m", run);
+    return ERR_TimeTableTooShort;
+  }
 
   TimeTable::iterator anchor_point;
 
@@ -125,10 +130,9 @@ int analyze(const TString header_file_path)
   {
     case ERR_EmptyTable: 
       {
-        // ideally this would never happen,
-        // because post-processing should have stopped before we even reach this function call.
+        // Redudant check. Ideally we should have errored out long before we reach this function call.
         print(&time_table, std::cerr);
-        fprintf(stderr, "\033[1;31mFatal Error: empty table (run %d).\n\n\n\033[0m", run);
+        fprintf(stderr, "\e[1;31mFatal Error: empty table (run %d).\n\n\n\e[0m", run);
         return ERR_EmptyTable;
       }
     case ERR_NoStableRegion:
@@ -177,7 +181,7 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
 
   // It only makes sense if we have at least one valid second (ie 3 consecutive `event_second`s).
   // Note: the final two seconds of any run are invalid (can't compute their pps delta),
-  if (time_table->size() < 3) return ERR_TinyTable;
+  if (time_table->size() < 3) return ERR_TimeTableTooShort;
 
   // Mar 10 2026: I manually figured out the shortest run is 889 at 20 seconds, 
   // so this warning would actually never be triggered :)
@@ -249,24 +253,9 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
 
 int simple_moving_average(TimeTable* time_table, std::size_t half_width)
 {
-  if (half_width == 0) 
-  {
-    fprintf(stderr,
-      "Error at %s:\n\t bad value supplied to parameter `half_width` (%lu), resetting it to 5 [seconds].\n",
-      __PRETTY_FUNCTION__ , half_width
-    );
-    half_width=5;
-  }
+  if (half_width == 0) half_width=5;
 
-  if (2 * half_width + 1 > time_table->size())
-  {
-    fprintf(stderr,
-      "\033[1;31mFatal Error at: %s\n\tReason: time_table too short (only %lu valid rows).\033[0m\n",
-      __PRETTY_FUNCTION__ , time_table->size()
-    );
-    print(time_table, std::cerr);
-    return ERR_TimeTableTooShort;
-  }
+  if (2 * half_width + 1 > time_table->size()) return ERR_TimeTableTooShort;
 
   TimeTable::iterator start = std::next(time_table->begin(), half_width);
   TimeTable::iterator stop =  std::prev(time_table->end(), half_width);
