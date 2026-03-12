@@ -58,9 +58,11 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anch
 void print(const TimeTable* time_table, std::ostream& stream = std::cout, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-#define ERR_EmptyTable -1
+#define ERR_TinyTable -1
 #define ERR_MissingSecond -2
-#define ERR_TimeTableTooShort -4
+#define ERR_TimeTableTooShort -3
+#define ERR_EmptyTable -4
+#define ERR_NoStableRegion -5
 
 int header_time_postprocessor_toy()
 {
@@ -100,11 +102,11 @@ int analyze(const TString header_file_path)
 
   switch(prepare_table(header_file_path, &run, &time_table, &invalid_seconds))
   {
-    case ERR_EmptyTable: 
+    case ERR_TinyTable: 
       {
         print(&time_table, std::cerr);
         fprintf(stderr, "\033[1;31mFatal Error: time table too short (run %d).\n\n\n\033[0m", run);
-        return ERR_EmptyTable;
+        return ERR_TinyTable;
       }
     case ERR_MissingSecond: 
       {
@@ -118,11 +120,29 @@ int analyze(const TString header_file_path)
   if(simple_moving_average(&time_table)) return ERR_TimeTableTooShort;
 
   TimeTable::iterator anchor_point;
-  if(find_stable_region_mid_point(&time_table, &anchor_point))
+
+  switch(find_stable_region_mid_point(&time_table, &anchor_point))
   {
-    print(&time_table, std::cerr);
-    fprintf(stderr, "\033[1;31mFatal Error: empty table (run %d).\n\n\n\033[0m", run);
-    return ERR_EmptyTable;
+    case ERR_EmptyTable: 
+      {
+        // ideally this would never happen,
+        // because post-processing should have stopped before we even reach this function call.
+        print(&time_table, std::cerr);
+        fprintf(stderr, "\033[1;31mFatal Error: empty table (run %d).\n\n\n\033[0m", run);
+        return ERR_EmptyTable;
+      }
+    case ERR_NoStableRegion:
+      {
+        print(&time_table, std::cerr);
+        fprintf(
+          stderr,
+          "\e[31;1mWarning: couldn't find a stable region where `next_pps` - `this_pps` ≈ 125 million.\n"
+          "Will use the first second as the anchor point (run %d).\n\n\n\e[0m", run
+        );
+        break;
+      }
+    default:
+      break;
   }
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
@@ -155,18 +175,16 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
   *run = rvec->front();
 
-  if (time_table->size() < 3) 
-  { // It only makes sense if we have at least one valid second,
-    // and since the final two seconds of any run are invalid (can't compute their pps delta),
-    // really we need at least 3 seconds in a run.
-    return ERR_EmptyTable;
-  }  
+  // It only makes sense if we have at least one valid second (ie 3 consecutive `event_second`s).
+  // Note: the final two seconds of any run are invalid (can't compute their pps delta),
+  if (time_table->size() < 3) return ERR_TinyTable;
 
+  // Mar 10 2026: I manually figured out the shortest run is 889 at 20 seconds, 
+  // so this warning would actually never be triggered :)
   if (time_table->size() < 20)
-  { // Mar 10 2026: I manually figured out the shortest run is 889 at 20 seconds
+  {                        
     print(time_table, std::cerr);
-    fprintf(stderr, "\033[1;33mWarning at %s.\n\tReason: small table (run %d).\n\033[0m",
-            __PRETTY_FUNCTION__, *run);
+    fprintf(stderr, "\033[1;33mWarning: small table (run %d).\n\033[0m", *run);
   }
   
   bool missing = false;
@@ -284,11 +302,8 @@ template<typename T> bool approx_equal(T a, T b, T tolerance = 20)
 
 int find_stable_region_mid_point(TimeTable * time_table, TimeTable::iterator* anchor_point) 
 {
-  if (time_table->empty())
-  { // ideally this would never happen,
-    // because post-processing should have stopped before we even reach this function call.
-    return ERR_EmptyTable;
-  }
+  if (time_table->empty()) return ERR_EmptyTable;
+
   // some arbitrarily decided values for the length of this "stable period".
   std::size_t stable_length = time_table->size() < 50 ? 10 : time_table->size() / 5;
 
@@ -307,18 +322,12 @@ int find_stable_region_mid_point(TimeTable * time_table, TimeTable::iterator* an
     else stable_seconds.clear();
   }
 
-  if (stable_seconds.size() == stable_length) 
-    *anchor_point = stable_seconds.at(stable_length/2);
+  if (stable_seconds.size() != stable_length) return ERR_EmptyTable;  
   else 
   {
-    print(time_table, std::cerr);
-    fprintf(stderr,
-            "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
-            "where `next_pps` - `this_pps` are all approximately 125 million clock counts.\n"
-            "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
-            stable_length, time_table->begin()->first);
+    *anchor_point = stable_seconds.at(stable_length/2);
+    return 0;
   }
-  return 0;
 }
 
 void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_seconds)
