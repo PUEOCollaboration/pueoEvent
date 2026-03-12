@@ -41,20 +41,19 @@ int prepare_table (const TString & header_file_name, int * run, TimeTable * time
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
 // Returns error (code ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
 // @todo figure out a reasonable default `half_width`
-int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5);
+int simple_moving_average(TimeTable* time_table, std::size_t half_width = 5);
 
 // Finds the mid-point of a stable period;
 // for every second in this period, delta ≈ avg_relative_delta.
-// returns iterator `anchor_point` (or time_table.begin() if a stable region couldn't be found).
-// returns success (0) or ERR_EmptyTable.
-int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anchor_point);
+// Returns iterator `anchor_point` (or time_table.begin() if a stable region couldn't be found).
+// Returns success (0) or ERR_EmptyTable.
+int find_stable_region_mid_point(TimeTable* time_table, TimeTable::iterator* anchor_point);
 
 void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_seconds);
 
-// Calls `simple_moving_average()` to compute `avg_relative_delta` for each second,
-// then extrapolates from `anchor_point` to compute the `corrected_pps` for every second using
-// `avg_relative_delta` of each second.
-void stupid_extrapolation(TimeTable& time_table, const TimeTable::iterator anchor_point);
+// Extrapolates from `anchor_point` to compute the `corrected_pps` for every second using `avg_relative_delta`.
+// Relies on `simple_moving_average()` to have computed `avg_relative_delta`.
+void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anchor_point);
 
 void print(const TimeTable* time_table, std::ostream& stream = std::cout, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
@@ -116,20 +115,20 @@ int analyze(const TString header_file_path)
       break;
   }
 
-  if(simple_moving_average(time_table)) return ERR_TimeTableTooShort;
+  if(simple_moving_average(&time_table)) return ERR_TimeTableTooShort;
 
   TimeTable::iterator anchor_point;
-  if(find_stable_region_mid_point(time_table, anchor_point))
+  if(find_stable_region_mid_point(&time_table, &anchor_point))
   {
     print(&time_table, std::cerr);
-    fprintf(stderr, "\033[1;31mFatal Error: time table too short (run %d).\n\n\n\033[0m", run);
+    fprintf(stderr, "\033[1;31mFatal Error: empty table (run %d).\n\n\n\033[0m", run);
     return ERR_EmptyTable;
   }
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
-  stupid_extrapolation(time_table, anchor_point);
-  print(&time_table, std::cerr);
-  plot(time_table);
+  stupid_extrapolation(&time_table, anchor_point);
+  // print(&time_table, std::cerr);
+  // plot(time_table);
 
   return run;
 }
@@ -230,7 +229,7 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
   return missing ? ERR_MissingSecond : 0;
 }
 
-int simple_moving_average(TimeTable& time_table, std::size_t half_width)
+int simple_moving_average(TimeTable* time_table, std::size_t half_width)
 {
   if (half_width == 0) 
   {
@@ -241,18 +240,18 @@ int simple_moving_average(TimeTable& time_table, std::size_t half_width)
     half_width=5;
   }
 
-  if (2 * half_width + 1 > time_table.size())
+  if (2 * half_width + 1 > time_table->size())
   {
     fprintf(stderr,
       "\033[1;31mFatal Error at: %s\n\tReason: time_table too short (only %lu valid rows).\033[0m\n",
-      __PRETTY_FUNCTION__ , time_table.size()
+      __PRETTY_FUNCTION__ , time_table->size()
     );
-    print(&time_table, std::cerr);
+    print(time_table, std::cerr);
     return ERR_TimeTableTooShort;
   }
 
-  TimeTable::iterator start = std::next(time_table.begin(), half_width);
-  TimeTable::iterator stop =  std::prev(time_table.end(), half_width);
+  TimeTable::iterator start = std::next(time_table->begin(), half_width);
+  TimeTable::iterator stop =  std::prev(time_table->end(), half_width);
 
   // first, perform moving average for the "meat" of the table (ie exclude first/last few rows)
   for(TimeTable::iterator it = start; it!=stop; ++it)
@@ -267,10 +266,10 @@ int simple_moving_average(TimeTable& time_table, std::size_t half_width)
 
   // As for the first/last few rows in the table,
   // I could probably do something more sophisticated, but nah let's just extrapolate
-  for (auto it=time_table.begin(); it!=start; ++it){
+  for (auto it=time_table->begin(); it!=start; ++it){
     it->second.avg_relative_delta = start->second.avg_relative_delta;
   }
-  for (auto it=stop; it!=time_table.end(); ++it){
+  for (auto it=stop; it!=time_table->end(); ++it){
     it->second.avg_relative_delta = std::prev(stop)->second.avg_relative_delta;
   }
 
@@ -283,25 +282,23 @@ template<typename T> bool approx_equal(T a, T b, T tolerance = 20)
   return diff <= tolerance;
 }
 
-int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anchor_point) 
+int find_stable_region_mid_point(TimeTable * time_table, TimeTable::iterator* anchor_point) 
 {
-  if (time_table.empty())
+  if (time_table->empty())
   { // ideally this would never happen,
     // because post-processing should have stopped before we even reach this function call.
-    fprintf(stderr, "\033[1;31mFatal Error at %s.\n\tReason: empty table.\n\033[0m", __PRETTY_FUNCTION__);
-    print(&time_table, std::cerr);
     return ERR_EmptyTable;
   }
   // some arbitrarily decided values for the length of this "stable period".
-  std::size_t stable_length = time_table.size() < 50 ? 10 : time_table.size() / 5;
+  std::size_t stable_length = time_table->size() < 50 ? 10 : time_table->size() / 5;
 
-  anchor_point = time_table.begin();
-  TimeTable::iterator stop = time_table.end();
+  *anchor_point = time_table->begin();
+  TimeTable::iterator stop = time_table->end();
 
   std::vector<TimeTable::iterator> stable_seconds;
   stable_seconds.reserve(stable_length);
 
-  for (auto it=time_table.begin(); it!=stop; ++it) 
+  for (auto it=time_table->begin(); it!=stop; ++it) 
   {
     if (stable_seconds.size() == stable_length) break; 
 
@@ -311,15 +308,15 @@ int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anc
   }
 
   if (stable_seconds.size() == stable_length) 
-    anchor_point = stable_seconds.at(stable_length/2);
+    *anchor_point = stable_seconds.at(stable_length/2);
   else 
   {
-    print(&time_table, std::cerr);
+    print(time_table, std::cerr);
     fprintf(stderr,
             "\e[31;1mCouldn't find a stable region (required: %lu stable seconds) "
             "where `next_pps` - `this_pps` are all approximately 125 million clock counts.\n"
             "Falling back to the assumption that the first second (%llu) is a \"good second\"\n\e[31;0m",
-            stable_length, time_table.begin()->first);
+            stable_length, time_table->begin()->first);
   }
   return 0;
 }
@@ -342,12 +339,12 @@ void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_secon
   }
 }
 
-void stupid_extrapolation(TimeTable& time_table, const TimeTable::iterator anchor_point)
+void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator & anchor_point)
 {
   anchor_point->second.corrected_pps = anchor_point->second.this_pps;
 
   // backward extrapolation from the anchor point
-  for (auto rit = std::make_reverse_iterator(anchor_point); rit!=time_table.rend(); ++rit)
+  for (auto rit = std::make_reverse_iterator(anchor_point); rit!=time_table->rend(); ++rit)
   {
     auto future = std::prev(rit);
     rit->second.corrected_pps = 
@@ -359,7 +356,7 @@ void stupid_extrapolation(TimeTable& time_table, const TimeTable::iterator ancho
   }
 
   // forward extrapolation
-  for (auto it = std::next(anchor_point); it!=time_table.end(); ++it)
+  for (auto it = std::next(anchor_point); it!=time_table->end(); ++it)
   {
     auto past = std::prev(it);
     it->second.corrected_pps = 
