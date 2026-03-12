@@ -38,10 +38,6 @@ int analyze(const TString header_file_path);
 // Prepare a TimeTable (invalid rows not included in the table). Returns the run number and error code
 int prepare_table (const TString & header_file_name, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
 
-// Removes duplicate entries in `invalid_seconds` and sort ascending.
-// Returns an error if there are too many consecutive invalid seconds.
-int prune_and_check_invalid_seconds(const TimeTable * invalid_seconds, std::size_t TOLERANCE = 10);
-
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
 // Returns error (code ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
 // @todo figure out a reasonable default `half_width`
@@ -65,7 +61,6 @@ void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
 #define ERR_EmptyTable -1
 #define ERR_MissingSecond -2
-#define ERR_TooManyConsecutiveInvalid -3
 #define ERR_TimeTableTooShort -4
 
 int header_time_postprocessor_toy()
@@ -103,23 +98,18 @@ int analyze(const TString header_file_path)
   TimeTable time_table;
   TimeTable invalid_seconds;
   int run;
-  if (prepare_table(header_file_path, &run, &time_table, &invalid_seconds))
-  {
-    print(&time_table, std::cerr);
-    fprintf(stderr, "\033[1;31mFatal Error: time table too short (run %d).\n\n\n\033[0m", run);
-    return ERR_EmptyTable;
-  }
 
-  switch(prune_and_check_invalid_seconds(&invalid_seconds)){
-    case ERR_MissingSecond: // should be recoverable
+  switch(prepare_table(header_file_path, &run, &time_table, &invalid_seconds))
+  {
+    case ERR_EmptyTable: 
       {
-        fprintf(stderr, "\033[1;33mWarning: missing seconds in run %d.\033[0m\n", run);
-        break;
+        print(&time_table, std::cerr);
+        fprintf(stderr, "\033[1;31mFatal Error: time table too short (run %d).\n\n\n\033[0m", run);
+        return ERR_EmptyTable;
       }
-    case ERR_TooManyConsecutiveInvalid: 
+    case ERR_MissingSecond: 
       {
-        std::cerr << "Error occurred during run " << run << "\n";
-        return ERR_TooManyConsecutiveInvalid;
+        fprintf(stderr, "\033[1;33mWarning: missing seconds inserted (run %d).\n\n\n\033[0m", run);
         break;
       }
     default:
@@ -129,7 +119,12 @@ int analyze(const TString header_file_path)
   if(simple_moving_average(time_table)) return ERR_TimeTableTooShort;
 
   TimeTable::iterator anchor_point;
-  if(find_stable_region_mid_point(time_table, anchor_point)) return ERR_EmptyTable;
+  if(find_stable_region_mid_point(time_table, anchor_point))
+  {
+    print(&time_table, std::cerr);
+    fprintf(stderr, "\033[1;31mFatal Error: time table too short (run %d).\n\n\n\033[0m", run);
+    return ERR_EmptyTable;
+  }
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
   stupid_extrapolation(time_table, anchor_point);
@@ -175,6 +170,8 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
             __PRETTY_FUNCTION__, *run);
   }
   
+  bool missing = false;
+
   // loop from first second to last second, if a second is missing, add it as invalid
   for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),2);++current)
   {
@@ -187,12 +184,14 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
     {
       (*time_table)[actual_next_second].missing = true;
       current->second.invalid_delta = true;
+      missing = true;
     }
     if (actual_next_next != next_next->first)
     {
       (*time_table)[actual_next_next].missing = true;
       current->second.invalid_delta = true;
       (*time_table)[actual_next_second].invalid_delta = true;
+      missing = true;
     }
   }
 
@@ -228,36 +227,7 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
     invalid_seconds->insert(time_table->extract(it++));
   }
 
-  return 0;
-}
-
-int prune_and_check_invalid_seconds(const TimeTable * invalid_seconds, std::size_t TOLERANCE)
-{
-  if (invalid_seconds->size() > 2) 
-  {
-    return ERR_MissingSecond;
-  }
-  // if (TOLERANCE < 2) // since the final two seconds are always invalid, TOLERANCE should be lenient enough
-  // {
-  //   fprintf(stderr, "%s\n\tBad TOLERANCE: %lu, resetting to 10\n", __PRETTY_FUNCTION__, TOLERANCE);
-  //   TOLERANCE = 10;
-  // }
-  // if (invalid_seconds->size() <= TOLERANCE) return 0;
-  //
-  // std::size_t invalid_chunk_size = 1;
-  //
-  // for (Keys::iterator it=invalid_seconds->begin(); it!=std::prev(invalid_seconds->end()); ++it)
-  // {
-  //   // check if the next invalid second is (current+1), if not, reset invalid chunk size
-  //   if (*(std::next(it)) != *it + 1) invalid_chunk_size = 1;
-  //   else
-  //   {
-  //     invalid_chunk_size++;
-  //     if (invalid_chunk_size > TOLERANCE) return ERR_TooManyConsecutiveInvalid;
-  //   }
-  // }
-  //
-  return 0;
+  return missing ? ERR_MissingSecond : 0;
 }
 
 int simple_moving_average(TimeTable& time_table, std::size_t half_width)
