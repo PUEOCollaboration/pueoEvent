@@ -8,7 +8,6 @@
 #include <iostream>
 #include <iomanip>
 #include <map>
-#include <set>
 #include <filesystem>
 #include <regex>
 
@@ -32,17 +31,16 @@ struct event_second_start_end
 };
 
 using TimeTable=std::map<Long64_t, event_second_start_end>;
-using Keys=std::set<Long64_t>;
 
 // The "main" function. Returns the run number or error code
 int analyze(const TString header_file_path);
 
 // Prepare a TimeTable (invalid rows not included in the table). Returns the run number and error code
-int prepare_table (const TString & header_file_name, int * run, TimeTable * time_table, Keys * invalid_seconds);
+int prepare_table (const TString & header_file_name, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
 
 // Removes duplicate entries in `invalid_seconds` and sort ascending.
 // Returns an error if there are too many consecutive invalid seconds.
-int prune_and_check_invalid_seconds(const Keys * invalid_seconds, std::size_t TOLERANCE = 10);
+int prune_and_check_invalid_seconds(const TimeTable * invalid_seconds, std::size_t TOLERANCE = 10);
 
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
 // Returns error (code ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
@@ -55,7 +53,7 @@ int simple_moving_average(TimeTable& time_table, std::size_t half_width = 5);
 // returns success (0) or ERR_EmptyTable.
 int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anchor_point);
 
-void insert_invalid_seconds_back(TimeTable* time_table, const Keys* invalid_seconds);
+void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_seconds);
 
 // Calls `simple_moving_average()` to compute `avg_relative_delta` for each second,
 // then extrapolates from `anchor_point` to compute the `corrected_pps` for every second using
@@ -95,7 +93,7 @@ int header_time_postprocessor_toy()
   //   }
   //
   // }
-  auto run=1282;
+  auto run=840;
   analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
   return 0;
 }
@@ -103,7 +101,7 @@ int header_time_postprocessor_toy()
 int analyze(const TString header_file_path)
 {
   TimeTable time_table;
-  Keys invalid_seconds;
+  TimeTable invalid_seconds;
   int run;
   if (prepare_table(header_file_path, &run, &time_table, &invalid_seconds))
   {
@@ -141,7 +139,7 @@ int analyze(const TString header_file_path)
   return run;
 }
 
-int prepare_table(const TString& header_file_name, int* run, TimeTable* time_table, Keys* invalid_seconds)
+int prepare_table(const TString& header_file_name, int* run, TimeTable* time_table, TimeTable* invalid_seconds)
 {
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
@@ -180,20 +178,21 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
   // loop from first second to last second, if a second is missing, add it as invalid
   for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),2);++current)
   {
-    TimeTable::iterator next_next = std::next(current,2);
-    TimeTable::iterator next = std::next(current,1);
+    TimeTable::iterator next_next = std::next(current, 2);
+    TimeTable::iterator next = std::next(current, 1);
     Long64_t actual_next_second = current->first+1;
     Long64_t actual_next_next = current->first+2;
     // if the next (or next next) second does not exist, then the current second's delta pps cannot be computed
     if (actual_next_second != next->first)
     {
-      current->second.invalid_delta = true;
       (*time_table)[actual_next_second].missing = true;
+      current->second.invalid_delta = true;
     }
     if (actual_next_next != next_next->first)
     {
-      current->second.invalid_delta = true;
       (*time_table)[actual_next_next].missing = true;
+      current->second.invalid_delta = true;
+      (*time_table)[actual_next_second].invalid_delta = true;
     }
   }
 
@@ -203,11 +202,10 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
   {
     TimeTable::iterator next_next = std::next(current, 2);
     TimeTable::iterator next = std::next(current, 1);
-
     if (next->second.missing || next_next->second.missing)
     {
-      invalid_seconds->emplace(current->first);
-      current = time_table->erase(current); // only keep entries with valid deltas in the table
+      // move entries with invalid deltas to a separate table
+      invalid_seconds->insert(time_table->extract(current++));
     }
     else
     {
@@ -224,15 +222,16 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
     }  
   }
   // The final 2 seconds will never have valid deltas since the next two seconds don't exist for them.
-  invalid_seconds->emplace((--time_table->end())->first);
-  time_table->erase(--time_table->end());
-  invalid_seconds->emplace((--time_table->end())->first);
-  time_table->erase(--time_table->end());
+  for(TimeTable::iterator it=std::prev(time_table->end(),2); it!=time_table->end();)
+  {
+    it->second.invalid_delta=true;
+    invalid_seconds->insert(time_table->extract(it++));
+  }
 
   return 0;
 }
 
-int prune_and_check_invalid_seconds(const Keys* invalid_seconds, std::size_t TOLERANCE)
+int prune_and_check_invalid_seconds(const TimeTable * invalid_seconds, std::size_t TOLERANCE)
 {
   if (invalid_seconds->size() > 2) 
   {
@@ -355,21 +354,21 @@ int find_stable_region_mid_point(TimeTable& time_table, TimeTable::iterator& anc
   return 0;
 }
 
-void insert_invalid_seconds_back(TimeTable* time_table, const Keys* invalid_seconds)
+void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_seconds)
 {
-  for(auto& sec: *invalid_seconds)
+  for(TimeTable::iterator it=invalid_seconds->begin(); it!=invalid_seconds->end();)
   {
-    (*time_table)[sec].invalid_delta = true;
-    TimeTable::iterator past   = time_table->find(sec-1);
-    TimeTable::iterator future = time_table->find(sec+1);
-    if (past != time_table->end())
+    auto insert = time_table->insert(invalid_seconds->extract(it++));
+    TimeTable::iterator current = insert.position; // position of the newly inserted element in time_table
+    TimeTable::iterator past = std::prev(current);
+    TimeTable::iterator future = std::next(current);
+    if (future != time_table->end())
     {
-      (*time_table)[sec].avg_relative_delta = past->second.avg_relative_delta;
-    } 
-    else if (future != time_table->end())
-    {
-      (*time_table)[sec].avg_relative_delta = future->second.avg_relative_delta;
-    } 
+      double avg = (past->second.avg_relative_delta + future->second.avg_relative_delta) / 2;
+      current->second.avg_relative_delta = avg;
+    } else {
+      current->second.avg_relative_delta = past->second.avg_relative_delta;
+    }
   }
 }
 
@@ -418,13 +417,17 @@ void print(const TimeTable* time_table, std::ostream& stream, std::size_t num_ro
   TString color;
   for (auto it=time_table->begin(); it!=stop; ++it)
   {
-    auto color = (it->second.missing || it->second.invalid_delta) ? "\033[1;31m " : "\033[0m ";
+    if (it->second.invalid_delta) color = "\033[1;31m "; // red 
+    else if (it->second.missing) color = "\033[1;33m ";  // yellow
+    else color = "\033[0m ";
 
     stream << color << std::setw(13) << std::left << it->first
            << color << std::setw(11) << it->second.last_pps// << "\033[0m\n";
            << color << std::setw(11) << it->second.this_pps
            << color << std::setw(11) << it->second.next_pps
            << color << std::setw(10) << it->second.relative_delta
+           // << color << std::setw(10) << std::boolalpha << it->second.missing
+           // << color << std::setw(10) << std::boolalpha << it->second.invalid_delta <<  "\033[0m\n";
            << color << std::setw(9)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
            << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\033[0m\n";
   }
@@ -481,7 +484,7 @@ void plot(TimeTable& encounters, TString name)
   original.GetYaxis()->SetTitleSize(0.1);
   original.GetYaxis()->SetTitleOffset(0.3);
   original.GetYaxis()->CenterTitle();
-  original.GetXaxis()->SetRange(1400, 2200);
+  original.GetXaxis()->SetRangeUser(1400, 2100);
   corrected.Draw("P");
   corrected.SetMarkerStyle(kCircle);
   corrected.SetMarkerColor(kRed);
@@ -508,7 +511,7 @@ void plot(TimeTable& encounters, TString name)
   original_delta.GetYaxis()->SetTitleSize(0.1);
   original_delta.GetYaxis()->SetTitleOffset(0.3);
   original_delta.GetXaxis()->SetLabelSize(0);
-  original_delta.GetXaxis()->SetRangeUser(1400, 2200);
+  original_delta.GetXaxis()->SetRangeUser(1400, 2100);
   original_delta.GetYaxis()->SetRangeUser(30, 40);
 
   avg_delta.Draw("P");
@@ -533,7 +536,7 @@ void plot(TimeTable& encounters, TString name)
   diff.GetXaxis()->CenterTitle();
   diff.GetXaxis()->SetLabelOffset(0.05);
   diff.GetYaxis()->SetRangeUser(-10, 10);
-  diff.GetXaxis()->SetRangeUser(1400, 2200);
+  diff.GetXaxis()->SetRangeUser(1400, 2100);
 
   c1.SaveAs(name);
 }
