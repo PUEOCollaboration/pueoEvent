@@ -33,7 +33,7 @@ struct event_second_start_end
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
 // The "main" function. Returns the run number or error code
-int analyze(const TString header_file_path, int *run);
+int analyze(const TString header_file_path);
 
 // Prepares two printable TimeTables, see #print().
 // @param[out] run Run number
@@ -82,37 +82,32 @@ int header_time_postprocessor_toy()
     if (!std::regex_match(name, run_match, pattern)) continue;
 
     std::cout << entry.path() << "\n";
-    int actual_run = -999;
-    int attempt_run = std::atoi(run_match[1].str().c_str());
-    analyze(entry.path().c_str(), &actual_run);
-
-    if (actual_run != attempt_run)
-      fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
-
+    analyze(entry.path().c_str());
   }
+
   // int r;
   // int run=840;
   // analyze(Form("/work/headers/run%d/headFile%d.root", run, run), &r);
-
   return 0;
 }
 
-int analyze(const TString header_file_path, int * run)
+int analyze(const TString header_file_path)
 {
   TimeTable time_table;
   TimeTable invalid_seconds;
+  int run;
 
-  switch(prepare_table(header_file_path, run, &time_table, &invalid_seconds))
+  switch(prepare_table(header_file_path, &run, &time_table, &invalid_seconds))
   {
     case ERR_TimeTableTooShort: 
       {
         print(&time_table, std::cerr);
-        fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", *run);
+        fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", run);
         return ERR_TimeTableTooShort;
       }
     case ERR_MissingSecond: 
       {
-        fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\n\n\e[0m", *run);
+        fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\n\n\e[0m", run);
         break;
       }
     default:
@@ -123,7 +118,7 @@ int analyze(const TString header_file_path, int * run)
   {
     print(&time_table, std::cerr);
     fprintf(stderr, "\e[1;31mFatal Error: can't compute average delta -"
-            "time table too short (run %d).\n\n\n\e[0m", *run);
+            "time table too short (run %d).\n\n\n\e[0m", run);
     return ERR_TimeTableTooShort;
   }
 
@@ -135,7 +130,7 @@ int analyze(const TString header_file_path, int * run)
       {
         // Redudant check. Ideally we should have errored out long before we reach this function call.
         print(&time_table, std::cerr);
-        fprintf(stderr, "\e[1;31mFatal Error: empty table (run %d).\n\n\n\e[0m", *run);
+        fprintf(stderr, "\e[1;31mFatal Error: empty table (run %d).\n\n\n\e[0m", run);
         return ERR_EmptyTable;
       }
     case ERR_NoStableRegion:
@@ -144,7 +139,7 @@ int analyze(const TString header_file_path, int * run)
         fprintf(
           stderr,
           "\e[31;1mWarning: couldn't find a stable region where `next_pps` - `this_pps` ≈ 125 million.\n"
-          "Will use the first second as the anchor point (run %d).\n\n\n\e[0m", *run
+          "Will use the first second as the anchor point (run %d).\n\n\n\e[0m", run
         );
         break;
       }
@@ -241,7 +236,7 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
       // Explicitly use UInt_t so that wrap-around subtraction is automatic
       UInt_t delta =  npps - tpps;
       // And then convert to int so that values below nominal show up as negative
-      current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;;
+      current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
       ++current;
     }  
   }
