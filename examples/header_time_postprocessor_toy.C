@@ -35,20 +35,23 @@ using TimeTable=std::map<Long64_t, event_second_start_end>;
 // The "main" function. Returns the run number or error code
 int analyze(const TString header_file_path);
 
-// Prepare a TimeTable (invalid rows not included in the table). Returns the run number and error code
-int prepare_table (const TString & header_file_name, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
+// Prepares two printable TimeTables, see #print().
+// @param[out] run Run number
+// @retval Success (0), Error (ERR_TimeTableTooShort), or Warning (ERR_MissingSecond)
+int prepare_table(const TString & header_file_name, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
 
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
-// Returns error (code ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
+// @retval Success (0) or error (ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
 // @todo figure out a reasonable default `half_width`
 int simple_moving_average(TimeTable* time_table, std::size_t half_width = 5);
 
-// Finds the mid-point of a stable period;
-// for every second in this period, delta ≈ avg_relative_delta.
-// Returns iterator `anchor_point` (or time_table.begin() if a stable region couldn't be found).
-// Returns success (0) or ERR_EmptyTable.
+// Finds the mid-point of a stable period; for every second in this period, delta ≈ avg_relative_delta.
+// @param[out] `anchor_point` (which is time_table.begin() if a stable region couldn't be found).
+// @retval Success (0), warning (ERR_NoStableRegion), or error (ERR_EmptyTable).
 int find_stable_region_mid_point(TimeTable* time_table, TimeTable::iterator* anchor_point);
 
+// Inserts invalid seconds back to time_table.
+// The pps delta of an invalid second is simply identical to its valid neighbors.
 void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_seconds);
 
 // Extrapolates from `anchor_point` to compute the `corrected_pps` for every second using `avg_relative_delta`.
@@ -311,7 +314,7 @@ int find_stable_region_mid_point(TimeTable * time_table, TimeTable::iterator* an
     else stable_seconds.clear();
   }
 
-  if (stable_seconds.size() != stable_length) return ERR_EmptyTable;  
+  if (stable_seconds.size() != stable_length) return ERR_NoStableRegion;
   else 
   {
     *anchor_point = stable_seconds.at(stable_length/2);
