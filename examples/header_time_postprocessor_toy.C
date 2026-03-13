@@ -43,7 +43,7 @@ int prepare_table(const TString & header_file_name, int * run, TimeTable * time_
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
 // @retval Success (0) or error (ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
 // @todo figure out a reasonable default `half_width`
-int simple_moving_average(TimeTable* time_table, std::size_t half_width = 5);
+int simple_moving_average(TimeTable* time_table, std::size_t half_width = 8);
 
 // Finds the mid-point of a stable period; for every second in this period, delta ≈ avg_relative_delta.
 // @param[out] `anchor_point` (which is time_table.begin() if a stable region couldn't be found).
@@ -61,33 +61,35 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anch
 void print(const TimeTable* time_table, std::ostream& stream = std::cout, std::size_t num_rows = -1); // -1: print all rows
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-#define ERR_TimeTableTooShort -1
-#define ERR_MissingSecond -2 // recoverable
-#define ERR_EmptyTable -4
-#define ERR_NoStableRegion -5 // recoverable
+enum err_code{
+  ERR_TimeTableTooShort = 1<<0,
+  ERR_MissingSecond     = 1<<1, // recoverable
+  ERR_LargeDelta        = 1<<2, // recoverable
+  ERR_EmptyTable        = 1<<3,
+  ERR_NoStableRegion    = 1<<4 // recoverable
+};
 
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  fs::recursive_directory_iterator run_dir("/work/headers/");
-  const std::regex pattern(R"(headFile(\d+))");
-  std::smatch run_match;
+  int run=770;
+  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
-  for(auto const& entry: run_dir)
-  {
-    if (!entry.is_regular_file()) continue;
+  // fs::recursive_directory_iterator run_dir("/work/headers/");
+  // const std::regex pattern(R"(headFile(\d+))");
+  // std::smatch run_match;
+  // for(auto const& entry: run_dir)
+  // {
+  //   if (!entry.is_regular_file()) continue;
+  //
+  //   std::string name = entry.path().stem().string(); 
+  //   // skip other root files in the run folder
+  //   if (!std::regex_match(name, run_match, pattern)) continue;
+  //
+  //   std::cout << entry.path() << "\n";
+  //   analyze(entry.path().c_str());
+  // }
 
-    std::string name = entry.path().stem().string(); 
-    // skip other root files in the run folder
-    if (!std::regex_match(name, run_match, pattern)) continue;
-
-    std::cout << entry.path() << "\n";
-    analyze(entry.path().c_str());
-  }
-
-  // int r;
-  // int run=840;
-  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run), &r);
   return 0;
 }
 
@@ -97,22 +99,17 @@ int analyze(const TString header_file_path)
   TimeTable invalid_seconds;
   int run;
 
-  switch(prepare_table(header_file_path, &run, &time_table, &invalid_seconds))
+  int err = prepare_table(header_file_path, &run, &time_table, &invalid_seconds);
+  if (err&ERR_TimeTableTooShort)
   {
-    case ERR_TimeTableTooShort: 
-      {
-        print(&time_table, std::cerr);
-        fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", run);
-        return ERR_TimeTableTooShort;
-      }
-    case ERR_MissingSecond: 
-      {
-        fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\n\n\e[0m", run);
-        break;
-      }
-    default:
-      break;
+    print(&time_table, std::cerr);
+    fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", run);
+    return ERR_TimeTableTooShort;
   }
+  if (err & ERR_MissingSecond)
+    fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\n\n\e[0m", run);
+  if (err & ERR_LargeDelta)
+    fprintf(stderr, "\e[1;33mWarning: large pps delta detected (run %d).\n\n\n\e[0m", run);
 
   if(simple_moving_average(&time_table))
   {
@@ -147,11 +144,10 @@ int analyze(const TString header_file_path)
       break;
   }
 
-  // insert_invalid_seconds_back(&time_table, &invalid_seconds);
-  // stupid_extrapolation(&time_table, anchor_point);
-  // print(&time_table, std::cerr);
-  // plot(time_table);
-  // print(&time_table);
+  insert_invalid_seconds_back(&time_table, &invalid_seconds);
+  stupid_extrapolation(&time_table, anchor_point);
+  print(&time_table, std::cerr);
+  plot(time_table);
 
   return 0;
 }
@@ -190,7 +186,7 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
     fprintf(stderr, "\033[1;33mWarning: small table (run %d).\n\033[0m", *run);
   }
   
-  bool missing = false;
+  int warning_code = 0;
 
   // loop from first second to last second, if a second is missing, add it as invalid
   for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),2);++current)
@@ -204,14 +200,14 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
     {
       (*time_table)[actual_next_second].missing = true;
       current->second.invalid_delta = true;
-      missing = true;
+      warning_code |= ERR_MissingSecond;
     }
     if (actual_next_next != next_next->first)
     {
       (*time_table)[actual_next_next].missing = true;
       current->second.invalid_delta = true;
       (*time_table)[actual_next_second].invalid_delta = true;
-      missing = true;
+      warning_code |= ERR_MissingSecond;
     }
   }
 
@@ -236,7 +232,10 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
       // Explicitly use UInt_t so that wrap-around subtraction is automatic
       UInt_t delta =  npps - tpps;
       // And then convert to int so that values below nominal show up as negative
-      current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
+      int rel_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
+      current->second.relative_delta = rel_delta;
+
+      if (TMath::Abs(rel_delta) > 100) warning_code |= ERR_LargeDelta;
       ++current;
     }  
   }
@@ -247,7 +246,8 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
     invalid_seconds->insert(time_table->extract(it++));
   }
 
-  return missing ? ERR_MissingSecond : 0;
+
+  return warning_code;
 }
 
 int simple_moving_average(TimeTable* time_table, std::size_t half_width)
@@ -408,8 +408,8 @@ void print(const TimeTable* time_table, std::ostream& stream, std::size_t num_ro
 void plot(TimeTable& time_table, TString name)
 {
   Long64_t t0 = time_table.begin()->first;
-  int xlow = 200;
-  int xhigh = 300;
+  int xlow = 0;
+  int xhigh = 0;
 
   TGraph original_this_pps(time_table.size());
   TGraph corrected_this_pps(time_table.size());
