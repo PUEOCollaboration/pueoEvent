@@ -405,64 +405,72 @@ void print(const TimeTable* time_table, std::ostream& stream, std::size_t num_ro
   stream << "\033[0m---------------------------------------------------------------------------------------\n";
 }
 
-void plot(TimeTable& encounters, TString name)
+void plot(TimeTable& time_table, TString name)
 {
-  Long64_t t0 = encounters.begin()->first;
+  Long64_t t0 = time_table.begin()->first;
+  int xlow = 200;
+  int xhigh = 300;
 
-  TGraph original(encounters.size());
-  TGraph corrected(encounters.size());
-  TGraph diff(encounters.size());
+  TGraph original_this_pps(time_table.size());
+  TGraph corrected_this_pps(time_table.size());
+  TGraph this_pps_residual(time_table.size());
 
-  TGraph original_delta(encounters.size());
-  TGraph avg_delta(encounters.size());
+  TGraph original_delta(time_table.size());
+  TGraph avg_delta(time_table.size());
 
   std::size_t counter=0;
-  for (auto& e: encounters){
+  for (auto& row: time_table){
 
-    Long64_t o = e.second.this_pps;
-    original.SetPoint(counter, e.first-t0,o);
-    double c = e.second.corrected_pps;
-    corrected.SetPoint(counter, e.first-t0, c);
-    double d = o-c;
-    diff.SetPoint(counter, e.first-t0, d);
+    Long64_t original = row.second.this_pps;
+    original_this_pps.SetPoint(counter, row.first-t0, original);
 
-    original_delta.SetPoint(counter, e.first-t0, e.second.relative_delta);
-    avg_delta.SetPoint(counter, e.first-t0, e.second.avg_relative_delta);
+    double corrected = row.second.corrected_pps;
+    corrected_this_pps.SetPoint(counter, row.first-t0, corrected);
+
+    double residual = original-corrected;
+    this_pps_residual.SetPoint(counter, row.first-t0, residual);
+
+    original_delta.SetPoint(counter, row.first-t0, row.second.relative_delta);
+    avg_delta.SetPoint(counter, row.first-t0, row.second.avg_relative_delta);
 
     counter++;
   }
 
-  original.RemovePoint(original.GetN()-1); // final second doesn't have a valid this_pps
-  diff.RemovePoint(diff.GetN()-1);         // final second doesn't have a valid this_pps
+  original_this_pps.RemovePoint(original_this_pps.GetN()-1); // last second doesn't have a valid this_pps
+  original_this_pps.RemovePoint(original_this_pps.GetN()-1); // 2nd-to-last second doesn't have a valid this_pps
+  this_pps_residual.RemovePoint(this_pps_residual.GetN()-1); // for comparison to make sense,
+  this_pps_residual.RemovePoint(this_pps_residual.GetN()-1);
+
   original_delta.RemovePoint(original_delta.GetN()-1); // final two seconds don't have valid deltas
-  original_delta.RemovePoint(original_delta.GetN()-1); // final two seconds don't have valid deltas
+  original_delta.RemovePoint(original_delta.GetN()-1);
 
   TCanvas c1(name, name, 1920 * 1.5, 1080 * 2);
   c1.Divide(1,3);
   c1.cd(1);
-  original.Draw("ALP");
-  original.SetMarkerStyle(kFullCrossX);
-  original.SetMarkerSize(3);
-  original.SetTitle("System Clock Value (uint32_t) at Start of Each Second (aka \"this_pps\")");
-  original.GetXaxis()->SetLabelSize(0);
-  original.GetYaxis()->SetTitle("[sysclk counts]");
-  original.GetYaxis()->SetTitleSize(0.1);
-  original.GetYaxis()->SetTitleOffset(0.3);
-  original.GetYaxis()->CenterTitle();
-  // original.GetXaxis()->SetRangeUser(1400, 2100);
-  corrected.Draw("P");
-  corrected.SetMarkerStyle(kCircle);
-  corrected.SetMarkerColor(kRed);
-  corrected.SetMarkerSize(2);
+  original_this_pps.Draw("ALP");
+  original_this_pps.SetMarkerStyle(kFullCrossX);
+  original_this_pps.SetMarkerSize(3);
+  original_this_pps.SetTitle("System Clock Value (uint32_t) at Start of Each Second (aka \"this_pps\")");
+  original_this_pps.GetXaxis()->SetLabelSize(0);
+  original_this_pps.GetYaxis()->SetTitle("[sysclk counts]");
+  original_this_pps.GetYaxis()->SetTitleSize(0.1);
+  original_this_pps.GetYaxis()->SetTitleOffset(0.3);
+  original_this_pps.GetYaxis()->CenterTitle();
+  if (xlow && xhigh)
+    original_this_pps.GetXaxis()->SetRangeUser(xlow, xhigh);
+  corrected_this_pps.Draw("P");
+  corrected_this_pps.SetMarkerStyle(kCircle);
+  corrected_this_pps.SetMarkerColor(kRed);
+  corrected_this_pps.SetMarkerSize(2);
 
   double y0 = UINT32_MAX;
-  TLine line(original.GetPointX(0), y0, original.GetPointX(original.GetN()-1), y0);
+  TLine line(original_this_pps.GetPointX(0), y0, original_this_pps.GetPointX(original_this_pps.GetN()-1), y0);
   line.SetLineStyle(2);   // dashed
   line.Draw();
 
   TLegend leg(0.6, 0, 0.9, 0.1); // (x1,y1,x2,y2) in NDC
-  leg.AddEntry(&original, "Original", "p");
-  leg.AddEntry(&corrected, "Corrected", "p");
+  leg.AddEntry(&original_this_pps, "Original", "p");
+  leg.AddEntry(&corrected_this_pps, "Corrected", "p");
   leg.AddEntry(&line, "UINT 32Bit MAX", "l");
   leg.Draw();
 
@@ -476,7 +484,8 @@ void plot(TimeTable& encounters, TString name)
   original_delta.GetYaxis()->SetTitleSize(0.1);
   original_delta.GetYaxis()->SetTitleOffset(0.3);
   original_delta.GetXaxis()->SetLabelSize(0);
-  // original_delta.GetXaxis()->SetRangeUser(1400, 2100);
+  if (xlow && xhigh)
+    original_delta.GetXaxis()->SetRangeUser(xlow, xhigh);
   // original_delta.GetYaxis()->SetRangeUser(30, 40);
 
   avg_delta.Draw("P");
@@ -485,23 +494,24 @@ void plot(TimeTable& encounters, TString name)
 
   TLegend leg3(0.6, 0.0, 0.9, 0.1); // (x1,y1,x2,y2) in NDC
   leg3.AddEntry(&original_delta, "original (discrete) delta (uint32_t)", "p");
-  leg3.AddEntry(&corrected, "smoothed (moving averaged) delta (double_t)", "p");
+  leg3.AddEntry(&avg_delta, "smoothed (moving averaged) delta (double_t)", "p");
   leg3.Draw();
 
   c1.cd(3);
-  diff.Draw("ALP");
-  diff.SetTitle("(original this_pps) - (corrected_pps)");
-  diff.SetMarkerStyle(kCircle);
-  diff.GetYaxis()->SetTitle("[sysclk counts]");
-  diff.GetYaxis()->CenterTitle();
-  diff.GetYaxis()->SetTitleSize(0.1);
-  diff.GetYaxis()->SetTitleOffset(0.3);
-  diff.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%lld)]", t0));
-  diff.GetXaxis()->SetTitleOffset(2.2);
-  diff.GetXaxis()->CenterTitle();
-  diff.GetXaxis()->SetLabelOffset(0.05);
-  diff.GetYaxis()->SetRangeUser(-10, 10);
-  // diff.GetXaxis()->SetRangeUser(1400, 2100);
+  this_pps_residual.Draw("ALP");
+  this_pps_residual.SetTitle("(original this_pps) - (corrected_pps)");
+  this_pps_residual.SetMarkerStyle(kCircle);
+  this_pps_residual.GetYaxis()->SetTitle("[sysclk counts]");
+  this_pps_residual.GetYaxis()->CenterTitle();
+  this_pps_residual.GetYaxis()->SetTitleSize(0.1);
+  this_pps_residual.GetYaxis()->SetTitleOffset(0.3);
+  this_pps_residual.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%lld)]", t0));
+  this_pps_residual.GetXaxis()->SetTitleOffset(2.2);
+  this_pps_residual.GetXaxis()->CenterTitle();
+  this_pps_residual.GetXaxis()->SetLabelOffset(0.05);
+  if (xlow && xhigh)
+    this_pps_residual.GetXaxis()->SetRangeUser(xlow, xhigh);
+  // this_pps_residual.GetYaxis()->SetRangeUser(-10, 10);
 
   c1.SaveAs(name);
 }
