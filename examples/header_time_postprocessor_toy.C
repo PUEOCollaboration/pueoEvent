@@ -33,7 +33,7 @@ struct event_second_start_end
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
 // The "main" function. Returns the run number or error code
-int analyze(const TString header_file_path);
+int analyze(const TString header_file_path, int *run, TH1I* delta_hist);
 
 // Prepares two printable TimeTables, see #print().
 // @param[out] run Run number
@@ -69,95 +69,112 @@ void plot (TimeTable& time_table, TString name="pps_correction.svg");
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // fs::recursive_directory_iterator run_dir("/work/headers/");
-  // const std::regex pattern(R"(headFile(\d+))");
-  // std::smatch run_match;
-  //
-  // for(auto const& entry: run_dir)
-  // {
-  //   if (!entry.is_regular_file()) continue;
-  //
-  //   std::string name = entry.path().stem().string(); 
-  //   // skip other root files in the run folder
-  //   if (!std::regex_match(name, run_match, pattern)) continue;
-  //
-  //   std::cout << entry.path() << "\n";
-  //   int actual_run = analyze(entry.path().c_str());
-  //   int attempt_run = std::atoi(run_match[1].str().c_str());
-  //
-  //   if (actual_run >= 0 && actual_run != attempt_run)
-  //   {
-  //     fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
-  //   }
-  //
-  // }
-  auto run=840;
-  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
+  TH1I delta_hist("delta_hist", "Relative Delta Histogram", 601, -100, 500);
+  fs::recursive_directory_iterator run_dir("/work/headers/");
+  const std::regex pattern(R"(headFile(\d+))");
+  std::smatch run_match;
+
+  for(auto const& entry: run_dir)
+  {
+    if (!entry.is_regular_file()) continue;
+
+    std::string name = entry.path().stem().string(); 
+    // skip other root files in the run folder
+    if (!std::regex_match(name, run_match, pattern)) continue;
+
+    std::cout << entry.path() << "\n";
+    int actual_run = -999;
+    int attempt_run = std::atoi(run_match[1].str().c_str());
+    analyze(entry.path().c_str(), &actual_run, &delta_hist);
+
+    if (actual_run != attempt_run)
+      fprintf(stderr, "run number mismatch (attempt: %d, result: %d)", attempt_run, actual_run);
+
+  }
+  // int r;
+  // int run=840;
+  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run), &r, &delta_hist);
+
+  TCanvas c("","",1920, 1080);
+  delta_hist.Draw();
+  delta_hist.GetXaxis()->SetTitle("relative_delta := next_pps - this_pps - 125E6");
+  delta_hist.GetXaxis()->CenterTitle();
+  delta_hist.GetYaxis()->SetTitle("Counts");
+  delta_hist.GetYaxis()->CenterTitle();
+  gPad->SetLogy();
+  c.SaveAs("preprocessed_deltas.svg");
+  std::cout << "Underflow: " << delta_hist.GetBinContent(0) << "\n";
+  std::cout << "Overflow: " << delta_hist.GetBinContent(delta_hist.GetNbinsX()+1) << "\n";
   return 0;
 }
 
-int analyze(const TString header_file_path)
+int analyze(const TString header_file_path, int * run, TH1I * delta_hist)
 {
   TimeTable time_table;
   TimeTable invalid_seconds;
-  int run;
 
-  switch(prepare_table(header_file_path, &run, &time_table, &invalid_seconds))
+  switch(prepare_table(header_file_path, run, &time_table, &invalid_seconds))
   {
     case ERR_TimeTableTooShort: 
       {
-        print(&time_table, std::cerr);
-        fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", run);
+        // print(&time_table, std::cerr);
+        // fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", *run);
         return ERR_TimeTableTooShort;
       }
     case ERR_MissingSecond: 
       {
-        fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\n\n\e[0m", run);
+        // fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\n\n\e[0m", *run);
         break;
       }
     default:
       break;
   }
 
-  if(simple_moving_average(&time_table))
+  for(auto&sec: time_table)
   {
-    print(&time_table, std::cerr);
-    fprintf(stderr, "\e[1;31mFatal Error: can't compute average delta -"
-            "time table too short (run %d).\n\n\n\e[0m", run);
-    return ERR_TimeTableTooShort;
+    delta_hist->Fill(sec.second.relative_delta);
   }
 
-  TimeTable::iterator anchor_point;
+  // if(simple_moving_average(&time_table))
+  // {
+  //   print(&time_table, std::cerr);
+  //   fprintf(stderr, "\e[1;31mFatal Error: can't compute average delta -"
+  //           "time table too short (run %d).\n\n\n\e[0m", run);
+  //   return ERR_TimeTableTooShort;
+  // }
 
-  switch(find_stable_region_mid_point(&time_table, &anchor_point))
-  {
-    case ERR_EmptyTable: 
-      {
-        // Redudant check. Ideally we should have errored out long before we reach this function call.
-        print(&time_table, std::cerr);
-        fprintf(stderr, "\e[1;31mFatal Error: empty table (run %d).\n\n\n\e[0m", run);
-        return ERR_EmptyTable;
-      }
-    case ERR_NoStableRegion:
-      {
-        print(&time_table, std::cerr);
-        fprintf(
-          stderr,
-          "\e[31;1mWarning: couldn't find a stable region where `next_pps` - `this_pps` ≈ 125 million.\n"
-          "Will use the first second as the anchor point (run %d).\n\n\n\e[0m", run
-        );
-        break;
-      }
-    default:
-      break;
-  }
+  // TimeTable::iterator anchor_point;
+  //
+  // switch(find_stable_region_mid_point(&time_table, &anchor_point))
+  // {
+  //   case ERR_EmptyTable: 
+  //     {
+  //       // Redudant check. Ideally we should have errored out long before we reach this function call.
+  //       print(&time_table, std::cerr);
+  //       fprintf(stderr, "\e[1;31mFatal Error: empty table (run %d).\n\n\n\e[0m", run);
+  //       return ERR_EmptyTable;
+  //     }
+  //   case ERR_NoStableRegion:
+  //     {
+  //       print(&time_table, std::cerr);
+  //       fprintf(
+  //         stderr,
+  //         "\e[31;1mWarning: couldn't find a stable region where `next_pps` - `this_pps` ≈ 125 million.\n"
+  //         "Will use the first second as the anchor point (run %d).\n\n\n\e[0m", run
+  //       );
+  //       break;
+  //     }
+  //   default:
+  //     break;
+  // }
 
-  insert_invalid_seconds_back(&time_table, &invalid_seconds);
-  stupid_extrapolation(&time_table, anchor_point);
-  print(&time_table, std::cerr);
-  plot(time_table);
+  // insert_invalid_seconds_back(&time_table, &invalid_seconds);
+  // stupid_extrapolation(&time_table, anchor_point);
+  // print(&time_table, std::cerr);
+  // plot(time_table);
+  // print(&time_table);
 
-  return run;
+  return 0;
 }
 
 int prepare_table(const TString& header_file_name, int* run, TimeTable* time_table, TimeTable* invalid_seconds)
@@ -239,8 +256,15 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
       current->second.next_pps =  npps;
       // Explicitly use UInt_t so that wrap-around subtraction is automatic
       UInt_t delta =  npps - tpps;
+      int rel_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
+
+      if (TMath::Abs(rel_delta) > 100)
+        fprintf(stderr, "\e[1;31mLarge pps delta (run %d): %d\e[0m\n", *run, rel_delta);
+      else if(TMath::Abs(rel_delta) < 5)
+        fprintf(stderr, "\e[1;33mSmall pps delta (run %d): %d\e[0m\n", *run, rel_delta);
+
       // And then convert to int so that values below nominal show up as negative
-      current->second.relative_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
+      current->second.relative_delta = rel_delta;
       ++current;
     }  
   }
