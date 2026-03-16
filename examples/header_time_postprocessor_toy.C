@@ -74,7 +74,7 @@ enum err_code
   ERR_Year1970          = 1<<2, // should be recoverable
   ERR_TimeTableTooShort = 1<<3, // fatal, time tables with only 1 or 2 seconds can't be processed
   ERR_MissingSecond     = 1<<4, // recoverable
-  ERR_LargeDelta        = 1<<5, // recoverable won't happen, because they happen in pre-amp runs
+  ERR_LargeDelta        = 1<<5, // recoverable but won't happen, because they happen in pre-amp runs
   ERR_EmptyTable        = 1<<6, // fatal but probably won't be reached; we should have errored out already
   ERR_NoStableRegion    = 1<<7  // recoverable
 };
@@ -113,37 +113,37 @@ int analyze(const char * header_file_path)
   if (err&ERR_MoreThanOneRun) 
   {
     fprintf(stderr, "\e[1;31mFatal Error: cannot process %s; I can only handle a single run"
-            " at a time but more than one is found.\n\n\n\e[0m", header_file_path);
+            " at a time but more than one is found.\n\e[0m", header_file_path);
     return ERR_MoreThanOneRun;
   }
 
   if (err&ERR_PreAmpRun ) 
   {
-    fprintf(stderr, "\e[1;32mNote: run %d is a pre-amp run and will be ignored.\n\n\n\e[0m", run);
+    fprintf(stderr, "\e[1;32mNote: run %d is a pre-amp run and will be ignored.\n\e[0m", run);
     return ERR_PreAmpRun ;
   }
 
   if (err&ERR_TimeTableTooShort)
   {
     print(&time_table, std::cerr);
-    fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", run);
+    fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\e[0m", run);
     return ERR_TimeTableTooShort;
   }
 
   if (err & ERR_MissingSecond)
-    fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\n\n\e[0m", run);
+    fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\e[0m", run);
 
   if (err & ERR_LargeDelta)
-    fprintf(stderr, "\e[1;33mWarning: large pps delta detected (run %d).\n\n\n\e[0m", run);
+    fprintf(stderr, "\e[1;33mWarning: large pps delta detected (run %d).\n\e[0m", run);
 
   if (check_event_seconds(&time_table))
-    fprintf(stderr, "\e[1;31mWarning: fucked up event_second (run %d).\n\n\n\e[0m", run);
+    fprintf(stderr, "\e[1;31mWarning: problematic event_second (run %d).\n\e[0m", run);
 
   if(simple_moving_average(&time_table))
   {
     print(&time_table, std::cerr);
     fprintf(stderr, "\e[1;31mFatal Error: can't compute average delta; "
-            "time table too short (run %d).\n\n\n\e[0m", run);
+            "time table too short (run %d).\n\e[0m", run);
     return ERR_TimeTableTooShort;
   }
 
@@ -155,7 +155,7 @@ int analyze(const char * header_file_path)
       {
         // Redudant check. Ideally we should have errored out long before we reach this function call.
         print(&time_table, std::cerr);
-        fprintf(stderr, "\e[1;31mFatal Error: empty table (run %d).\n\n\n\e[0m", run);
+        fprintf(stderr, "\e[1;31mFatal Error: empty table (run %d).\n\e[0m", run);
         return ERR_EmptyTable;
       }
     case ERR_NoStableRegion:
@@ -164,7 +164,7 @@ int analyze(const char * header_file_path)
         fprintf(
           stderr,
           "\e[31;1mWarning: couldn't find a stable region where `next_pps` - `this_pps` ≈ 125 million.\n"
-          "Will use the first second as the anchor point (run %d).\n\n\n\e[0m", run
+          "Will use the first second as the anchor point (run %d).\n\e[0m", run
         );
         break;
       }
