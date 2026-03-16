@@ -14,6 +14,7 @@
 namespace fs = std::filesystem;
 
 constexpr int NOMINAL_CLOCK_FREQ=125000000;
+constexpr int PUEO_FIRST_AMP_RUN=782; // will ignore all runs prior to this one
 
 // Nominally, delta := (next_pps - this_pps) should yield approximately 125E6 
 // (unsigned integer overflow should be taken care of when computing this difference).
@@ -33,12 +34,12 @@ struct event_second_start_end
 using TimeTable=std::map<Long64_t, event_second_start_end>;
 
 // The "main" function. Returns the run number or error code
-int analyze(const TString header_file_path);
+int analyze(const char * header_file_path);
 
 // Prepares two printable TimeTables, see #print().
 // @param[out] run Run number
-// @retval Success (0), Error (ERR_TimeTableTooShort), or Warning (ERR_MissingSecond)
-int prepare_table(const TString & header_file_name, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
+// @retval Success (0), Error (eg. ERR_TimeTableTooShort), or Warning (eg. ERR_MissingSecond)
+int prepare_table(const char * header_file_path, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
 
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
 // @retval Success (0) or error (ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
@@ -63,11 +64,13 @@ void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
 enum err_code
 {
-  ERR_TimeTableTooShort = 1<<0,
-  ERR_MissingSecond     = 1<<1, // recoverable
-  ERR_LargeDelta        = 1<<2, // recoverable
-  ERR_EmptyTable        = 1<<3,
-  ERR_NoStableRegion    = 1<<4 // recoverable
+  ERR_MoreThanOneRun    = 1<<0, // fatal, more than one run present in headerFile<run>.root
+  ERR_PreAmpRun         = 1<<1, // fatal, because we are just going to ignore these
+  ERR_TimeTableTooShort = 1<<2, // fatal, time tables with only 1 or 2 seconds can't be processed
+  ERR_MissingSecond     = 1<<3, // recoverable
+  ERR_LargeDelta        = 1<<4, // recoverable won't happen, because they happen in pre-amp runs
+  ERR_EmptyTable        = 1<<5, // fatal but probably won't be reached; we should have errored out already
+  ERR_NoStableRegion    = 1<<6  // recoverable
 };
 
 int header_time_postprocessor_toy()
@@ -84,9 +87,8 @@ int header_time_postprocessor_toy()
     if (!entry.is_regular_file()) continue;
 
     std::string name = entry.path().stem().string(); 
-    // skip other root files in the run folder, as well as any runs before 782 (1st run with amp on)
+    // skip other root files in the run folder
     if (!std::regex_match(name, run_match, pattern)) continue;
-    else if (std::atoi(run_match[1].str().c_str()) < 782) continue;
 
     std::cout << entry.path() << "\n";
     analyze(entry.path().c_str());
@@ -95,16 +97,27 @@ int header_time_postprocessor_toy()
   return 0;
 }
 
-int analyze(const TString header_file_path)
+int analyze(const char * header_file_path)
 {
   TimeTable time_table;
   TimeTable invalid_seconds;
-  int run;
+  int run=-999;
 
   int err = prepare_table(header_file_path, &run, &time_table, &invalid_seconds);
+  if (err&ERR_MoreThanOneRun) 
+  {
+    fprintf(stderr, "\e[1;31mFatal Error: cannot process %s; I can only handle a single run"
+            " at a time but more than one is found.\n\n\n\e[0m", header_file_path);
+    return ERR_MoreThanOneRun;
+  }
+  if (err&ERR_PreAmpRun ) 
+  {
+    fprintf(stderr, "\e[1;32mNote: run %d is a pre-amp run and will be ignored.\n\n\n\e[0m", run);
+    return ERR_PreAmpRun ;
+  }
   if (err&ERR_TimeTableTooShort)
   {
-    print(&time_table, std::cerr);
+    // print(&time_table, std::cerr);
     fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", run);
     return ERR_TimeTableTooShort;
   }
@@ -154,12 +167,13 @@ int analyze(const TString header_file_path)
   return 0;
 }
 
-int prepare_table(const TString& header_file_name, int* run, TimeTable* time_table, TimeTable* invalid_seconds)
+int prepare_table(const char * header_file_path, int* run, TimeTable* time_table, TimeTable* invalid_seconds)
 {
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
-  ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_name);
-  auto rvec = tmp_header_rdf.Take<Int_t>("run"); // will return the first element in this vector
+  ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_path);
+  auto rmin = tmp_header_rdf.Min<Int_t>("run");
+  auto rmax = tmp_header_rdf.Min<Int_t>("run"); 
 
   // start by filling a table of event_second vs lpps
   auto search_and_fill = 
@@ -174,7 +188,11 @@ int prepare_table(const TString& header_file_name, int* run, TimeTable* time_tab
       }
     };
   tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
-  *run = rvec->front();
+
+  if (*rmin!=*rmax) return ERR_MoreThanOneRun;
+  else *run = *rmin;
+
+  if (*run < PUEO_FIRST_AMP_RUN) return ERR_PreAmpRun ;
 
   // It only makes sense if we have at least one valid second (ie 3 consecutive `event_second`s).
   // Note: the final two seconds of any run are invalid (can't compute their pps delta),
