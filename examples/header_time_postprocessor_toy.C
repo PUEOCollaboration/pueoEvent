@@ -72,23 +72,24 @@ enum err_code{
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  int run=770;
-  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
+  // int run=770;
+  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
-  // fs::recursive_directory_iterator run_dir("/work/headers/");
-  // const std::regex pattern(R"(headFile(\d+))");
-  // std::smatch run_match;
-  // for(auto const& entry: run_dir)
-  // {
-  //   if (!entry.is_regular_file()) continue;
-  //
-  //   std::string name = entry.path().stem().string(); 
-  //   // skip other root files in the run folder
-  //   if (!std::regex_match(name, run_match, pattern)) continue;
-  //
-  //   std::cout << entry.path() << "\n";
-  //   analyze(entry.path().c_str());
-  // }
+  fs::recursive_directory_iterator run_dir("/work/headers/");
+  const std::regex pattern(R"(headFile(\d+))");
+  std::smatch run_match;
+  for(auto const& entry: run_dir)
+  {
+    if (!entry.is_regular_file()) continue;
+
+    std::string name = entry.path().stem().string(); 
+    // skip other root files in the run folder, as well as any runs before 782 (1st run with amp on)
+    if (!std::regex_match(name, run_match, pattern)) continue;
+    else if (std::atoi(run_match[1].str().c_str()) < 782) continue;
+
+    std::cout << entry.path() << "\n";
+    analyze(entry.path().c_str());
+  }
 
   return 0;
 }
@@ -114,7 +115,7 @@ int analyze(const TString header_file_path)
   if(simple_moving_average(&time_table))
   {
     print(&time_table, std::cerr);
-    fprintf(stderr, "\e[1;31mFatal Error: can't compute average delta -"
+    fprintf(stderr, "\e[1;31mFatal Error: can't compute average delta; "
             "time table too short (run %d).\n\n\n\e[0m", run);
     return ERR_TimeTableTooShort;
   }
@@ -146,8 +147,8 @@ int analyze(const TString header_file_path)
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
   stupid_extrapolation(&time_table, anchor_point);
-  print(&time_table, std::cerr);
-  plot(time_table);
+  // print(&time_table, std::cerr);
+  // plot(time_table);
 
   return 0;
 }
