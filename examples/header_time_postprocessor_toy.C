@@ -15,6 +15,7 @@ namespace fs = std::filesystem;
 
 constexpr int NOMINAL_CLOCK_FREQ=125000000;
 constexpr int PUEO_FIRST_AMP_RUN=782; // will ignore all runs prior to this one
+constexpr Long64_t PUEO_LAUNCH_SECOND=1766163240;
 
 // Nominally, delta := (next_pps - this_pps) should yield approximately 125E6 
 // (unsigned integer overflow should be taken care of when computing this difference).
@@ -41,6 +42,10 @@ int analyze(const char * header_file_path);
 // @retval Success (0), Error (eg. ERR_TimeTableTooShort), or Warning (eg. ERR_MissingSecond)
 int prepare_table(const char * header_file_path, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
 
+// Checks if the first column of the table (`event_second`) starts out wrong.
+// Rumor has it that some runs started erroneously from year 1970 (Unix epoch).
+int check_event_seconds(const TimeTable * time_table);
+
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
 // @retval Success (0) or error (ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
 // @todo figure out a reasonable default `half_width`
@@ -66,11 +71,12 @@ enum err_code
 {
   ERR_MoreThanOneRun    = 1<<0, // fatal, more than one run present in headerFile<run>.root
   ERR_PreAmpRun         = 1<<1, // fatal, because we are just going to ignore these
-  ERR_TimeTableTooShort = 1<<2, // fatal, time tables with only 1 or 2 seconds can't be processed
-  ERR_MissingSecond     = 1<<3, // recoverable
-  ERR_LargeDelta        = 1<<4, // recoverable won't happen, because they happen in pre-amp runs
-  ERR_EmptyTable        = 1<<5, // fatal but probably won't be reached; we should have errored out already
-  ERR_NoStableRegion    = 1<<6  // recoverable
+  ERR_Year1970          = 1<<2, // should be recoverable
+  ERR_TimeTableTooShort = 1<<3, // fatal, time tables with only 1 or 2 seconds can't be processed
+  ERR_MissingSecond     = 1<<4, // recoverable
+  ERR_LargeDelta        = 1<<5, // recoverable won't happen, because they happen in pre-amp runs
+  ERR_EmptyTable        = 1<<6, // fatal but probably won't be reached; we should have errored out already
+  ERR_NoStableRegion    = 1<<7  // recoverable
 };
 
 int header_time_postprocessor_toy()
@@ -110,21 +116,28 @@ int analyze(const char * header_file_path)
             " at a time but more than one is found.\n\n\n\e[0m", header_file_path);
     return ERR_MoreThanOneRun;
   }
+
   if (err&ERR_PreAmpRun ) 
   {
     fprintf(stderr, "\e[1;32mNote: run %d is a pre-amp run and will be ignored.\n\n\n\e[0m", run);
     return ERR_PreAmpRun ;
   }
+
   if (err&ERR_TimeTableTooShort)
   {
-    // print(&time_table, std::cerr);
+    print(&time_table, std::cerr);
     fprintf(stderr, "\e[1;31mFatal Error: time table too short (run %d).\n\n\n\e[0m", run);
     return ERR_TimeTableTooShort;
   }
+
   if (err & ERR_MissingSecond)
     fprintf(stderr, "\e[1;33mWarning: missing seconds inserted (run %d).\n\n\n\e[0m", run);
+
   if (err & ERR_LargeDelta)
     fprintf(stderr, "\e[1;33mWarning: large pps delta detected (run %d).\n\n\n\e[0m", run);
+
+  if (check_event_seconds(&time_table))
+    fprintf(stderr, "\e[1;31mWarning: fucked up event_second (run %d).\n\n\n\e[0m", run);
 
   if(simple_moving_average(&time_table))
   {
@@ -268,6 +281,16 @@ int prepare_table(const char * header_file_path, int* run, TimeTable* time_table
 
 
   return warning_code;
+}
+
+int check_event_seconds(const TimeTable* time_table)
+{
+  for (auto &sec: *time_table)
+  {
+    if (sec.first < PUEO_LAUNCH_SECOND) return ERR_Year1970;
+  }
+
+  return 0;
 }
 
 int simple_moving_average(TimeTable* time_table, std::size_t half_width)
