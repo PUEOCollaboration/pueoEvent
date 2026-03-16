@@ -58,10 +58,11 @@ void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_secon
 // Relies on `simple_moving_average()` to have computed `avg_relative_delta`.
 void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anchor_point);
 
-void print(const TimeTable* time_table, std::ostream& stream = std::cout, std::size_t num_rows = -1); // -1: print all rows
+void print(const TimeTable* time_table, std::ostream& stream = std::cout);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-enum err_code{
+enum err_code
+{
   ERR_TimeTableTooShort = 1<<0,
   ERR_MissingSecond     = 1<<1, // recoverable
   ERR_LargeDelta        = 1<<2, // recoverable
@@ -72,7 +73,7 @@ enum err_code{
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // int run=770;
+  // int run=1311;
   // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
   fs::recursive_directory_iterator run_dir("/work/headers/");
@@ -366,10 +367,8 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator & anc
   }
 }
 
-void print(const TimeTable* time_table, std::ostream& stream, std::size_t num_rows)
+void print(const TimeTable* time_table, std::ostream& stream)
 {
-  auto stop = (num_rows < time_table->size()) ? std::next(time_table->begin(), num_rows) 
-                                              : time_table->end();
 
   stream << "\nColor: \e[1;34mMissing \e[1;33m Invalid Delta \e[1;31m Missing and Invalid Delta\e[0m\n";
   stream << "Relative delta is defined to be (next_pps - this_pps) - 125000000\n";
@@ -380,7 +379,7 @@ void print(const TimeTable* time_table, std::ostream& stream, std::size_t num_ro
          << "---------------------------------------------------------------------------------------\n";
 
   TString color;
-  for (auto it=time_table->begin(); it!=stop; ++it)
+  for (auto it=time_table->begin(); it!=time_table->end(); ++it)
   {
     if (it->second.missing && it->second.invalid_delta) color = "\033[1;31m ";  // red
     else if (it->second.missing) color = "\033[1;34m ";  // blue
@@ -395,14 +394,9 @@ void print(const TimeTable* time_table, std::ostream& stream, std::size_t num_ro
            // << color << std::setw(10) << std::boolalpha << it->second.missing
            // << color << std::setw(10) << std::boolalpha << it->second.invalid_delta <<  "\033[0m\n";
            << color << std::setw(9)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
-           << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\033[0m\n";
+           << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\n";
   }
 
-  if (num_rows < time_table->size()){
-    stream << " ...\n";
-    stream << " ...\n";
-    stream << " ...\n";
-  }
   stream << "\033[0m---------------------------------------------------------------------------------------\n";
 }
 
@@ -512,7 +506,7 @@ void plot(TimeTable& time_table, TString name)
   this_pps_residual.GetXaxis()->SetLabelOffset(0.05);
   if (xlow && xhigh)
     this_pps_residual.GetXaxis()->SetRangeUser(xlow, xhigh);
-  // this_pps_residual.GetYaxis()->SetRangeUser(-10, 10);
+  this_pps_residual.GetYaxis()->SetRangeUser(-10, 10);
 
   c1.SaveAs(name);
 }
