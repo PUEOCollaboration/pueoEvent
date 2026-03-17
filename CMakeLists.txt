@@ -7,13 +7,14 @@ include(GNUInstallDirs)
 set(HEADER_FILES
   src/pueo/Conventions.h
   src/pueo/Converter.h
+  src/pueo/DaqHsk.h
   src/pueo/Dataset.h
   src/pueo/GeomTool.h
-  src/pueo/Nav.h
-  src/pueo/DaqHsk.h
   src/pueo/Hsk.h
+  src/pueo/Nav.h
   src/pueo/RawEvent.h
   src/pueo/RawHeader.h
+  src/pueo/Timemark.h
   src/pueo/TruthEvent.h
   src/pueo/UsefulEvent.h
   src/pueo/Version.h
@@ -21,13 +22,14 @@ set(HEADER_FILES
 target_sources(${PROJECT_NAME} PRIVATE
   src/Conventions.cc
   src/Converter.cc
+  src/DaqHsk.cc
   src/Dataset.cc
   src/GeomTool.cc
-  src/Nav.cc
   src/Hsk.cc
-  src/DaqHsk.cc
+  src/Nav.cc
   src/RawEvent.cc
   src/RawHeader.cc
+  src/Timemark.cc
   src/TruthEvent.cc
   src/UsefulEvent.cc
   src/Version.cc
