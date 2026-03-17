@@ -28,7 +28,6 @@
 ****************************************************************************/
 
 
-#include <vector>
 #include "Compression.h"
 
 
@@ -49,11 +48,12 @@ namespace pueo
 //
 // arguments are:  (tag, raw type, ROOT type, postprocessor, has_arit)
 //
-// The typetag is used as the argument to the convert driver program, as well
+// The typetag "tag" is used as the argument to the convert driver program, as well
 // as the tree and branch name.
 //
 // The raw type should not have the pueo_ prefix and _t suffix (e.g. for
 // pueo_full_waveform_t should just be full_waveform)
+// ie. it has to be the same as the X-macro `PUEO_IO_DISPATCH_TABLE(X)` in libpueorawdata/inc/pueo/rawio.h
 //
 // The postprocess_function will be used to postprocess a generated ROOT file
 // as an intermediate step (e.g. doing fixups that require the whole tree), if

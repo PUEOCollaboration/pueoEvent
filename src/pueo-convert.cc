@@ -1,6 +1,7 @@
 #include "pueo/Converter.h"
 
 #include <iostream>
+#include <vector>
 #include <string.h>
 
 void usage()

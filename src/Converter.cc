@@ -35,6 +35,7 @@
 #include "TFile.h"
 #include "TTree.h"
 
+#include <vector>
 #include <iostream>
 #include <dirent.h>
 #include <algorithm>
