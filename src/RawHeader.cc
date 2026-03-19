@@ -25,7 +25,6 @@
 
 #include "pueo/RawHeader.h" 
 
-ClassImp(pueo::RawHeader); 
 
 
 int pueo::RawHeader::isInPhiMask(int phi, pueo::pol::pol_t pol) const
