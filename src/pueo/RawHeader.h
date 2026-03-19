@@ -73,7 +73,7 @@ namespace pueo
      int isInPhiMask(int phi, pol::pol_t=pol::kVertical) const; ///< Returns 1 if given phi-pol is in mask
 
 
-    ClassDefNV(RawHeader,2);
+    ClassDefNV(RawHeader,3);
 
   };
 }
