@@ -27,7 +27,6 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/GeomTool.cc
   src/Nav.cc
   src/RawHeader.cc
-  src/TruthEvent.cc
   src/UsefulEvent.cc
   src/Version.cc
 )
