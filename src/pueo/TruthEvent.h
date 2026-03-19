@@ -26,23 +26,21 @@
 #ifndef PUEO_TRUTH_EVENT_H
 #define PUEO_TRUTH_EVENT_H
 
-#include <TObject.h>
-#include <TVector3.h>
 #include "pueo/Conventions.h" 
+#include "TVector3.h"
+#include "Rtypes.h"
 
 namespace pueo 
 {
 
-  class TruthEvent : public TObject 
+  class TruthEvent
   {
     public: 
-      TruthEvent() { ; }
-      virtual ~TruthEvent() {; }
+      TruthEvent(){;}
 
       Int_t run = 0; //< Run number;
       UInt_t          realTime=0;               ///< unixTime of readout
       UInt_t          eventNumber=0;            ///< Software event number
-
 
       TVector3        balloonPos;             ///< Balloon position (icemc Cartesian coordinates) 
       TVector3        balloonDir;             ///< Balloon direction (icemc Cartesian coordinateS)
@@ -60,12 +58,10 @@ namespace pueo
       Double_t        sourceAlt = 0;          ///< RF position when leaving the ice: Altitude  (using icemc model)
       Double_t        weight = 0;             ///< Weight assigned by icemc
 
-
       std::vector<double> signal[k::NUM_DIGITIZED_CHANNELS];  ///<Noise-less signal
 
-    ClassDef(TruthEvent,1); 
+    ClassDefNV(TruthEvent,1); 
   }; 
 }
-
 
 #endif
