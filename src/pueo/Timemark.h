@@ -13,11 +13,10 @@ class Time
 {
 public:
   Time(){;}
-  virtual ~Time() {;}
 
   ULong64_t utc_secs;
   ULong64_t utc_nsecs; // screw it, it gets 64 bit whether it needs it or not :)
-  ClassDef(Time,2);
+  ClassDefNV(Time, 1);
 
 #ifdef HAVE_PUEORAWDATA
   Time(const pueo_time_t *t):utc_secs(t->utc_secs),utc_nsecs(t->utc_nsecs){;}
@@ -29,7 +28,6 @@ class Timemark
 {
 public:
   Timemark(){;}
-  virtual ~Timemark() {;}
 
   pueo::Time readout_time;
   pueo::Time rising;
@@ -37,7 +35,7 @@ public:
   UInt_t rise_count;
   UInt_t channel;
   UInt_t flags;
-  ClassDef(Timemark,2); // CERN ROOT bs
+  ClassDefNV(Timemark, 1); // non virual ClassDef, see https://root-forum.cern.ch/t/classdef-variants/44736/6
 
 #ifdef HAVE_PUEORAWDATA
   Timemark(const pueo_timemark_t *tmrk):
