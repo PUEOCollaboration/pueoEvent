@@ -21,16 +21,7 @@
 *
 ****************************************************************************************/ 
 
-
-
 #include "pueo/Nav.h" 
-
-ClassImp(pueo::nav::Position); 
-ClassImp(pueo::nav::Attitude); 
-ClassImp(pueo::nav::Sat); 
-ClassImp(pueo::nav::Sats); 
-ClassImp(pueo::nav::SunSensor);
-ClassImp(pueo::nav::SunSensors);
 
 #ifdef HAVE_PUEORAWDATA
 
