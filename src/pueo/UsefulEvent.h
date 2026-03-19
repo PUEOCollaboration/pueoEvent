@@ -57,7 +57,7 @@ namespace pueo
       double t(size_t chan, size_t i) const { return t0[chan] + i * dt[chan]; }
 
 
-    ClassDef(UsefulEvent,2); 
+    ClassDef(UsefulEvent,3); 
   }; 
 }
 
