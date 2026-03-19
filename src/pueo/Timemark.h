@@ -20,12 +20,12 @@ public:
   ClassDef(Time,2);
 
 #ifdef HAVE_PUEORAWDATA
-  Time(const pueo_time_t *t);
+  Time(const pueo_time_t *t):utc_secs(t->utc_secs),utc_nsecs(t->utc_nsecs){;}
 #endif
 };
 
 
-class Timemark: public TObject
+class Timemark
 {
 public:
   Timemark(){;}
@@ -40,7 +40,14 @@ public:
   ClassDef(Timemark,2); // CERN ROOT bs
 
 #ifdef HAVE_PUEORAWDATA
-  Timemark(const pueo_timemark_t *tmrk);
+  Timemark(const pueo_timemark_t *tmrk):
+    readout_time(&tmrk->readout_time),
+    rising(&tmrk->rising),
+    falling(&tmrk->falling),
+    rise_count(tmrk->rise_count),
+    channel(tmrk->channel),
+    flags(tmrk->flags)
+  {;}
 #endif
 };
 }

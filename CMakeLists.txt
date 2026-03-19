@@ -29,7 +29,6 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/Nav.cc
   src/RawEvent.cc
   src/RawHeader.cc
-  src/Timemark.cc
   src/TruthEvent.cc
   src/UsefulEvent.cc
   src/Version.cc
