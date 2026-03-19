@@ -1,7 +1,6 @@
 #ifndef PUEO_TIMEMARK_H
 #define PUEO_TIMEMARK_H
-
-#include <TObject.h>
+#include "Rtypes.h"
 
 #ifdef HAVE_PUEORAWDATA
 #include "pueo/rawdata.h"
