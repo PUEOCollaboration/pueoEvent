@@ -25,7 +25,6 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/DaqHsk.cc
   src/Dataset.cc
   src/GeomTool.cc
-  src/Hsk.cc
   src/Nav.cc
   src/RawHeader.cc
   src/TruthEvent.cc
