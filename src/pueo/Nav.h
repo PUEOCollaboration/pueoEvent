@@ -64,7 +64,7 @@ public:
   Float_t         tdop = 0; //< 
   Int_t           flag = 0;
 
-  ClassDefNV(Position,1);
+  ClassDefNV(Position,2);
 };
 
 // position AND attitude
@@ -96,7 +96,7 @@ public:
   std::array<UShort_t, 3> antennaCurrents;
   Short_t        temperature = 0;
 
-  ClassDefNV(Attitude,1);
+  ClassDefNV(Attitude,3);
 };
 
 class Sat
@@ -108,7 +108,7 @@ public:
   uint8_t azimuth=0; 
   uint8_t snr=0; 
   uint8_t used : 1; 
-  ClassDefNV(Sat,1);
+  ClassDefNV(Sat,2);
 };
 
 class Sats
@@ -121,7 +121,7 @@ public:
   UInt_t          payloadTimeUs = 0;
   std::vector<Sat> sats; 
 
-  ClassDefNV(Sats,1); 
+  ClassDefNV(Sats,2);
 }; 
 
 class SunSensor
@@ -135,7 +135,7 @@ public:
   UInt_t tempADS1220 = 0;
   UInt_t tempSS = 0;
 
-  ClassDefNV(SunSensor,1);
+  ClassDefNV(SunSensor,2);
 };
 
 class SunSensors
@@ -190,7 +190,7 @@ public:
   UInt_t sequence_number = 0;
   UInt_t flags = 0;
 
-  ClassDefNV(SunSensors,1); 
+  ClassDefNV(SunSensors,2);
 }; 
 
 } // nav namespace
