@@ -64,7 +64,7 @@ public:
   std::string sens_name;
   char typetag;
   char kind_unit;
-  ClassDefNV(Sensor,1);
+  ClassDefNV(Sensor,3);
 };
 }
 }
