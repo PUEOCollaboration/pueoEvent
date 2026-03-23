@@ -19,14 +19,12 @@ void keith_housekeeping_test(unsigned short i=112) {
   auto meta_df = df.Filter(Form("sensor_id == %d", i))
     .Define("s_sub", [](const std::string s){ return s; }, {"subsys"})
     .Define("s_nam", [](const std::string s){ return s; }, {"sens_name"})
-    .Define("s_type", [](const char s){ return s; }, {"typetag"})
     .Define("s_kind", [](const char s){ return s; }, {"kind_unit"});
 
   // Take will collect all instances, but we'll only look at the first one.
   // This books the event loop (using MT) to fill the vectors
   auto subsys_ptr = meta_df.Take<std::string>("s_sub");
   auto sens_name_ptr = meta_df.Take<std::string>("s_nam");
-  auto typetag_ptr = meta_df.Take<char>("s_type");
   auto kind_ptr = meta_df.Take<char>("s_kind");
 
   // Accessing the pointer will trigger the event loop
@@ -37,7 +35,6 @@ void keith_housekeeping_test(unsigned short i=112) {
 
   std::string subsys_name = subsys_ptr->at(0);
   std::string sensor_name = sens_name_ptr->at(0);
-  char typetag_name = typetag_ptr->at(0);
   char kind_name = kind_ptr->at(0);
   std::cout << "Processing: " << subsys_name << " - " << sensor_name << std::endl;
   float fmin=-1.0;
@@ -74,7 +71,7 @@ void keith_housekeeping_test(unsigned short i=112) {
   // shift the graph and divide by 3600 to get hours?
   double* xValues = gPersistent->GetX();
   int n = gPersistent->GetN();
-  int xMin = TMath::LocMin(n, xValues); // Returns index of min
+  // int xMin = TMath::LocMin(n, xValues); // Returns index of min
   //double minVal = xValues[xMin];
   if (n > 0) {
     double offset = 1766163300; // Store the minimum x value
@@ -105,8 +102,8 @@ void keith_housekeeping_test(unsigned short i=112) {
   gPad->Modified(); // Tell the pad something changed
   gPad->Update();   // Force the pad to calculate the axis ranges NOW
   // 2. Get the current Y-axis limits so the line fills the whole height
-  double ymin = gPad->GetUymin();
-  double ymax = gPad->GetUymax();
+  // double ymin = gPad->GetUymin();
+  // double ymax = gPad->GetUymax();
 
   // 3. Create the line at x = 1500
   //double xVal1= (double) (1767123180 - 1766225000)/3600.0;
