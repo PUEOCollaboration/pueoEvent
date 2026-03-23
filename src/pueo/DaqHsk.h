@@ -45,7 +45,7 @@ public:
   UShort_t pseudoscaler=0;
   Bool_t inMask=0;
   Bool_t scalerBank=0;
-  ClassDefNV(Beam,1);
+  ClassDefNV(Beam,2);
 };
 class Surf{
 public:
@@ -59,7 +59,7 @@ public:
   uint8_t surf_link = 0;
   uint8_t surf_slot = 0;
   std::array<daqhsk::Beam,pueo::k::NUM_BEAMS> Beams; 
-  ClassDefNV(Surf,1);
+  ClassDefNV(Surf,2);
 };
 
 // per class there will be a surf array that has the surf information and beam array inside it
@@ -104,7 +104,7 @@ public:
   UShort_t offset = 0;
   UShort_t pps_trig_offset = 0;
   std::array<daqhsk::Surf, pueo::k::NUM_SURF_SLOTS> Surfs;
-  ClassDefNV(DaqHsk,1);
+  ClassDefNV(DaqHsk,2);
 };
 }
 }
