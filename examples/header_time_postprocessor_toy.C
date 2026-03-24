@@ -82,19 +82,18 @@ enum err_code
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // int run=1311;
+  // int run=1103;
   // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
   fs::recursive_directory_iterator run_dir("/work/headers/");
   const std::regex pattern(R"(headFile(\d+))");
-  std::smatch run_match;
   for(auto const& entry: run_dir)
   {
     if (!entry.is_regular_file()) continue;
 
     std::string name = entry.path().stem().string(); 
     // skip other root files in the run folder
-    if (!std::regex_match(name, run_match, pattern)) continue;
+    if (!std::regex_match(name, pattern)) continue;
 
     std::cout << entry.path() << "\n";
     analyze(entry.path().c_str());
