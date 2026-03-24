@@ -22,6 +22,7 @@ constexpr Long64_t PUEO_LAUNCH_SECOND=1766163240;
 // `relative_delta` is then defined as (delta - 125E6).
 struct event_second_start_end 
 {
+  UInt_t readoutTime_sec = 0;
   UInt_t last_pps = 0;           // value of the sysclk counter at the start of the previous second
   UInt_t this_pps = 0;           // extracted from the last_pps of the next second.
   UInt_t next_pps = 0;           // extracted from the last_pps of the second after next second.
@@ -82,23 +83,23 @@ enum err_code
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  // int run=1103;
-  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
+  int run=1103;
+  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
-  fs::recursive_directory_iterator run_dir("/work/headers/");
-  const std::regex pattern(R"(headFile(\d+))");
-  for(auto const& entry: run_dir)
-  {
-    if (!entry.is_regular_file()) continue;
-
-    std::string name = entry.path().stem().string(); 
-    // skip other root files in the run folder
-    if (!std::regex_match(name, pattern)) continue;
-
-    std::cout << entry.path() << "\n";
-    analyze(entry.path().c_str());
-  }
-
+  // fs::recursive_directory_iterator run_dir("/work/headers/");
+  // const std::regex pattern(R"(headFile(\d+))");
+  // for(auto const& entry: run_dir)
+  // {
+  //   if (!entry.is_regular_file()) continue;
+  //
+  //   std::string name = entry.path().stem().string(); 
+  //   // skip other root files in the run folder
+  //   if (!std::regex_match(name, pattern)) continue;
+  //
+  //   std::cout << entry.path() << "\n";
+  //   analyze(entry.path().c_str());
+  // }
+  //
   return 0;
 }
 
@@ -173,7 +174,7 @@ int analyze(const char * header_file_path)
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
   stupid_extrapolation(&time_table, anchor_point);
-  // print(&time_table, std::cerr);
+  print(&time_table, std::cerr);
   // plot(time_table);
 
   return 0;
@@ -190,16 +191,16 @@ int prepare_table(const char * header_file_path, int* run, TimeTable* time_table
   // start by filling a table of event_second vs lpps
   auto search_and_fill = 
     [&time_table]
-    (UInt_t event_second, UInt_t lpps)
+    (UInt_t event_second, UInt_t readoutTime_sec, UInt_t lpps)
     {
       Long64_t evtsec = (Long64_t) event_second;
       bool new_encounter = time_table->find(evtsec) == time_table->end();
       if (new_encounter) 
       {
-        time_table->emplace(evtsec, event_second_start_end{.last_pps=lpps});
+        time_table->emplace(evtsec, event_second_start_end{.readoutTime_sec=readoutTime_sec,.last_pps=lpps});
       }
     };
-  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","lastPPS"});
+  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","readoutTime","lastPPS"});
 
   if (*rmin!=*rmax) return ERR_MoreThanOneRun;
   else *run = *rmin;
@@ -412,11 +413,11 @@ void print(const TimeTable* time_table, std::ostream& stream)
 
   stream << "\nColor: \e[1;34mMissing \e[1;33m Invalid Delta \e[1;31m Missing and Invalid Delta\e[0m\n";
   stream << "Relative delta is defined to be (next_pps - this_pps) - 125000000\n";
-  stream << "---------------------------------------------------------------------------------------\n"
-         << " seconds     | last pps  | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
-         << " since epoch |           |           |           | delta    | delta     | this_pps   \n"
-         << " Long64_t    | UInt_t    | UInt_t    | UInt_t    | int      | double    | double     \n"
-         << "---------------------------------------------------------------------------------------\n";
+  stream << "-----------------------------------------------------------------------------------------------------\n"
+         << " DAQ Trigger | readout     | last pps  | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
+         << " time (sec)  | time (sec)  |           |           |           | delta    | delta     | this_pps   \n"
+         << " Long64_t    | UInt_t      | UInt_t    | UInt_t    | UInt_t    | int      | double    | double     \n"
+         << "-----------------------------------------------------------------------------------------------------\n";
 
   TString color;
   for (auto it=time_table->begin(); it!=time_table->end(); ++it)
@@ -427,6 +428,7 @@ void print(const TimeTable* time_table, std::ostream& stream)
     else color = "\033[0m ";
 
     stream << color << std::setw(13) << std::left << it->first
+           << color << std::setw(13) << std::left << it->second.readoutTime_sec
            << color << std::setw(11) << it->second.last_pps// << "\033[0m\n";
            << color << std::setw(11) << it->second.this_pps
            << color << std::setw(11) << it->second.next_pps
