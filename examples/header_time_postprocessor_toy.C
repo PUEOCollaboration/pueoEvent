@@ -65,10 +65,35 @@ void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_secon
 // Relies on `simple_moving_average()` to have computed `avg_relative_delta`.
 void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anchor_point);
 
-// void event_second_correction(ROOT::RDF::RNode header_rdf)
-
 void print(const TimeTable* time_table, std::ostream& stream = std::cout);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
+
+void event_second_correction(ROOT::RDF::RNode header_rdf, const TimeTable* pps_corrected_time_table)
+{
+  auto from_corrected_pps = 
+    [pps_corrected_time_table]
+    (UInt_t event_second, UInt_t event_time)
+    {
+      // todo: corrected last pps is a useful thing, maybe store in the time table in case we are at the first second?
+      double corrected_last_pps = 
+        pps_corrected_time_table->find((Long64_t)event_second-1)->second.corrected_pps;
+
+      double avg_delta = static_cast<double>(NOMINAL_CLOCK_FREQ) + 
+        pps_corrected_time_table->find((Long64_t)event_second)->second.avg_relative_delta;
+
+      double subsecond = std::fmod(
+        static_cast<double>(event_time) - corrected_last_pps + static_cast<double>(UINT32_MAX) + 1.,
+        static_cast<double>(UINT32_MAX) + 1
+      );
+
+      subsecond /= avg_delta;
+      return subsecond;
+    };
+  header_rdf.Define("subsecond",from_corrected_pps,{"triggerTime", "trigTime"})
+            .Filter("triggerTime==1766361576")
+            .Display({"triggerTime", "trigTime", "subsecond"}, 1000)->Print();
+  print(pps_corrected_time_table);
+}
 
 enum err_code
 {
@@ -177,8 +202,10 @@ int analyze(const char * header_file_path)
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
   stupid_extrapolation(&time_table, anchor_point);
-  print(&time_table, std::cerr);
+  // print(&time_table, std::cerr);
   // plot(time_table);
+
+  event_second_correction(header_rdf, &time_table);
 
   return 0;
 }
