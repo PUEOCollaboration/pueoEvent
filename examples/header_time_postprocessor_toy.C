@@ -22,7 +22,7 @@ constexpr Long64_t PUEO_LAUNCH_SECOND=1766163240;
 // `relative_delta` is then defined as (delta - 125E6).
 struct event_second_start_end 
 {
-  UInt_t readoutTime_sec = 0;
+  UInt_t readoutTime_sec = 0;    // CPU readout time, not necessarily the same as event_second
   UInt_t last_pps = 0;           // value of the sysclk counter at the start of the previous second
   UInt_t this_pps = 0;           // extracted from the last_pps of the next second.
   UInt_t next_pps = 0;           // extracted from the last_pps of the second after next second.
@@ -41,7 +41,7 @@ int analyze(const char * header_file_path);
 // Prepares two printable TimeTables, see #print().
 // @param[out] run Run number
 // @retval Success (0), Error (eg. ERR_TimeTableTooShort), or Warning (eg. ERR_MissingSecond)
-int prepare_table(const char * header_file_path, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
+int prepare_table(ROOT::RDF::RNode header_rdf, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
 
 // Checks if the first column of the table (`event_second`) starts out wrong.
 // Rumor has it that some runs started erroneously from year 1970 (Unix epoch).
@@ -65,6 +65,8 @@ void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_secon
 // Relies on `simple_moving_average()` to have computed `avg_relative_delta`.
 void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anchor_point);
 
+// void event_second_correction(ROOT::RDF::RNode header_rdf)
+
 void print(const TimeTable* time_table, std::ostream& stream = std::cout);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
@@ -83,7 +85,7 @@ enum err_code
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  int run=1103;
+  int run=829;
   analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
   // fs::recursive_directory_iterator run_dir("/work/headers/");
@@ -105,11 +107,12 @@ int header_time_postprocessor_toy()
 
 int analyze(const char * header_file_path)
 {
+  ROOT::RDataFrame header_rdf("headerTree", header_file_path);
   TimeTable time_table;
   TimeTable invalid_seconds;
   int run=-999;
 
-  int err = prepare_table(header_file_path, &run, &time_table, &invalid_seconds);
+  int err = prepare_table(header_rdf, &run, &time_table, &invalid_seconds);
   if (err&ERR_MoreThanOneRun) 
   {
     fprintf(stderr, "\e[1;31mFatal Error: cannot process %s; I can only handle a single run"
@@ -180,13 +183,12 @@ int analyze(const char * header_file_path)
   return 0;
 }
 
-int prepare_table(const char * header_file_path, int* run, TimeTable* time_table, TimeTable* invalid_seconds)
+int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, TimeTable* invalid_seconds)
 {
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
-  ROOT::RDataFrame tmp_header_rdf("headerTree", header_file_path);
-  auto rmin = tmp_header_rdf.Min<Int_t>("run");
-  auto rmax = tmp_header_rdf.Min<Int_t>("run"); 
+  auto rmin = header_rdf.Min<Int_t>("run");
+  auto rmax = header_rdf.Min<Int_t>("run"); 
 
   // start by filling a table of event_second vs lpps
   auto search_and_fill = 
@@ -200,7 +202,7 @@ int prepare_table(const char * header_file_path, int* run, TimeTable* time_table
         time_table->emplace(evtsec, event_second_start_end{.readoutTime_sec=readoutTime_sec,.last_pps=lpps});
       }
     };
-  tmp_header_rdf.Foreach(search_and_fill, {"triggerTime","readoutTime","lastPPS"});
+  header_rdf.Foreach(search_and_fill, {"triggerTime","readoutTime","lastPPS"});
 
   if (*rmin!=*rmax) return ERR_MoreThanOneRun;
   else *run = *rmin;
