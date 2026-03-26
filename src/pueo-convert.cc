@@ -14,7 +14,9 @@ void usage()
   std::cout << "   -P   post processor args (quote for multiple) " << std::endl;
   std::cout << "   typetag  typetag of input, or use auto to try to determine (problematic if more than one ROOT type can be generate from the same raw type)"<<std::endl;
   std::cout << "   outfile  name of output file " <<std::endl;
-  std::cout << "   input    name(s) of input files or directories (note that directories are not recursive) " <<std::endl;
+  std::cout << "   input    name(s) of input files or directories. Note that directories are not recursive. " <<std::endl;
+  std::cout << "            So, as an example, converting all timemarks into one root file, one would have  " <<std::endl;
+  std::cout << "            to pass /path/to/timemark/* instead of /path/to/timemark/                       " <<std::endl;
 }
 
 int main(int nargs, char ** args) 
