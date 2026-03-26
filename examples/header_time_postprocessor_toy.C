@@ -87,12 +87,12 @@ void event_second_correction(ROOT::RDF::RNode header_rdf, const TimeTable* pps_c
       );
 
       subsecond /= avg_delta;
-      return subsecond;
+      return subsecond * 1e9;
     };
   header_rdf.Define("subsecond",from_corrected_pps,{"triggerTime", "trigTime"})
-            .Filter("triggerTime==1766361576")
+            .Filter("std::fabs(subsecond - 990509081) < 200")
             .Display({"triggerTime", "trigTime", "subsecond"}, 1000)->Print();
-  print(pps_corrected_time_table);
+  print(pps_corrected_time_table, std::cerr);
 }
 
 enum err_code
@@ -110,7 +110,7 @@ enum err_code
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  int run=829;
+  int run=1103;
   analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
   // fs::recursive_directory_iterator run_dir("/work/headers/");
