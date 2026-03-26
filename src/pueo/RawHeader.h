@@ -24,7 +24,7 @@
 #define PUEO_RAW_HEADER_H
 
 //Includes
-#include <TObject.h>
+#include "Rtypes.h"
 #include "pueo/Conventions.h"
 
 #ifdef HAVE_PUEORAWDATA
@@ -38,7 +38,7 @@
 
 namespace pueo
 {
-  class RawHeader: public TObject
+  class RawHeader
   {
      public:
      RawHeader() {;} ///< Default constructor
@@ -73,7 +73,7 @@ namespace pueo
      int isInPhiMask(int phi, pol::pol_t=pol::kVertical) const; ///< Returns 1 if given phi-pol is in mask
 
 
-    ClassDef(RawHeader,2);
+    ClassDefNV(RawHeader,3);
 
   };
 }

@@ -1,19 +1,27 @@
 #include "pueo/Converter.h"
 
 #include <iostream>
+#include <vector>
 #include <string.h>
 
 void usage()
 {
 
-  std::cout << "Usage: pueo-convert [-f] [-t tmpsuf] [-s sortby] [-P postprocessor args] typetag outfile.root input [input2]" <<std::endl;
-  std::cout << "   -f   allow clobbering output " << std::endl;
-  std::cout << "   -t   set a temporary file suffix " <<std::endl;
-  std::cout << "   -s   sort by an expression (quotes for complex expression, anything that goes in TTree::Draw and produces a double will work)." << std::endl << "       Mostly useful for telemetered data. A useful expression may be \"run*1e9+event\"."<<std::endl;
-  std::cout << "   -P   post processor args (quote for multiple) " << std::endl;
-  std::cout << "   typetag  typetag of input, or use auto to try to determine (problematic if more than one ROOT type can be generate from the same raw type)"<<std::endl;
-  std::cout << "   outfile  name of output file " <<std::endl;
-  std::cout << "   input    name(s) of input files or directories (note that directories are not recursive) " <<std::endl;
+  std::cout << "Usage: pueo-convert [-f] [-t tmpsuf] [-s sortby] [-P postprocessor args] typetag outfile.root input [input2]                                 \n"
+               "   -f   allow clobbering output                                                                                                              \n"
+               "   -t   set a temporary file suffix                                                                                                          \n"
+               "   -s   sort by an expression (quotes for complex expression, anything that goes in TTree::Draw and produces a double will work).            \n"
+               "        Mostly useful for telemetered data. A useful expression may be \"run*1e9+event\".                                                    \n"
+               "   -P   post processor args (quote for multiple)                                                                                             \n"
+               "   typetag  typetag of input, or use auto to try to determine (problematic if more than one ROOT type can be generate from the same raw type)\n"
+               "   outfile  name of output file                                                                                                              \n"
+               "   input    name(s) of input files or directories. Note that directories are not recursive.                                                  \n"
+               "            So, as an example, converting all timemarks (file structure timemarks/<year>_<month>_<day>/*.timemark.dat) into one root file,   \n"
+               "            one would have to pass `/path/to/timemark/*` instead of `/path/to/timemark/`                                                   \n\n" 
+
+               "            As another example: on the other hand, converting one day's worth of timemarks,                                                  \n"
+               "            simply pass the directory path `/path/to/timemark/<year>_<month>_<day>/`                                                         \n"
+    << std::endl;
 }
 
 int main(int nargs, char ** args) 

@@ -29,7 +29,6 @@
 #include "TGraph.h"
 #include "TAxis.h" 
 
-ClassImp(pueo::UsefulEvent); 
 
 
 
