@@ -72,19 +72,19 @@ void plot (TimeTable& time_table, TString name="pps_correction.svg");
 int event_second_correction(ROOT::RDF::RNode header_rdf, TimeTable* pps_corrected_time_table, 
                             ROOT::RDF::RNode timemark_rdf)
 {
-  // pick a somewhat arbitray point of reference, say 15 seconds into the run so that
-  // the readout time is more or less stable and contiguous (not sure if this necessary)
-  TimeTable::const_iterator ref = std::next(pps_corrected_time_table->begin(), 15);
 
-  auto distance_to_ref = [ref](ULong64_t rising_sec)
-    {return std::abs(static_cast<Long64_t>(rising_sec) - ref->second.readoutTime_sec);};
+  // Pick a somewhat arbitray reference readout time, say,
+  // 15 seconds into the run so that the readout time is more or less stable and contiguous.
+  // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
+  Long64_t ref_readout = std::next(pps_corrected_time_table->begin(), 15)->second.readoutTime_sec;
 
-  struct sec_and_nanosec {
-    ULong64_t sec;
-    ULong64_t nanosec;
-  };
-
+  struct sec_and_nanosec {ULong64_t sec; ULong64_t nanosec;};
   std::map<Long64_t, sec_and_nanosec> useful_timemarks;
+
+  // In the timemarkTree, pick rows whose rising.utc_secs ≈ reference readout time chosen above
+  auto distance_to_ref = [ref_readout](ULong64_t rising_sec)
+    {return std::abs(static_cast<Long64_t>(rising_sec) - ref_readout);};
+
   auto fill_ordered_map = [&useful_timemarks](Long64_t dist, ULong64_t sec, ULong64_t nsec)
     {useful_timemarks[dist] = sec_and_nanosec{.sec=sec, .nanosec=nsec};};
 
@@ -92,13 +92,22 @@ int event_second_correction(ROOT::RDF::RNode header_rdf, TimeTable* pps_correcte
               .Filter([](Long64_t dist){return dist<=5;}, {"distance"})
               .Foreach(fill_ordered_map, {"distance", "rising.utc_secs", "rising.utc_nsecs"});
     
+  // todo: maybe make this recoverable instead of erroring out
   if (useful_timemarks.empty()) return -1;
 
-  UInt_t target_subsecond = static_cast<UInt_t>(useful_timemarks.begin()->second.nanosec);
-  std::cout << "target subsecond: " << target_subsecond << '\n';
-  std::cout << "correct event_second: " << useful_timemarks.begin()->second.sec << '\n';
+  // The one with the smallest distance, since the map is sorted
+  auto nearest_timemark = useful_timemarks.begin();
+  // We will try to find an event whose subsecond is close to this target_subsecond
+  double target_subsecond = static_cast<double>(nearest_timemark->second.nanosec);
+  // The matching row's event_second will be corrected using the useful timemark
+  Long64_t correct_event_second = static_cast<Long64_t>(nearest_timemark->second.sec);
 
-  auto compute_subsec_from_corrected_pps = 
+  // Filter out events that are not close to the reference point, somewhat necessary (see todo below)
+  auto narrow_range = [ref_readout](UInt_t readout)
+    {return std::abs((Long64_t)readout - ref_readout) < 3;};
+  auto narrowed_rdf = header_rdf.Filter(narrow_range, {"readoutTime"});
+
+  auto compute_subsec = 
     [pps_corrected_time_table]
     (UInt_t event_second, UInt_t event_time)
     {
@@ -121,30 +130,27 @@ int event_second_correction(ROOT::RDF::RNode header_rdf, TimeTable* pps_correcte
 
       return subsecond * 1e9; // subsecton [nanosec]
     };
+  auto subsecond_rdf = narrowed_rdf.Define("subsecond", compute_subsec, {"triggerTime", "trigTime"});
 
+  // Locate the event that was timemarked (using subsecond as the identifier)
   auto double_abs_diff = [target_subsecond](double subsec)
     {return std::fabs(subsec - target_subsecond);};
+  auto result_rdf = subsecond_rdf.Define("diff", double_abs_diff, {"subsecond"})
+                                 .Filter("diff < 200"); // todo: 200 is a magic-number tolerance
 
+  // extract the result from result_rdf
   std::map<double, std::pair<UInt_t, double>> timemarked_event;
   auto extract_row = [&timemarked_event](double diff, UInt_t event_second, double computed_subsecond)
-    {
-      timemarked_event[diff] = std::pair(event_second, computed_subsecond);
-    };
-  header_rdf.Define("subsecond", compute_subsec_from_corrected_pps,{"triggerTime", "trigTime"})
-            .Define("diff", double_abs_diff, {"subsecond"})
-            .Filter("diff < 200") // todo: 200 is a magic number
-            .Foreach(extract_row, {"diff", "triggerTime", "subsecond"});
+    {timemarked_event[diff] = std::pair(event_second, computed_subsecond);};
+  result_rdf.Foreach(extract_row, {"diff", "triggerTime", "subsecond"});
 
+  // todo: mayhap this is recoverable
   if (timemarked_event.size() != 1) return -1;
 
-  std::cout << "Found a time marked event. Incorrect event_second: " 
-            << timemarked_event.begin()->second.first 
-            << " with subsecond: " << (ULong64_t)timemarked_event.begin()->second.second << "\n";
-
-  pps_corrected_time_table->find(timemarked_event.begin()->second.first)->second.corrected_sec = useful_timemarks.begin()->second.sec;
+  // use the timemakred event's rising.utc_secs to correct the `event_second` in the TimeTable
+  Long64_t maybe_wrong_event_second = static_cast<Long64_t>(timemarked_event.begin()->second.first);
+  pps_corrected_time_table->find(maybe_wrong_event_second)->second.corrected_sec = correct_event_second;
   
-  // auto incorrect_event_second = header_rdf
-  print(pps_corrected_time_table, std::cerr);
   return 0;
 }
 
@@ -255,11 +261,11 @@ int analyze(const char * header_file_path)
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
   stupid_extrapolation(&time_table, anchor_point);
-  // print(&time_table, std::cerr);
   // plot(time_table);
 
   ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
   event_second_correction(header_rdf, &time_table, timemark_rdf);
+  print(&time_table, std::cerr);
 
   return 0;
 }
