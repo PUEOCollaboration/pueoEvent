@@ -69,19 +69,15 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anch
 void print(const TimeTable* time_table, std::ostream& stream = std::cout);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-int event_second_correction(ROOT::RDF::RNode header_rdf, TimeTable* pps_corrected_time_table, 
-                            ROOT::RDF::RNode timemark_rdf)
+int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* dont_use_first_row,
+                            ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf)
 {
-
-  // Pick a somewhat arbitray reference readout time, say,
-  // 15 seconds into the run so that the readout time is more or less stable and contiguous.
-  // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
-  Long64_t ref_readout = std::next(pps_corrected_time_table->begin(), 15)->second.readoutTime_sec;
+  Long64_t ref_readout = (*dont_use_first_row)->second.readoutTime_sec;
 
   struct sec_and_nanosec {ULong64_t sec; ULong64_t nanosec;};
   std::map<Long64_t, sec_and_nanosec> useful_timemarks;
 
-  // In the timemarkTree, pick rows whose rising.utc_secs ≈ reference readout time chosen above
+  // Pick timemarks whose rising.utc_secs ≈ reference readout time chosen above
   auto distance_to_ref = [ref_readout](ULong64_t rising_sec)
     {return std::abs(static_cast<Long64_t>(rising_sec) - ref_readout);};
 
@@ -149,7 +145,8 @@ int event_second_correction(ROOT::RDF::RNode header_rdf, TimeTable* pps_correcte
 
   // use the timemakred event's rising.utc_secs to correct the `event_second` in the TimeTable
   Long64_t maybe_wrong_event_second = static_cast<Long64_t>(timemarked_event.begin()->second.first);
-  pps_corrected_time_table->find(maybe_wrong_event_second)->second.corrected_sec = correct_event_second;
+  *dont_use_first_row = pps_corrected_time_table->find(maybe_wrong_event_second);
+  (*dont_use_first_row)->second.corrected_sec = correct_event_second;
   
   return 0;
 }
@@ -264,7 +261,16 @@ int analyze(const char * header_file_path)
   // plot(time_table);
 
   ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
-  event_second_correction(header_rdf, &time_table, timemark_rdf);
+
+  // Pick a somewhat arbitray reference readout time, say,
+  // 10 seconds into the run so that the readout time is more or less stable and contiguous.
+  // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
+  TimeTable::iterator some_row = std::next(time_table.begin(), 10);
+  correct_one_event_second(&time_table, &some_row, header_rdf, timemark_rdf);
+
+  TimeTable::iterator another_row = std::next(some_row, 5);
+  correct_one_event_second(&time_table, &another_row, header_rdf, timemark_rdf);
+
   print(&time_table, std::cerr);
 
   return 0;
