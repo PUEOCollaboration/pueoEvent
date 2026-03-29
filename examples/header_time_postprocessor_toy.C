@@ -151,6 +151,38 @@ int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::ite
   return 0;
 }
 
+// second_correction HAS TO BE LATER than first_correction
+int correct_all_event_seconds(TimeTable* time_table_twice_corrected, TimeTable::iterator first_correction,
+                              TimeTable::iterator second_correction)
+{
+
+  // the difference between event_second (the key of the map)
+  auto key_diff = second_correction->first - first_correction->first;
+  if (key_diff <= 0) return -1;
+  // the if above guarantees second comes later than first
+  // second_correction HAS TO BE later than first_correction otherwise this will be UB
+  auto distance = std::distance(first_correction, second_correction);
+
+  auto correction_diff = second_correction->second.corrected_sec - first_correction->second.corrected_sec;
+  if (correction_diff!=key_diff) return -1;
+  if (correction_diff!=distance) return -1;
+
+  for (auto it=std::make_reverse_iterator(first_correction); it!=(*time_table_twice_corrected).rend(); ++it)
+  {
+    it->second.corrected_sec = first_correction->second.corrected_sec - (first_correction->first - it->first);
+  }
+  for (auto it=std::next(first_correction); it!=second_correction; ++it)
+  {
+    it->second.corrected_sec = first_correction->second.corrected_sec + (it->first - first_correction->first);
+  }
+  for (auto it=std::next(second_correction); it!=(*time_table_twice_corrected).end(); ++it)
+  {
+    it->second.corrected_sec = second_correction->second.corrected_sec + (it->first - second_correction->first);
+  }
+
+  return 0;
+}
+
 enum err_code
 {
   ERR_MoreThanOneRun    = 1<<0, // fatal, more than one run present in headerFile<run>.root
@@ -268,8 +300,10 @@ int analyze(const char * header_file_path)
   TimeTable::iterator some_row = std::next(time_table.begin(), 10);
   correct_one_event_second(&time_table, &some_row, header_rdf, timemark_rdf);
 
-  TimeTable::iterator another_row = std::next(some_row, 5);
+  TimeTable::iterator another_row = std::next(time_table.begin(), 15);
   correct_one_event_second(&time_table, &another_row, header_rdf, timemark_rdf);
+
+  correct_all_event_seconds(&time_table, some_row, another_row);
 
   print(&time_table, std::cerr);
 
