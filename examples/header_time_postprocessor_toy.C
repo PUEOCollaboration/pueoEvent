@@ -5,6 +5,7 @@
 #include "TLine.h"
 #include "TCanvas.h"
 #include "TLegend.h"
+#include <cstdint>
 #include <iostream>
 #include <iomanip>
 #include <map>
@@ -13,16 +14,16 @@
 
 namespace fs = std::filesystem;
 
-constexpr int NOMINAL_CLOCK_FREQ=125000000;
-constexpr int PUEO_FIRST_AMP_RUN=782; // will ignore all runs prior to this one
-constexpr Long64_t PUEO_LAUNCH_SECOND=1766163240;
+constexpr int32_t NOMINAL_CLOCK_FREQ=125000000;
+constexpr int32_t PUEO_FIRST_AMP_RUN=782; // will ignore all runs prior to this one
+constexpr int64_t PUEO_LAUNCH_SECOND=1766163240;
 
 // Nominally, delta := (next_pps - this_pps) should yield approximately 125E6 
 // (unsigned integer overflow should be taken care of when computing this difference).
 // `relative_delta` is then defined as (delta - 125E6).
 struct event_second_start_end 
 {
-  Long64_t corrected_sec = 0;      // Corrected event_second
+  int64_t corrected_sec = 0;      // Corrected event_second
   UInt_t   readoutTime_sec = 0;    // CPU readout time, not necessarily the same as event_second
   UInt_t   this_pps = 0;           // value of the sysclk counter of the current second
   UInt_t   next_pps = 0;           // value of the sysclk counter of the next second
@@ -33,7 +34,7 @@ struct event_second_start_end
   bool     invalid_delta = false;  // set to true if relative_delta cannot be computed
 };
 
-using TimeTable=std::map<Long64_t, event_second_start_end>;
+using TimeTable=std::map<int64_t, event_second_start_end>;
 
 // The "main" function. Returns the run number or error code
 int analyze(const char * header_file_path);
@@ -71,20 +72,20 @@ void plot (TimeTable& time_table, TString name="pps_correction.svg");
 int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* dont_use_first_row,
                             ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf)
 {
-  Long64_t ref_readout = (*dont_use_first_row)->second.readoutTime_sec;
+  int64_t ref_readout = (*dont_use_first_row)->second.readoutTime_sec;
 
   struct sec_and_nanosec {ULong64_t sec; ULong64_t nanosec;};
-  std::map<Long64_t, sec_and_nanosec> useful_timemarks;
+  std::map<int64_t, sec_and_nanosec> useful_timemarks;
 
   // Pick timemarks whose rising.utc_secs ≈ reference readout time chosen above
   auto distance_to_ref = [ref_readout](ULong64_t rising_sec)
-    {return std::abs(static_cast<Long64_t>(rising_sec) - ref_readout);};
+    {return std::abs(static_cast<int64_t>(rising_sec) - ref_readout);};
 
-  auto fill_ordered_map = [&useful_timemarks](Long64_t dist, ULong64_t sec, ULong64_t nsec)
+  auto fill_ordered_map = [&useful_timemarks](int64_t dist, ULong64_t sec, ULong64_t nsec)
     {useful_timemarks[dist] = sec_and_nanosec{.sec=sec, .nanosec=nsec};};
 
   timemark_rdf.Define("distance", distance_to_ref, {"rising.utc_secs"})
-              .Filter([](Long64_t dist){return dist<=5;}, {"distance"})
+              .Filter([](int64_t dist){return dist<=5;}, {"distance"})
               .Foreach(fill_ordered_map, {"distance", "rising.utc_secs", "rising.utc_nsecs"});
     
   // todo: maybe make this recoverable instead of erroring out
@@ -95,11 +96,11 @@ int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::ite
   // We will try to find an event whose subsecond is close to this target_subsecond
   double target_subsecond = static_cast<double>(nearest_timemark->second.nanosec);
   // The matching row's event_second will be corrected using the useful timemark
-  Long64_t correct_event_second = static_cast<Long64_t>(nearest_timemark->second.sec);
+  int64_t correct_event_second = static_cast<int64_t>(nearest_timemark->second.sec);
 
   // Filter out events that are not close to the reference point, somewhat necessary (see todo below)
   auto narrow_range = [ref_readout](UInt_t readout)
-    {return std::abs((Long64_t)readout - ref_readout) < 3;};
+    {return std::abs((int64_t)readout - ref_readout) < 3;};
   auto narrowed_rdf = header_rdf.Filter(narrow_range, {"readoutTime"});
 
   auto compute_subsec = 
@@ -109,11 +110,11 @@ int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::ite
       // todo: corrected last pps is a useful thing,
       // maybe store in the time table in case we are at the first second and can't go back any futher?
       double corrected_last_pps = 
-        pps_corrected_time_table->find((Long64_t)event_second)->second.corrected_pps;
+        pps_corrected_time_table->find((int64_t)event_second)->second.corrected_pps;
 
       // around 125 million clock counts
       double avg_delta = static_cast<double>(NOMINAL_CLOCK_FREQ) + 
-        pps_corrected_time_table->find((Long64_t)event_second)->second.avg_relative_delta;
+        pps_corrected_time_table->find((int64_t)event_second)->second.avg_relative_delta;
 
       // subsecond [clock counts]
       double subsecond = std::fmod(
@@ -143,7 +144,7 @@ int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::ite
   if (timemarked_event.size() != 1) return -1;
 
   // use the timemakred event's rising.utc_secs to correct the `event_second` in the TimeTable
-  Long64_t maybe_wrong_event_second = static_cast<Long64_t>(timemarked_event.begin()->second.first);
+  int64_t maybe_wrong_event_second = static_cast<int64_t>(timemarked_event.begin()->second.first);
   *dont_use_first_row = pps_corrected_time_table->find(maybe_wrong_event_second);
   (*dont_use_first_row)->second.corrected_sec = correct_event_second;
   
@@ -197,7 +198,7 @@ enum err_code
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  int run=840;
+  int run=1103;
   analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
   // fs::recursive_directory_iterator run_dir("/work/headers/");
@@ -289,20 +290,20 @@ int analyze(const char * header_file_path)
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
   stupid_extrapolation(&time_table, anchor_point);
-  plot(time_table);
+  // plot(time_table);
 
-  // ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
-  //
-  // // Pick a somewhat arbitray reference readout time, say,
-  // // 10 seconds into the run so that the readout time is more or less stable and contiguous.
-  // // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
-  // TimeTable::iterator some_row = std::next(time_table.begin(), 10);
-  // correct_one_event_second(&time_table, &some_row, header_rdf, timemark_rdf);
-  //
-  // TimeTable::iterator another_row = std::next(time_table.begin(), 15);
-  // correct_one_event_second(&time_table, &another_row, header_rdf, timemark_rdf);
-  //
-  // correct_all_event_seconds(&time_table, some_row, another_row);
+  ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
+
+  // Pick a somewhat arbitray reference readout time, say,
+  // 10 seconds into the run so that the readout time is more or less stable and contiguous.
+  // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
+  TimeTable::iterator some_row = std::next(time_table.begin(), 10);
+  correct_one_event_second(&time_table, &some_row, header_rdf, timemark_rdf);
+
+  TimeTable::iterator another_row = std::next(time_table.begin(), 15);
+  correct_one_event_second(&time_table, &another_row, header_rdf, timemark_rdf);
+
+  correct_all_event_seconds(&time_table, some_row, another_row);
   //
   print(&time_table, std::cerr);
 
@@ -321,7 +322,7 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
     [&time_table]
     (UInt_t event_second, UInt_t readoutTime_sec, UInt_t last_pps)
     {
-      Long64_t evtsec = (Long64_t) event_second;
+      int64_t evtsec = (int64_t) event_second;
       bool new_encounter = time_table->find(evtsec) == time_table->end();
       if (new_encounter) 
       {
@@ -355,7 +356,7 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
   for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),1);++current)
   {
     TimeTable::iterator next = std::next(current, 1);
-    Long64_t actual_next_second = current->first+1;
+    int64_t actual_next_second = current->first+1;
 
     // if the next second does not exist, then the current second's delta pps cannot be computed
     // the missing second's delta couldn't be computed either, because it wouldn't have a this_pps
@@ -541,7 +542,7 @@ void print(const TimeTable* time_table, std::ostream& stream)
   stream << "--------------------------------------------------------------------------------------------------------\n"
          << " event_second | corrected    | readout     | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
          << " from DAQ     | event_second | time (sec)  |           |           | delta    | delta     | this_pps   \n"
-         << " Long64_t     | UInt_t       | UInt_t      | UInt_t    | UInt_t    | int      | double    | double     \n"
+         << " int64_t      | UInt_t       | UInt_t      | UInt_t    | UInt_t    | int      | double    | double     \n"
          << "--------------------------------------------------------------------------------------------------------\n";
 
   TString color;
@@ -566,7 +567,7 @@ void print(const TimeTable* time_table, std::ostream& stream)
 
 void plot(TimeTable& time_table, TString name)
 {
-  Long64_t t0 = time_table.begin()->first;
+  int64_t t0 = time_table.begin()->first;
   int xlow = 0;
   int xhigh = 0;
 
@@ -580,7 +581,7 @@ void plot(TimeTable& time_table, TString name)
   std::size_t counter=0;
   for (auto& row: time_table){
 
-    Long64_t original = row.second.this_pps;
+    int64_t original = row.second.this_pps;
     original_this_pps.SetPoint(counter, row.first-t0, original);
 
     double corrected = row.second.corrected_pps;
