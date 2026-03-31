@@ -16,47 +16,47 @@ namespace fs = std::filesystem;
 
 constexpr int32_t NOMINAL_CLOCK_FREQ=125000000;
 constexpr int32_t PUEO_FIRST_AMP_RUN=782; // will ignore all runs prior to this one
-constexpr int64_t PUEO_LAUNCH_SECOND=1766163240;
+constexpr int32_t PUEO_LAUNCH_SECOND=1766163240;
 
 // Nominally, delta := (next_pps - this_pps) should yield approximately 125E6 
 // (unsigned integer overflow should be taken care of when computing this difference).
 // `relative_delta` is then defined as (delta - 125E6).
 struct event_second_start_end 
 {
-  int64_t corrected_sec = 0;      // Corrected event_second
-  UInt_t   readoutTime_sec = 0;    // CPU readout time, not necessarily the same as event_second
+  int32_t  corrected_sec = 0;      // Corrected event_second
+  int32_t  readoutTime_sec = 0;    // CPU readout time, not necessarily the same as event_second
   UInt_t   this_pps = 0;           // value of the sysclk counter of the current second
   UInt_t   next_pps = 0;           // value of the sysclk counter of the next second
-  int      relative_delta = 0;     // (next_pps - this_pps) - 125E6; unsigned int overflow taken care of
+  int32_t  relative_delta = 0;     // (next_pps - this_pps) - 125E6; unsigned int overflow taken care of
   double   avg_relative_delta = 0; // average delta (moving average)
   double   corrected_pps = 0;      // corrected this_pps (correction via avg_relative_delta)
   bool     missing = false;        // set to true if the second is a missing second
   bool     invalid_delta = false;  // set to true if relative_delta cannot be computed
 };
 
-using TimeTable=std::map<int64_t, event_second_start_end>;
+using TimeTable=std::map<int32_t, event_second_start_end>;
 
 // The "main" function. Returns the run number or error code
-int analyze(const char * header_file_path);
+int32_t analyze(const char * header_file_path);
 
 // Prepares two printable TimeTables, see #print().
 // @param[out] run Run number
 // @retval Success (0), Error (eg. ERR_TimeTableTooShort), or Warning (eg. ERR_MissingSecond)
-int prepare_table(ROOT::RDF::RNode header_rdf, int * run, TimeTable * time_table, TimeTable * invalid_seconds);
+int32_t prepare_table(ROOT::RDF::RNode header_rdf, int32_t * run, TimeTable * time_table, TimeTable * invalid_seconds);
 
 // Checks if the first column of the table (`event_second`) starts out wrong.
 // Rumor has it that some runs started erroneously from year 1970 (Unix epoch).
-int check_event_seconds(const TimeTable * time_table);
+int32_t check_event_seconds(const TimeTable * time_table);
 
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
 // @retval Success (0) or error (ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
 // @todo figure out a reasonable default `half_width`
-int simple_moving_average(TimeTable* time_table, std::size_t half_width = 8);
+int32_t simple_moving_average(TimeTable* time_table, std::size_t half_width = 8);
 
 // Finds the mid-point of a stable period; for every second in this period, delta ≈ avg_relative_delta.
 // @param[out] `anchor_point` (which is time_table.begin() if a stable region couldn't be found).
 // @retval Success (0), warning (ERR_NoStableRegion), or error (ERR_EmptyTable).
-int find_stable_region_mid_point(TimeTable* time_table, TimeTable::iterator* anchor_point);
+int32_t find_stable_region_mid_point(TimeTable* time_table, TimeTable::iterator* anchor_point);
 
 // Inserts invalid seconds back to time_table.
 // The pps delta of an invalid second is simply identical to its valid neighbors.
@@ -69,23 +69,23 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anch
 void print(const TimeTable* time_table, std::ostream& stream = std::cout);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* dont_use_first_row,
+int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* dont_use_first_row,
                             ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf)
 {
-  int64_t ref_readout = (*dont_use_first_row)->second.readoutTime_sec;
+  int32_t ref_readout = (*dont_use_first_row)->second.readoutTime_sec;
 
-  struct sec_and_nanosec {ULong64_t sec; ULong64_t nanosec;};
-  std::map<int64_t, sec_and_nanosec> useful_timemarks;
+  struct sec_and_nanosec {int32_t sec; int32_t nanosec;};
+  std::map<int32_t, sec_and_nanosec> useful_timemarks;
 
   // Pick timemarks whose rising.utc_secs ≈ reference readout time chosen above
   auto distance_to_ref = [ref_readout](ULong64_t rising_sec)
-    {return std::abs(static_cast<int64_t>(rising_sec) - ref_readout);};
+    {return std::abs(static_cast<int32_t>(rising_sec) - ref_readout);};
 
-  auto fill_ordered_map = [&useful_timemarks](int64_t dist, ULong64_t sec, ULong64_t nsec)
-    {useful_timemarks[dist] = sec_and_nanosec{.sec=sec, .nanosec=nsec};};
+  auto fill_ordered_map = [&useful_timemarks](int32_t dist, ULong64_t sec, ULong64_t nsec)
+    {useful_timemarks[dist] = sec_and_nanosec{.sec=(int32_t)sec, .nanosec=(int32_t)nsec};};
 
   timemark_rdf.Define("distance", distance_to_ref, {"rising.utc_secs"})
-              .Filter([](int64_t dist){return dist<=5;}, {"distance"})
+              .Filter([](int32_t dist){return dist<=5;}, {"distance"})
               .Foreach(fill_ordered_map, {"distance", "rising.utc_secs", "rising.utc_nsecs"});
     
   // todo: maybe make this recoverable instead of erroring out
@@ -96,25 +96,23 @@ int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::ite
   // We will try to find an event whose subsecond is close to this target_subsecond
   double target_subsecond = static_cast<double>(nearest_timemark->second.nanosec);
   // The matching row's event_second will be corrected using the useful timemark
-  int64_t correct_event_second = static_cast<int64_t>(nearest_timemark->second.sec);
+  int32_t correct_event_second = nearest_timemark->second.sec;
 
-  // Filter out events that are not close to the reference point, somewhat necessary (see todo below)
+  // Filter out events that are not close to the reference point
   auto narrow_range = [ref_readout](UInt_t readout)
-    {return std::abs((int64_t)readout - ref_readout) < 3;};
+    {return std::abs((int32_t)readout - ref_readout) < 3;};
   auto narrowed_rdf = header_rdf.Filter(narrow_range, {"readoutTime"});
 
   auto compute_subsec = 
     [pps_corrected_time_table]
     (UInt_t event_second, UInt_t event_time)
     {
-      // todo: corrected last pps is a useful thing,
-      // maybe store in the time table in case we are at the first second and can't go back any futher?
       double corrected_last_pps = 
-        pps_corrected_time_table->find((int64_t)event_second)->second.corrected_pps;
+        pps_corrected_time_table->find((int32_t)event_second)->second.corrected_pps;
 
       // around 125 million clock counts
       double avg_delta = static_cast<double>(NOMINAL_CLOCK_FREQ) + 
-        pps_corrected_time_table->find((int64_t)event_second)->second.avg_relative_delta;
+        pps_corrected_time_table->find((int32_t)event_second)->second.avg_relative_delta;
 
       // subsecond [clock counts]
       double subsecond = std::fmod(
@@ -143,8 +141,8 @@ int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::ite
   // todo: mayhap this is recoverable
   if (timemarked_event.size() != 1) return -1;
 
-  // use the timemakred event's rising.utc_secs to correct the `event_second` in the TimeTable
-  int64_t maybe_wrong_event_second = static_cast<int64_t>(timemarked_event.begin()->second.first);
+  // use the timemarked event's rising.utc_secs to correct the `event_second` in the TimeTable
+  int32_t maybe_wrong_event_second = static_cast<int32_t>(timemarked_event.begin()->second.first);
   *dont_use_first_row = pps_corrected_time_table->find(maybe_wrong_event_second);
   (*dont_use_first_row)->second.corrected_sec = correct_event_second;
   
@@ -152,8 +150,8 @@ int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::ite
 }
 
 // second_correction HAS TO BE LATER than first_correction
-int correct_all_event_seconds(TimeTable* time_table_twice_corrected, TimeTable::iterator first_correction,
-                              TimeTable::iterator second_correction)
+int32_t correct_all_event_seconds(TimeTable* time_table_twice_corrected, TimeTable::iterator first_correction,
+                                  TimeTable::iterator second_correction)
 {
 
   // the difference between event_second (the key of the map)
@@ -195,10 +193,10 @@ enum err_code
   ERR_NoStableRegion    = 1<<7  // recoverable
 };
 
-int header_time_postprocessor_toy()
+int32_t header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  int run=1103;
+  int32_t run=1103;
   analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
   // fs::recursive_directory_iterator run_dir("/work/headers/");
@@ -218,14 +216,14 @@ int header_time_postprocessor_toy()
   return 0;
 }
 
-int analyze(const char * header_file_path)
+int32_t analyze(const char * header_file_path)
 {
   ROOT::RDataFrame header_rdf("headerTree", header_file_path);
   TimeTable time_table;
   TimeTable invalid_seconds;
-  int run=-999;
+  int32_t run=-999;
 
-  int err = prepare_table(header_rdf, &run, &time_table, &invalid_seconds);
+  int32_t err = prepare_table(header_rdf, &run, &time_table, &invalid_seconds);
   if (err&ERR_MoreThanOneRun) 
   {
     fprintf(stderr, "\e[1;31mFatal Error: cannot process %s; I can only handle a single run"
@@ -310,7 +308,7 @@ int analyze(const char * header_file_path)
   return 0;
 }
 
-int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, TimeTable* invalid_seconds)
+int32_t prepare_table(ROOT::RDF::RNode header_rdf, int32_t* run, TimeTable* time_table, TimeTable* invalid_seconds)
 {
   // default already disables this so no need to explicitly disable
   // ROOT::DisableImplicitMT(); // can't multithread cuz of the lambda capture
@@ -322,13 +320,15 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
     [&time_table]
     (UInt_t event_second, UInt_t readoutTime_sec, UInt_t last_pps)
     {
-      int64_t evtsec = (int64_t) event_second;
+      int32_t evtsec = (int32_t) event_second;
       bool new_encounter = time_table->find(evtsec) == time_table->end();
       if (new_encounter) 
       {
         // If you think about it,
         // the last_pps of any event is actually the "this_pps" if we're sitting exactly on `event_second`.
-        time_table->emplace(evtsec, event_second_start_end{.readoutTime_sec=readoutTime_sec,.this_pps=last_pps});
+        time_table->emplace(evtsec, event_second_start_end{
+          .readoutTime_sec=(int32_t)readoutTime_sec,.this_pps=last_pps
+        });
       }
     };
   header_rdf.Foreach(search_and_fill, {"triggerTime","readoutTime","lastPPS"});
@@ -350,13 +350,13 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
     fprintf(stderr, "\033[1;33mWarning: small table (run %d).\n\033[0m", *run);
   }
   
-  int warning_code = 0;
+  int32_t warning_code = 0;
 
   // loop from first second to last second, if a second is missing, add it as invalid
   for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),1);++current)
   {
     TimeTable::iterator next = std::next(current, 1);
-    int64_t actual_next_second = current->first+1;
+    int32_t actual_next_second = current->first+1;
 
     // if the next second does not exist, then the current second's delta pps cannot be computed
     // the missing second's delta couldn't be computed either, because it wouldn't have a this_pps
@@ -373,7 +373,7 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
   // REMOVE entries with invalid deltas, since we're gonna perform an average later.
 
   // The first second doesn't have a valid delta, because its this_pps is garbage
-  auto first_second = (*time_table).begin();
+  TimeTable::iterator first_second = (*time_table).begin();
   first_second->second.this_pps=0; // clear out the garbage value and make it more obvious that this is bad
   first_second->second.invalid_delta=true;
   invalid_seconds->insert(time_table->extract(first_second)); // move invalid entry to a separate table
@@ -392,7 +392,7 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
       // Explicitly use UInt_t so that wrap-around subtraction is automatic
       UInt_t delta = current->second.next_pps - current->second.this_pps;
       // And then convert to int so that values below nominal show up as negative
-      int rel_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
+      int32_t rel_delta = static_cast<int32_t>(delta) - NOMINAL_CLOCK_FREQ;
       current->second.relative_delta = rel_delta;
 
       if (TMath::Abs(rel_delta) > 100) warning_code |= ERR_LargeDelta;
@@ -401,14 +401,14 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
   }
 
   // the final second doesn't have a valid delta, because there isn't a next second for it
-  auto final_second = std::prev((*time_table).end(),1);
+  TimeTable::iterator final_second = std::prev((*time_table).end(),1);
   final_second->second.invalid_delta=true;
   invalid_seconds->insert(time_table->extract(final_second));
 
   return warning_code;
 }
 
-int check_event_seconds(const TimeTable* time_table)
+int32_t check_event_seconds(const TimeTable* time_table)
 {
   for (auto &sec: *time_table)
   {
@@ -418,7 +418,7 @@ int check_event_seconds(const TimeTable* time_table)
   return 0;
 }
 
-int simple_moving_average(TimeTable* time_table, std::size_t half_width)
+int32_t simple_moving_average(TimeTable* time_table, std::size_t half_width)
 {
   if (half_width == 0) half_width=5;
 
@@ -456,7 +456,7 @@ template<typename T> bool approx_equal(T a, T b, T tolerance = 20)
   return diff <= tolerance;
 }
 
-int find_stable_region_mid_point(TimeTable * time_table, TimeTable::iterator* anchor_point) 
+int32_t find_stable_region_mid_point(TimeTable * time_table, TimeTable::iterator* anchor_point) 
 {
   if (time_table->empty()) return ERR_EmptyTable;
 
@@ -542,7 +542,7 @@ void print(const TimeTable* time_table, std::ostream& stream)
   stream << "--------------------------------------------------------------------------------------------------------\n"
          << " event_second | corrected    | readout     | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
          << " from DAQ     | event_second | time (sec)  |           |           | delta    | delta     | this_pps   \n"
-         << " int64_t      | UInt_t       | UInt_t      | UInt_t    | UInt_t    | int      | double    | double     \n"
+         << " int32_t      | int32_t      | int32_t     | UInt_t    | UInt_t    | int32_t  | double    | double     \n"
          << "--------------------------------------------------------------------------------------------------------\n";
 
   TString color;
@@ -567,9 +567,9 @@ void print(const TimeTable* time_table, std::ostream& stream)
 
 void plot(TimeTable& time_table, TString name)
 {
-  int64_t t0 = time_table.begin()->first;
-  int xlow = 0;
-  int xhigh = 0;
+  int32_t t0 = time_table.begin()->first;
+  int32_t xlow = 0;
+  int32_t xhigh = 0;
 
   TGraph original_this_pps(time_table.size());
   TGraph corrected_this_pps(time_table.size());
@@ -581,7 +581,7 @@ void plot(TimeTable& time_table, TString name)
   std::size_t counter=0;
   for (auto& row: time_table){
 
-    int64_t original = row.second.this_pps;
+    double original = row.second.this_pps;
     original_this_pps.SetPoint(counter, row.first-t0, original);
 
     double corrected = row.second.corrected_pps;
@@ -615,7 +615,7 @@ void plot(TimeTable& time_table, TString name)
   original_this_pps.GetYaxis()->SetTitle("[sysclk counts]");
   original_this_pps.GetYaxis()->SetTitleSize(0.1);
   original_this_pps.GetYaxis()->SetTitleOffset(0.3);
-  original_this_pps.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%lld)]", t0));
+  original_this_pps.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%d)]", t0));
   original_this_pps.GetXaxis()->SetTitleOffset(2.2);
   original_this_pps.GetXaxis()->CenterTitle();
   original_this_pps.GetXaxis()->SetLabelOffset(0.05);
@@ -648,7 +648,7 @@ void plot(TimeTable& time_table, TString name)
   original_delta.GetYaxis()->SetTitleSize(0.1);
   original_delta.GetYaxis()->SetTitleOffset(0.3);
   // original_delta.GetXaxis()->SetLabelSize(0);
-  original_delta.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%lld)]", t0));
+  original_delta.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%d)]", t0));
   original_delta.GetXaxis()->SetTitleOffset(2.2);
   original_delta.GetXaxis()->CenterTitle();
   original_delta.GetXaxis()->SetLabelOffset(0.05);
@@ -673,7 +673,7 @@ void plot(TimeTable& time_table, TString name)
   this_pps_residual.GetYaxis()->CenterTitle();
   this_pps_residual.GetYaxis()->SetTitleSize(0.1);
   this_pps_residual.GetYaxis()->SetTitleOffset(0.3);
-  this_pps_residual.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%lld)]", t0));
+  this_pps_residual.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%d)]", t0));
   this_pps_residual.GetXaxis()->SetTitleOffset(2.2);
   this_pps_residual.GetXaxis()->CenterTitle();
   this_pps_residual.GetXaxis()->SetLabelOffset(0.05);
