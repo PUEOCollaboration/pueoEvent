@@ -24,9 +24,8 @@ struct event_second_start_end
 {
   Long64_t corrected_sec = 0;      // Corrected event_second
   UInt_t   readoutTime_sec = 0;    // CPU readout time, not necessarily the same as event_second
-  UInt_t   last_pps = 0;           // value of the sysclk counter at the start of the previous second
-  UInt_t   this_pps = 0;           // extracted from the last_pps of the next second.
-  UInt_t   next_pps = 0;           // extracted from the last_pps of the second after next second.
+  UInt_t   this_pps = 0;           // value of the sysclk counter of the current second
+  UInt_t   next_pps = 0;           // value of the sysclk counter of the next second
   int      relative_delta = 0;     // (next_pps - this_pps) - 125E6; unsigned int overflow taken care of
   double   avg_relative_delta = 0; // average delta (moving average)
   double   corrected_pps = 0;      // corrected this_pps (correction via avg_relative_delta)
@@ -110,7 +109,7 @@ int correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::ite
       // todo: corrected last pps is a useful thing,
       // maybe store in the time table in case we are at the first second and can't go back any futher?
       double corrected_last_pps = 
-        pps_corrected_time_table->find((Long64_t)event_second-1)->second.corrected_pps;
+        pps_corrected_time_table->find((Long64_t)event_second)->second.corrected_pps;
 
       // around 125 million clock counts
       double avg_delta = static_cast<double>(NOMINAL_CLOCK_FREQ) + 
@@ -198,7 +197,7 @@ enum err_code
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  int run=1103;
+  int run=1104;
   analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
   // fs::recursive_directory_iterator run_dir("/work/headers/");
@@ -320,13 +319,15 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
   // start by filling a table of event_second vs lpps
   auto search_and_fill = 
     [&time_table]
-    (UInt_t event_second, UInt_t readoutTime_sec, UInt_t lpps)
+    (UInt_t event_second, UInt_t readoutTime_sec, UInt_t last_pps)
     {
       Long64_t evtsec = (Long64_t) event_second;
       bool new_encounter = time_table->find(evtsec) == time_table->end();
       if (new_encounter) 
       {
-        time_table->emplace(evtsec, event_second_start_end{.readoutTime_sec=readoutTime_sec,.last_pps=lpps});
+        // If you think about it,
+        // the last_pps of any event is actually the "this_pps" if we're sitting exactly on `event_second`.
+        time_table->emplace(evtsec, event_second_start_end{.readoutTime_sec=readoutTime_sec,.this_pps=last_pps});
       }
     };
   header_rdf.Foreach(search_and_fill, {"triggerTime","readoutTime","lastPPS"});
@@ -337,7 +338,7 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
   if (*run < PUEO_FIRST_AMP_RUN) return ERR_PreAmpRun ;
 
   // It only makes sense if we have at least one valid second (ie 3 consecutive `event_second`s).
-  // Note: the final two seconds of any run are invalid (can't compute their pps delta),
+  // Note: the first second and the final second of any run are invalid (can't compute their pps delta),
   if (time_table->size() < 3) return ERR_TimeTableTooShort;
 
   // Mar 10 2026: I manually figured out the shortest run is 889 at 20 seconds, 
@@ -373,26 +374,29 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
     }
   }
 
-  // Next, compute this_pps, next_pps, and delta := (next_pps - this_pps) of each valid second;
+  // the first second doesn't have a valid delta, because its this_pps is garbage
+  auto first_second = (*time_table).begin();
+  first_second->second.this_pps=0;
+  first_second->second.invalid_delta=true;
+  invalid_seconds->insert(time_table->extract(first_second));
+
+  // Next, compute next_pps and delta := (next_pps - this_pps) of each valid second;
   // REMOVE entries with invalid deltas, since we're gonna perform an average later.
-  for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),2);)
+  for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),1);)
   {
-    TimeTable::iterator next_next = std::next(current, 2);
     TimeTable::iterator next = std::next(current, 1);
-    if (next->second.missing || next_next->second.missing)
+    if (next->second.missing)
     {
       // move entries with invalid deltas to a separate table
       invalid_seconds->insert(time_table->extract(current++));
     }
     else
     {
-      // the last_pps of next second is the current second's this_pps
-      UInt_t tpps = next->second.last_pps;
-      current->second.this_pps = tpps;
-      UInt_t npps = next_next->second.last_pps;
+      // the this_pps of next second is the current second's next_pps
+      UInt_t npps = next->second.this_pps;
       current->second.next_pps =  npps;
       // Explicitly use UInt_t so that wrap-around subtraction is automatic
-      UInt_t delta =  npps - tpps;
+      UInt_t delta =  npps - current->second.this_pps;
       // And then convert to int so that values below nominal show up as negative
       int rel_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
       current->second.relative_delta = rel_delta;
@@ -401,13 +405,11 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
       ++current;
     }  
   }
-  // The final 2 seconds will never have valid deltas since the next two seconds don't exist for them.
-  for(TimeTable::iterator it=std::prev(time_table->end(),2); it!=time_table->end();)
-  {
-    it->second.invalid_delta=true;
-    invalid_seconds->insert(time_table->extract(it++));
-  }
 
+  // the final second doesn't have a valid delta, because there isn't a next second for it
+  auto final_second = std::prev((*time_table).end(),1);
+  final_second->second.invalid_delta=true;
+  invalid_seconds->insert(time_table->extract(final_second));
 
   return warning_code;
 }
@@ -496,14 +498,15 @@ void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_secon
   {
     auto insert = time_table->insert(invalid_seconds->extract(it++));
     TimeTable::iterator current = insert.position; // position of the newly inserted element in time_table
-    TimeTable::iterator past = std::prev(current);
-    TimeTable::iterator future = std::next(current);
-    if (future != time_table->end())
-    {
+    if (current==time_table->begin())
+      current->second.avg_relative_delta = std::next(current)->second.avg_relative_delta;
+    else if (current==std::prev(time_table->end(),1))
+      current->second.avg_relative_delta = std::prev(current)->second.avg_relative_delta;
+    else {
+      TimeTable::iterator past = std::prev(current);
+      TimeTable::iterator future = std::next(current);
       double avg = (past->second.avg_relative_delta + future->second.avg_relative_delta) / 2;
       current->second.avg_relative_delta = avg;
-    } else {
-      current->second.avg_relative_delta = past->second.avg_relative_delta;
     }
   }
 }
@@ -542,11 +545,11 @@ void print(const TimeTable* time_table, std::ostream& stream)
 
   stream << "\nColor: \e[1;34mMissing \e[1;33m Invalid Delta \e[1;31m Missing and Invalid Delta\e[0m\n";
   stream << "Relative delta is defined to be (next_pps - this_pps) - 125000000\n";
-  stream << "--------------------------------------------------------------------------------------------------------------------\n"
-         << " event_second | corrected    | readout     | last pps  | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
-         << " from DAQ     | event_second | time (sec)  |           |           |           | delta    | delta     | this_pps   \n"
-         << " Long64_t     | UInt_t       | UInt_t      | UInt_t    | UInt_t    | UInt_t    | int      | double    | double     \n"
-         << "--------------------------------------------------------------------------------------------------------------------\n";
+  stream << "--------------------------------------------------------------------------------------------------------\n"
+         << " event_second | corrected    | readout     | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
+         << " from DAQ     | event_second | time (sec)  |           |           | delta    | delta     | this_pps   \n"
+         << " Long64_t     | UInt_t       | UInt_t      | UInt_t    | UInt_t    | int      | double    | double     \n"
+         << "--------------------------------------------------------------------------------------------------------\n";
 
   TString color;
   for (auto it=time_table->begin(); it!=time_table->end(); ++it)
@@ -559,12 +562,9 @@ void print(const TimeTable* time_table, std::ostream& stream)
     stream << color << std::setw(14) << std::left << it->first
            << color << std::setw(14) << std::left << it->second.corrected_sec
            << color << std::setw(13) << std::left << it->second.readoutTime_sec
-           << color << std::setw(11) << it->second.last_pps// << "\033[0m\n";
            << color << std::setw(11) << it->second.this_pps
            << color << std::setw(11) << it->second.next_pps
            << color << std::setw(10) << it->second.relative_delta
-           // << color << std::setw(10) << std::boolalpha << it->second.missing
-           // << color << std::setw(10) << std::boolalpha << it->second.invalid_delta <<  "\033[0m\n";
            << color << std::setw(9)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
            << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\n";
   }
