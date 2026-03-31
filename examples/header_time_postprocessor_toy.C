@@ -25,8 +25,8 @@ struct event_second_start_end
 {
   int32_t  corrected_sec = 0;      // Corrected event_second
   int32_t  readoutTime_sec = 0;    // CPU readout time, not necessarily the same as event_second
-  UInt_t   this_pps = 0;           // value of the sysclk counter of the current second
-  UInt_t   next_pps = 0;           // value of the sysclk counter of the next second
+  uint32_t this_pps = 0;           // value of the sysclk counter of the current second
+  uint32_t next_pps = 0;           // value of the sysclk counter of the next second
   int32_t  relative_delta = 0;     // (next_pps - this_pps) - 125E6; unsigned int overflow taken care of
   double   avg_relative_delta = 0; // average delta (moving average)
   double   corrected_pps = 0;      // corrected this_pps (correction via avg_relative_delta)
@@ -70,7 +70,7 @@ void print(const TimeTable* time_table, std::ostream& stream = std::cout);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
 int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* dont_use_first_row,
-                            ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf)
+                                 ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf)
 {
   int32_t ref_readout = (*dont_use_first_row)->second.readoutTime_sec;
 
@@ -92,7 +92,7 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
   if (useful_timemarks.empty()) return -1;
 
   // The one with the smallest distance, since the map is sorted
-  auto nearest_timemark = useful_timemarks.begin();
+  std::map<int32_t, sec_and_nanosec>::iterator nearest_timemark = useful_timemarks.begin();
   // We will try to find an event whose subsecond is close to this target_subsecond
   double target_subsecond = static_cast<double>(nearest_timemark->second.nanosec);
   // The matching row's event_second will be corrected using the useful timemark
@@ -302,7 +302,7 @@ int32_t analyze(const char * header_file_path)
   correct_one_event_second(&time_table, &another_row, header_rdf, timemark_rdf);
 
   correct_all_event_seconds(&time_table, some_row, another_row);
-  //
+
   print(&time_table, std::cerr);
 
   return 0;
@@ -327,7 +327,8 @@ int32_t prepare_table(ROOT::RDF::RNode header_rdf, int32_t* run, TimeTable* time
         // If you think about it,
         // the last_pps of any event is actually the "this_pps" if we're sitting exactly on `event_second`.
         time_table->emplace(evtsec, event_second_start_end{
-          .readoutTime_sec=(int32_t)readoutTime_sec,.this_pps=last_pps
+          .readoutTime_sec=(int32_t)readoutTime_sec,
+          .this_pps=(uint32_t)last_pps
         });
       }
     };
@@ -389,8 +390,8 @@ int32_t prepare_table(ROOT::RDF::RNode header_rdf, int32_t* run, TimeTable* time
       TimeTable::iterator next = std::next(current, 1);
       // the this_pps of next second is the current second's next_pps
       current->second.next_pps =  next->second.this_pps;;
-      // Explicitly use UInt_t so that wrap-around subtraction is automatic
-      UInt_t delta = current->second.next_pps - current->second.this_pps;
+      // Explicitly use uint32_t so that wrap-around subtraction is automatic
+      uint32_t delta = current->second.next_pps - current->second.this_pps;
       // And then convert to int so that values below nominal show up as negative
       int32_t rel_delta = static_cast<int32_t>(delta) - NOMINAL_CLOCK_FREQ;
       current->second.relative_delta = rel_delta;
@@ -542,7 +543,7 @@ void print(const TimeTable* time_table, std::ostream& stream)
   stream << "--------------------------------------------------------------------------------------------------------\n"
          << " event_second | corrected    | readout     | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
          << " from DAQ     | event_second | time (sec)  |           |           | delta    | delta     | this_pps   \n"
-         << " int32_t      | int32_t      | int32_t     | UInt_t    | UInt_t    | int32_t  | double    | double     \n"
+         << " int32_t      | int32_t      | int32_t     | uint32_t  | uint32_t  | int32_t  | double    | double     \n"
          << "--------------------------------------------------------------------------------------------------------\n";
 
   TString color;
