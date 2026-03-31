@@ -197,7 +197,7 @@ enum err_code
 int header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  int run=1104;
+  int run=840;
   analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
   // fs::recursive_directory_iterator run_dir("/work/headers/");
@@ -291,19 +291,19 @@ int analyze(const char * header_file_path)
   stupid_extrapolation(&time_table, anchor_point);
   // plot(time_table);
 
-  ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
-
-  // Pick a somewhat arbitray reference readout time, say,
-  // 10 seconds into the run so that the readout time is more or less stable and contiguous.
-  // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
-  TimeTable::iterator some_row = std::next(time_table.begin(), 10);
-  correct_one_event_second(&time_table, &some_row, header_rdf, timemark_rdf);
-
-  TimeTable::iterator another_row = std::next(time_table.begin(), 15);
-  correct_one_event_second(&time_table, &another_row, header_rdf, timemark_rdf);
-
-  correct_all_event_seconds(&time_table, some_row, another_row);
-
+  // ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
+  //
+  // // Pick a somewhat arbitray reference readout time, say,
+  // // 10 seconds into the run so that the readout time is more or less stable and contiguous.
+  // // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
+  // TimeTable::iterator some_row = std::next(time_table.begin(), 10);
+  // correct_one_event_second(&time_table, &some_row, header_rdf, timemark_rdf);
+  //
+  // TimeTable::iterator another_row = std::next(time_table.begin(), 15);
+  // correct_one_event_second(&time_table, &another_row, header_rdf, timemark_rdf);
+  //
+  // correct_all_event_seconds(&time_table, some_row, another_row);
+  //
   print(&time_table, std::cerr);
 
   return 0;
@@ -352,51 +352,44 @@ int prepare_table(ROOT::RDF::RNode header_rdf, int* run, TimeTable* time_table, 
   int warning_code = 0;
 
   // loop from first second to last second, if a second is missing, add it as invalid
-  for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),2);++current)
+  for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),1);++current)
   {
-    TimeTable::iterator next_next = std::next(current, 2);
     TimeTable::iterator next = std::next(current, 1);
     Long64_t actual_next_second = current->first+1;
-    Long64_t actual_next_next = current->first+2;
-    // if the next (or next next) second does not exist, then the current second's delta pps cannot be computed
+
+    // if the next second does not exist, then the current second's delta pps cannot be computed
+    // the missing second's delta couldn't be computed either, because it wouldn't have a this_pps
     if (actual_next_second != next->first)
     {
       (*time_table)[actual_next_second].missing = true;
-      current->second.invalid_delta = true;
-      warning_code |= ERR_MissingSecond;
-    }
-    if (actual_next_next != next_next->first)
-    {
-      (*time_table)[actual_next_next].missing = true;
-      current->second.invalid_delta = true;
       (*time_table)[actual_next_second].invalid_delta = true;
+      current->second.invalid_delta = true;
       warning_code |= ERR_MissingSecond;
     }
   }
 
-  // the first second doesn't have a valid delta, because its this_pps is garbage
-  auto first_second = (*time_table).begin();
-  first_second->second.this_pps=0;
-  first_second->second.invalid_delta=true;
-  invalid_seconds->insert(time_table->extract(first_second));
-
   // Next, compute next_pps and delta := (next_pps - this_pps) of each valid second;
   // REMOVE entries with invalid deltas, since we're gonna perform an average later.
+
+  // The first second doesn't have a valid delta, because its this_pps is garbage
+  auto first_second = (*time_table).begin();
+  first_second->second.this_pps=0; // clear out the garbage value and make it more obvious that this is bad
+  first_second->second.invalid_delta=true;
+  invalid_seconds->insert(time_table->extract(first_second)); // move invalid entry to a separate table
+
   for (TimeTable::iterator current=time_table->begin(); current!=std::prev(time_table->end(),1);)
   {
-    TimeTable::iterator next = std::next(current, 1);
-    if (next->second.missing)
+    if (current->second.invalid_delta)
     {
-      // move entries with invalid deltas to a separate table
       invalid_seconds->insert(time_table->extract(current++));
     }
     else
     {
+      TimeTable::iterator next = std::next(current, 1);
       // the this_pps of next second is the current second's next_pps
-      UInt_t npps = next->second.this_pps;
-      current->second.next_pps =  npps;
+      current->second.next_pps =  next->second.this_pps;;
       // Explicitly use UInt_t so that wrap-around subtraction is automatic
-      UInt_t delta =  npps - current->second.this_pps;
+      UInt_t delta = current->second.next_pps - current->second.this_pps;
       // And then convert to int so that values below nominal show up as negative
       int rel_delta = static_cast<int>(delta) - NOMINAL_CLOCK_FREQ;
       current->second.relative_delta = rel_delta;
@@ -555,7 +548,6 @@ void print(const TimeTable* time_table, std::ostream& stream)
   for (auto it=time_table->begin(); it!=time_table->end(); ++it)
   {
     if (it->second.missing && it->second.invalid_delta) color = "\033[1;31m ";  // red
-    else if (it->second.missing) color = "\033[1;34m ";  // blue
     else if (it->second.invalid_delta) color = "\033[1;33m "; // yellow
     else color = "\033[0m ";
 
@@ -618,10 +610,14 @@ void plot(TimeTable& time_table, TString name)
   original_this_pps.SetMarkerStyle(kFullCrossX);
   original_this_pps.SetMarkerSize(3);
   original_this_pps.SetTitle("System Clock Value (uint32_t) at Start of Each Second (aka \"this_pps\")");
-  original_this_pps.GetXaxis()->SetLabelSize(0);
+  // original_this_pps.GetXaxis()->SetLabelSize(0);
   original_this_pps.GetYaxis()->SetTitle("[sysclk counts]");
   original_this_pps.GetYaxis()->SetTitleSize(0.1);
   original_this_pps.GetYaxis()->SetTitleOffset(0.3);
+  original_this_pps.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%lld)]", t0));
+  original_this_pps.GetXaxis()->SetTitleOffset(2.2);
+  original_this_pps.GetXaxis()->CenterTitle();
+  original_this_pps.GetXaxis()->SetLabelOffset(0.05);
   original_this_pps.GetYaxis()->CenterTitle();
   if (xlow && xhigh)
     original_this_pps.GetXaxis()->SetRangeUser(xlow, xhigh);
