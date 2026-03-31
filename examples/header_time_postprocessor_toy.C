@@ -289,7 +289,7 @@ int analyze(const char * header_file_path)
 
   insert_invalid_seconds_back(&time_table, &invalid_seconds);
   stupid_extrapolation(&time_table, anchor_point);
-  // plot(time_table);
+  plot(time_table);
 
   // ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
   //
@@ -536,7 +536,7 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator & anc
 void print(const TimeTable* time_table, std::ostream& stream)
 {
 
-  stream << "\nColor: \e[1;34mMissing \e[1;33m Invalid Delta \e[1;31m Missing and Invalid Delta\e[0m\n";
+  stream << "\nColor: \e[1;33m Invalid Delta \e[1;31m Missing and Invalid Delta\e[0m\n";
   stream << "Relative delta is defined to be (next_pps - this_pps) - 125000000\n";
   stream << "--------------------------------------------------------------------------------------------------------\n"
          << " event_second | corrected    | readout     | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
@@ -646,7 +646,11 @@ void plot(TimeTable& time_table, TString name)
   original_delta.GetYaxis()->CenterTitle();
   original_delta.GetYaxis()->SetTitleSize(0.1);
   original_delta.GetYaxis()->SetTitleOffset(0.3);
-  original_delta.GetXaxis()->SetLabelSize(0);
+  // original_delta.GetXaxis()->SetLabelSize(0);
+  original_delta.GetXaxis()->SetTitle(Form("Event Second [seconds since t0 (%lld)]", t0));
+  original_delta.GetXaxis()->SetTitleOffset(2.2);
+  original_delta.GetXaxis()->CenterTitle();
+  original_delta.GetXaxis()->SetLabelOffset(0.05);
   if (xlow && xhigh)
     original_delta.GetXaxis()->SetRangeUser(xlow, xhigh);
   // original_delta.GetYaxis()->SetRangeUser(30, 40);
@@ -655,7 +659,7 @@ void plot(TimeTable& time_table, TString name)
   avg_delta.SetMarkerStyle(kCircle);
   avg_delta.SetMarkerColor(kRed);
 
-  TLegend leg3(0.6, 0.0, 0.9, 0.1); // (x1,y1,x2,y2) in NDC
+  TLegend leg3(0.1, 0.9, 0.4, 1); // (x1,y1,x2,y2) in NDC
   leg3.AddEntry(&original_delta, "original (discrete) delta (uint32_t)", "p");
   leg3.AddEntry(&avg_delta, "smoothed (moving averaged) delta (double_t)", "p");
   leg3.Draw();
