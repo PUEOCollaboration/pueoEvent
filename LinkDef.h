@@ -44,7 +44,6 @@
 #pragma link C++ class pueo::daqhsk::Surf+;
 #pragma link C++ class pueo::daqhsk::Beam+;
 #pragma link C++ class pueo::Timemark+;
-#pragma link C++ class pueo::Time+;
 
 #pragma read \
   targetClass = "pueo::RawEvent"\
