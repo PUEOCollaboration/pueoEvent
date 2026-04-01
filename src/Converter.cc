@@ -128,8 +128,16 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
         {
           nprocessed++;
           R->~RootType();
-          R = new (R) RootType(&r, j);
-          t->Fill();
+          try
+          {
+            R = new (R) RootType(&r, j);
+            t->Fill();
+          }
+          catch (const char * f)
+          {
+            std::cerr << "Conversion Exception: " << f << std::endl;
+          }
+
         }
       }
       else
@@ -137,8 +145,15 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
 
         nprocessed++;
         R->~RootType();
-        R = new (R) RootType(&r);
-        t->Fill();
+        try
+        {
+          R = new (R) RootType(&r);
+          t->Fill();
+        }
+        catch (const char * f)
+        {
+          std::cerr <<  "Conversion Exception: " << f << std::endl;
+        }
       }
     }
     pueo_handle_close(&h);
