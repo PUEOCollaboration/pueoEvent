@@ -210,7 +210,7 @@ pueo::nav::Attitude * pueo::Dataset::gps(bool force_load)
     if (fGpsDirty || force_load)
     {
       //try one that matches realtime
-      int gpsEntry = fGpsTree->GetEntryNumberWithBestIndex(round(header()->triggerTime + header()->triggerTimeNs  / 1e9)); 
+      int gpsEntry = fGpsTree->GetEntryNumberWithBestIndex(round(header()->corrected_trigger_time.GetSec() + header()->corrected_trigger_time.GetNanoSec()  / 1e9)); 
 //      int offset = 0; 
       fGpsTree->GetEntry(gpsEntry); 
       /*
@@ -256,7 +256,7 @@ pueo::RawHeader * pueo::Dataset::header(bool force_load)
 
 
   if(theStrat & kInsertedVPolEvents){
-    Int_t fakeTreeEntry = needToOverwriteEvent(pol::kVertical, fHeader->eventNumber);
+    Int_t fakeTreeEntry = needToOverwriteEvent(pol::kVertical, fHeader->event_number);
     if(fakeTreeEntry > -1){
       overwriteHeader(fHeader, pol::kVertical, fakeTreeEntry);
     }
@@ -264,7 +264,7 @@ pueo::RawHeader * pueo::Dataset::header(bool force_load)
 
 
   if(theStrat & kInsertedHPolEvents){
-    Int_t fakeTreeEntry = needToOverwriteEvent(pol::kHorizontal, fHeader->eventNumber);
+    Int_t fakeTreeEntry = needToOverwriteEvent(pol::kHorizontal, fHeader->event_number);
     if(fakeTreeEntry > -1){
       overwriteHeader(fHeader, pol::kHorizontal, fakeTreeEntry);
     }
@@ -373,7 +373,7 @@ int pueo::Dataset::getEntry(int entryNumber)
     if (fDecimated)
     {
       fDecimatedHeadTree->GetEntry(fDecimatedEntry); 
-      fWantedEntry = fHeadTree->GetEntryNumberWithIndex(fHeader->eventNumber); 
+      fWantedEntry = fHeadTree->GetEntryNumberWithIndex(fHeader->event_number); 
 
     }
     if (!fHaveUsefulFile) fUsefulDirty = true; 
@@ -382,7 +382,7 @@ int pueo::Dataset::getEntry(int entryNumber)
 
 
   // use the header to set the PUEO version 
-  version::setVersionFromUnixTime(header()->triggerTime); 
+  version::setVersionFromUnixTime(header()->corrected_trigger_time.GetSec()); 
 
   return fDecimated ? fDecimatedEntry : fWantedEntry; 
 }
@@ -717,7 +717,7 @@ int pueo::Dataset::previousMinBiasEvent()
       fIndex = N() - 1;
     }
     fHeadTree->GetEntry(fIndex);
-    if((fHeader->trigType&1) == 0) break;
+    if((fHeader->trig_type&1) == 0) break;
   }
   
   return nthEvent(fIndex);
@@ -739,7 +739,7 @@ int pueo::Dataset::nextMinBiasEvent()
       fIndex = 0;
     }
     fHeadTree->GetEntry(fIndex);
-    if((fHeader->trigType&1) == 0) break;
+    if((fHeader->trig_type&1) == 0) break;
   }
   
   return nthEvent(fIndex);
@@ -1136,7 +1136,7 @@ void pueo::Dataset::loadHiCalGps(char which) {
  * @param altitude hical position
  */
 void pueo::Dataset::hiCal(char which, Double_t& longitude, Double_t& latitude, Double_t& altitude) {
-  UInt_t realTime = fHeader ? fHeader->triggerTime : 0;
+  UInt_t realTime = fHeader ? fHeader->corrected_trigger_time.GetSec() : 0;
   hiCal(which, realTime, longitude, latitude, altitude);
 }
 
@@ -1200,16 +1200,14 @@ void pueo::Dataset::overwriteHeader(RawHeader* header, pol::pol_t pol, Int_t fak
   }
 
   // Retain some of the header data for camouflage
-  UInt_t realTime = header->triggerTime;
-  UInt_t triggerTimeNs = header->triggerTimeNs;
-  UInt_t eventNumber = header->eventNumber;
+  TTimeStamp trigger_time = header->corrected_trigger_time;
+  UInt_t event_number = header->event_number;
   Int_t run = header->run;
 
   (*header) = (*fBlindHeader[pol]);
 
-  header->triggerTime = realTime;
-  header->triggerTimeNs = triggerTimeNs;
-  header->eventNumber = eventNumber;
+  header->corrected_trigger_time = trigger_time;
+  header->event_number = event_number;
   header->run = run;
 
 }
