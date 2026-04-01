@@ -131,21 +131,21 @@
   sourceClass = "pueo::RawHeader"\
   target = "deadtime_counter" \
   version =  "[2]" \
-  source = "UShort_T deadTime;"
+  source = "UShort_t deadTime;"
 
 #pragma read \
   targetClass = "pueo::RawHeader"\
   sourceClass = "pueo::RawHeader"\
   target = "deadtime_counter_last_pps" \
   version =  "[2]" \
-  source = "UShort_T deadTimeLastPPS;"
+  source = "UShort_t deadTimeLastPPS;"
 
 #pragma read \
   targetClass = "pueo::RawHeader"\
   sourceClass = "pueo::RawHeader"\
   target = "deadtime_counter_llast_pps" \
   version =  "[2]" \
-  source = "UShort_T deadTimeLastLastPPS;"
+  source = "UShort_t deadTimeLastLastPPS;"
 
 #else
 #error "for compilation"
