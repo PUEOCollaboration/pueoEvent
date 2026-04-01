@@ -393,7 +393,7 @@ int pueo::Dataset::getEvent(int eventNumber, bool quiet)
 
   int entry  =  (fDecimated ? fDecimatedHeadTree : fHeadTree)->GetEntryNumberWithIndex(eventNumber); 
 
-  if (entry < 0 && (eventNumber < fHeadTree->GetMinimum("eventNumber") || eventNumber > fHeadTree->GetMaximum("eventNumber")))
+  if (entry < 0 && (eventNumber < fHeadTree->GetMinimum("event_number") || eventNumber > fHeadTree->GetMaximum("event_number")))
   {
       if (!quiet) fprintf(stderr,"WARNING: event %lld not found in header tree\n", fWantedEntry); 
       if (fDecimated) 
@@ -502,7 +502,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
       filesToClose.push_back(f); 
       fDecimatedHeadTree = (TTree*) f->Get("headTree"); 
       if (!fDecimatedHeadTree) fDecimatedHeadTree = (TTree*) f->Get("headerTree");
-      fDecimatedHeadTree->BuildIndex("eventNumber"); 
+      fDecimatedHeadTree->BuildIndex("event_number"); 
       fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
       fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
     }
@@ -548,7 +548,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
   if (!fDecimated) fHeadTree->SetBranchAddress("header",&fHeader); 
 
-  fHeadTree->BuildIndex("eventNumber"); 
+  fHeadTree->BuildIndex("event_number"); 
 
   if (!fDecimated) fIndices = ((TTreeIndex*) fHeadTree->GetTreeIndex())->GetIndex(); 
 
@@ -1009,8 +1009,8 @@ int pueo::Dataset::getRunAtTime(double t)
                 run_info  ri; 
                 ri.run = run; 
                 //TODO do this to nanosecond precision 
-                ri.start_time= t->GetMinimum("triggerTime"); 
-                ri.stop_time = t->GetMaximum("triggerTime") + 1; 
+                ri.start_time= t->GetMinimum("event_second"); 
+                ri.stop_time = t->GetMaximum("event_second") + 1; 
                 run_times[version].push_back(ri); 
               }
             }
