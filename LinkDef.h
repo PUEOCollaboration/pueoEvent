@@ -79,13 +79,6 @@
 #pragma read \
   targetClass = "pueo::RawHeader"\
   sourceClass = "pueo::RawHeader"\
-  target = "event_second" \
-  version =  "[2]" \
-  source = "UInt_t triggerTime;"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
   target = "readout_time" \
   version =  "[2]" \
   source = "UInt_t readoutTime; UInt_t readoutTimeNs;"\
