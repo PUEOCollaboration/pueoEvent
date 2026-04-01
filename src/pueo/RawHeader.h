@@ -42,7 +42,14 @@ namespace pueo
 class RawHeader
 {
 public:
-  RawHeader():readout_time(0,0),corrected_trigger_time(0,0){;} ///< Default constructor
+  // Default constructor:
+  // Initialize all timestamps to a clearly garbage value (year 1970).
+  // Otherwise ROOT will initialize them to the current time and that's not a good obvious garbage value
+  RawHeader():
+    readout_time(0,0),
+    corrected_readout_time(0,0),
+    corrected_trigger_time(0,0)
+  {;}
 
 #ifdef HAVE_PUEORAWDATA
   RawHeader(const pueo_full_waveforms_t * wfs);
@@ -77,6 +84,7 @@ public:
   TTimeStamp readout_time; ///< Time since Unix epoch [sec]
                            ///< Tagged by the flight computer upon packet creation (ie event reception)
 
+  TTimeStamp corrected_readout_time; ///< correction via post-processing (method TBD)
   TTimeStamp corrected_trigger_time; ///< correction via post-processing with pueo::Timemark
                                      ///< second: from (corrected) `event_second`
                                      ///< nanosecond: from `event_time` and (corrected) `last_pps`
