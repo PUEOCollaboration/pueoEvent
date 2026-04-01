@@ -47,8 +47,8 @@ public:
 #ifdef HAVE_PUEORAWDATA
   RawHeader(const pueo_full_waveforms_t * wfs);
 #endif
-  int32_t   run = -999; ///< Run number, assigned on ground
-  int32_t   event_number = -999;
+  uint32_t   run = 0; ///< Run number, assigned on ground
+  uint32_t   event_number = 0;
 
   /* An example:
 

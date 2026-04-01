@@ -22,8 +22,8 @@ namespace pueo
     uint8_t channel=0;
     uint8_t flags=0;
 
-    int32_t run=-999;          ///< not in raw data, but should be identifiable via post processing
-    int32_t event_number=-999; ///< not in raw data, but should be identifiable via post processing
+    uint32_t run=0;          ///< not in raw data, but should be identifiable via post processing
+    uint32_t event_number=0; ///< not in raw data, but should be identifiable via post processing
 
     ClassDefNV(Timemark, 3); // non virtual ClassDef, see https://root-forum.cern.ch/t/classdef-variants/44736/6
 
