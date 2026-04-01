@@ -82,8 +82,8 @@ public:
                                      ///< nanosecond: from `event_time` and (corrected) `last_pps`
 
   // uint32_t  flags = 0; @todo: not popuated
-  // uint32_t  phi_trigMask[k::NUM_POLS] = {0}; ///< 24-bit phi mask (from TURF) @todo: not populated
-  // UChar_t   L1Octants[k::NUM_SURF_SLOTS] ={0}; @todo not populated
+  // uint32_t  phi_trig_mask[k::NUM_POLS] = {0}; ///< 24-bit phi mask (from TURF) @todo: not populated
+  // UChar_t   L1_octants[k::NUM_SURF_SLOTS] ={0}; @todo not populated
 
   // Trigger info
   // int isInPhiMask(int phi, pol::pol_t=pol::kVertical) const; ///< Returns 1 if given phi-pol is in mask
