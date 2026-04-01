@@ -48,7 +48,7 @@ public:
     fval((Float_t) hsk->sensors[whichsensor].val.fval),
     ival((Int_t) hsk->sensors[whichsensor].val.ival),
     uval((UInt_t) hsk->sensors[whichsensor].val.uval),
-    subsys(pueo_sensor_id_get_subsystem(hsk->sensors[whichsensor].sensor_id)),
+    subsys(hsk->sensors[whichsensor].sensor_id < PUEO_MAX_SENSORS ?  pueo_sensor_id_get_subsystem(hsk->sensors[whichsensor].sensor_id) : throw "sensor out range"),
     sens_name(pueo_sensor_id_get_name(hsk->sensors[whichsensor].sensor_id)),
     typetag(pueo_sensor_id_get_type_tag(hsk->sensors[whichsensor].sensor_id)),
     kind_unit(pueo_sensor_id_get_kind(hsk->sensors[whichsensor].sensor_id)){;}
