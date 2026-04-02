@@ -1,7 +1,7 @@
 #ifndef PUEO_TIMEMARK_H
 #define PUEO_TIMEMARK_H
-#include "Rtypes.h"
 #include "TTimeStamp.h"
+#include <cstdint>
 
 #ifdef HAVE_PUEORAWDATA
 #include "pueo/rawdata.h"
@@ -13,16 +13,19 @@ namespace pueo
   class Timemark
   {
   public:
-    Timemark(){;}
+    Timemark(): readout_time(0,0), rising(0,0), falling(0,0){;}
 
     TTimeStamp readout_time;
     TTimeStamp rising;
     TTimeStamp falling;
-    UInt_t rise_count;
-    UInt_t channel;
-    UInt_t flags;
+    uint16_t rise_count=0;
+    uint8_t channel=0;
+    uint8_t flags=0;
 
-    ClassDefNV(Timemark, 2); // non virual ClassDef, see https://root-forum.cern.ch/t/classdef-variants/44736/6
+    uint32_t run=0;          ///< not in raw data, but should be identifiable via post processing
+    uint32_t event_number=0; ///< not in raw data, but should be identifiable via post processing
+
+    ClassDefNV(Timemark, 3); // non virtual ClassDef, see https://root-forum.cern.ch/t/classdef-variants/44736/6
 
 #ifdef HAVE_PUEORAWDATA
     Timemark(const pueo_timemark_t *tmrk):
