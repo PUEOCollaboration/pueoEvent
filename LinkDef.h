@@ -65,97 +65,48 @@
 #pragma read \
   targetClass = "pueo::RawHeader"\
   sourceClass = "pueo::RawHeader"\
-  target = "run" \
+  include = "cstdint" \
+  target = " \
+event_second,\
+readout_time,\
+event_number,\
+L2_mask,\
+trig_type,\
+event_time,\
+last_pps,\
+llast_pps,\
+deadtime_counter,\
+deadtime_counter_last_pps,\
+deadtime_counter_llast_pps\
+  " \
   version =  "[2]" \
-  source = "Int_t run;"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "event_second" \
-  version =  "[2]" \
-  source = "UInt_t triggerTime;"\
-  code = "{event_second = (int32_t) onfile.triggerTime;}"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "readout_time" \
-  version =  "[2]" \
-  source = "UInt_t readoutTime; UInt_t readoutTimeNs;"\
-  code="{readout_time = TTimeStamp((time_t) onfile.readoutTime, onfile.readoutTimeNs);}"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "event_number" \
-  version =  "[2]" \
-  source = "ULong_t eventNumber;" \
-  code = "{event_number = static_cast<uint32_t>(onfile.eventNumber);}"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "L2_mask" \
-  version =  "[2]" \
-  source = "UInt_t L2Mask;"\
-  code = "{L2_mask = static_cast<uint32_t>(onfile.L2Mask);}"
-  
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "trig_type" \
-  version =  "[2]" \
-  source = "UInt_t trigType;"\
-  code = "{trig_type = static_cast<uint32_t>(onfile.trigType);}"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "event_time" \
-  version =  "[2]" \
-  source = "UInt_t trigTime;"\
-  code = "{event_time = static_cast<uint32_t>(onfile.trigTime);}"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "last_pps" \
-  version =  "[2]" \
-  source = "UInt_t lastPPS;" \
-  code = "{last_pps = static_cast<uint32_t>(onfile.lastPPS);}"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "llast_pps" \
-  version =  "[2]" \
-  source = "UInt_t lastLastPPS;" \
-  code = "{llast_pps = static_cast<uint32_t>(onfile.lastLastPPS);}"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "deadtime_counter" \
-  version =  "[2]" \
-  source = "UShort_t deadTime;"\
-  code = "{deadtime_counter = static_cast<uint32_t>(onfile.deadTime);}"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "deadtime_counter_last_pps" \
-  version =  "[2]" \
-  source = "UShort_t deadTimeLastPPS;"\
-  code = "{deadtime_counter_last_pps = static_cast<uint32_t>(onfile.deadTimeLastPPS);}"
-
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  target = "deadtime_counter_llast_pps" \
-  version =  "[2]" \
-  source = "UShort_t deadTimeLastLastPPS;"\
-  code = "{deadtime_counter_llast_pps = static_cast<uint32_t>(onfile.deadTimeLastLastPPS);}"
+  source = "\
+UInt_t triggerTime;\
+UInt_t readoutTime;\
+UInt_t readoutTimeNs;\
+ULong_t eventNumber;\
+UInt_t L2Mask;\
+UInt_t trigType;\
+UInt_t trigTime;\
+UInt_t lastPPS;\
+UInt_t lastLastPPS;\
+UShort_t deadTime;\
+UShort_t deadTimeLastPPS;\
+UShort_t deadTimeLastLastPPS;\
+  "\
+  code = "{\
+event_second = (int32_t) onfile.triggerTime;\
+readout_time = TTimeStamp((time_t) onfile.readoutTime, onfile.readoutTimeNs);\
+event_number = static_cast<uint32_t>(onfile.eventNumber); \
+L2_mask = static_cast<uint32_t>(onfile.L2Mask);\
+trig_type = static_cast<uint32_t>(onfile.trigType);\
+event_time = static_cast<uint32_t>(onfile.trigTime);\
+last_pps = static_cast<uint32_t>(onfile.lastPPS);\
+llast_pps = static_cast<uint32_t>(onfile.lastLastPPS);\
+deadtime_counter = static_cast<uint32_t>(onfile.deadTime);\
+deadtime_counter_last_pps = static_cast<uint32_t>(onfile.deadTimeLastPPS);\
+deadtime_counter_llast_pps = static_cast<uint32_t>(onfile.deadTimeLastLastPPS);\
+  }"
 
 #else
 #error "for compilation"
