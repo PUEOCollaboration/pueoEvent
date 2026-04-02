@@ -46,9 +46,9 @@ public:
   // Initialize all timestamps to a clearly garbage value (year 1970).
   // Otherwise ROOT will initialize them to the current time and that's not a good obvious garbage value
   RawHeader():
-    readout_time(0,0),
-    corrected_readout_time(0,0),
-    corrected_trigger_time(0,0)
+    readout_time((time_t)0,0),
+    corrected_readout_time((time_t)0,0),
+    corrected_trigger_time((time_t)0,0)
   {;}
 
 #ifdef HAVE_PUEORAWDATA
