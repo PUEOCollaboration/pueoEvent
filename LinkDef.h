@@ -81,6 +81,7 @@ deadtime_counter_llast_pps\
   " \
   version =  "[2]" \
   source = "\
+Int_t run;\
 UInt_t triggerTime;\
 UInt_t readoutTime;\
 UInt_t readoutTimeNs;\
@@ -95,6 +96,7 @@ UShort_t deadTimeLastPPS;\
 UShort_t deadTimeLastLastPPS;\
   "\
   code = "{\
+newObj->run = (uint32_t) onfile.run;\
 event_second = (int32_t) onfile.triggerTime;\
 readout_time = TTimeStamp((time_t) onfile.readoutTime, onfile.readoutTimeNs);\
 event_number = static_cast<uint32_t>(onfile.eventNumber); \
