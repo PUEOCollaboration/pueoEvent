@@ -62,52 +62,52 @@
   source = " std::vector<double> volts[208]; "\
   code = "{ int iin = 0; for (int i = 0; i < 208; i++) { std::copy(onfile.volts[iin].begin(), onfile.volts[iin].end(), volts[i].begin()); iin++; }}"
 
-#pragma read \
-  targetClass = "pueo::RawHeader"\
-  sourceClass = "pueo::RawHeader"\
-  include = "cstdint" \
-  target = " \
-event_second,\
-readout_time,\
-event_number,\
-L2_mask,\
-trig_type,\
-event_time,\
-last_pps,\
-llast_pps,\
-deadtime_counter,\
-deadtime_counter_last_pps,\
-deadtime_counter_llast_pps\
-  " \
-  version =  "[2]" \
-  source = "\
-Int_t run;\
-UInt_t triggerTime;\
-UInt_t readoutTime;\
-UInt_t readoutTimeNs;\
-ULong_t eventNumber;\
-UInt_t L2Mask;\
-UInt_t trigType;\
-UInt_t trigTime;\
-UInt_t lastPPS;\
-UInt_t lastLastPPS;\
-UShort_t deadTime;\
-UShort_t deadTimeLastPPS;\
-UShort_t deadTimeLastLastPPS;\
-  "\
-  code = "{\
-newObj->run = (uint32_t) onfile.run;\
-event_second = (int32_t) onfile.triggerTime;\
-readout_time = TTimeStamp((time_t) onfile.readoutTime, onfile.readoutTimeNs);\
-event_number = static_cast<uint32_t>(onfile.eventNumber); \
-L2_mask = static_cast<uint32_t>(onfile.L2Mask);\
-trig_type = static_cast<uint32_t>(onfile.trigType);\
-event_time = static_cast<uint32_t>(onfile.trigTime);\
-last_pps = static_cast<uint32_t>(onfile.lastPPS);\
-llast_pps = static_cast<uint32_t>(onfile.lastLastPPS);\
-deadtime_counter = static_cast<uint32_t>(onfile.deadTime);\
-deadtime_counter_last_pps = static_cast<uint32_t>(onfile.deadTimeLastPPS);\
-deadtime_counter_llast_pps = static_cast<uint32_t>(onfile.deadTimeLastLastPPS);\
+#pragma read                                                                            \
+  targetClass = "pueo::RawHeader"                                                       \
+  sourceClass = "pueo::RawHeader"                                                       \
+  include = "cstdint"                                                                   \
+  target = "                                                                            \
+    event_second,                                                                       \
+    readout_time,                                                                       \
+    event_number,                                                                       \
+    L2_mask,                                                                            \
+    trig_type,                                                                          \
+    event_time,                                                                         \
+    last_pps,                                                                           \
+    llast_pps,                                                                          \
+    deadtime_counter,                                                                   \
+    deadtime_counter_last_pps,                                                          \
+    deadtime_counter_llast_pps                                                          \
+  "                                                                                     \
+  version =  "[2]"                                                                      \
+  source = "                                                                            \
+    Int_t run;                                                                          \
+    UInt_t triggerTime;                                                                 \
+    UInt_t readoutTime;                                                                 \
+    UInt_t readoutTimeNs;                                                               \
+    ULong_t eventNumber;                                                                \
+    UInt_t L2Mask;                                                                      \
+    UInt_t trigType;                                                                    \
+    UInt_t trigTime;                                                                    \
+    UInt_t lastPPS;                                                                     \
+    UInt_t lastLastPPS;                                                                 \
+    UShort_t deadTime;                                                                  \
+    UShort_t deadTimeLastPPS;                                                           \
+    UShort_t deadTimeLastLastPPS;                                                       \
+  "                                                                                     \
+  code = "{                                                                             \
+    newObj->run = (uint32_t) onfile.run;                                                \
+    event_second = (int32_t) onfile.triggerTime;                                        \
+    readout_time = TTimeStamp((time_t) onfile.readoutTime, onfile.readoutTimeNs);       \
+    event_number = static_cast<uint32_t>(onfile.eventNumber);                           \
+    L2_mask = static_cast<uint32_t>(onfile.L2Mask);                                     \
+    trig_type = static_cast<uint32_t>(onfile.trigType);                                 \
+    event_time = static_cast<uint32_t>(onfile.trigTime);                                \
+    last_pps = static_cast<uint32_t>(onfile.lastPPS);                                   \
+    llast_pps = static_cast<uint32_t>(onfile.lastLastPPS);                              \
+    deadtime_counter = static_cast<uint32_t>(onfile.deadTime);                          \
+    deadtime_counter_last_pps = static_cast<uint32_t>(onfile.deadTimeLastPPS);          \
+    deadtime_counter_llast_pps = static_cast<uint32_t>(onfile.deadTimeLastLastPPS);     \
   }"
 
 #else
