@@ -41,8 +41,8 @@ pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs):
   deadtime_counter_llast_pps(wfs->deadtime_counter_llast_pps),
   L2_mask(wfs->L2_mask),
   readout_time((time_t)wfs->readout_time.utc_secs, wfs->readout_time.utc_nsecs),
-  corrected_readout_time(0,0), // cannot know this without post-processing, so initialize to year 1970
-  corrected_trigger_time(0,0)  // cannot know this without post-processing, so initialize to year 1970
+  corrected_readout_time((time_t)0, 0), // cannot know this without post-processing, so initialize to year 1970
+  corrected_trigger_time((time_t)0, 0)  // cannot know this without post-processing, so initialize to year 1970
 {
   if (wfs->soft_trigger) trig_type |= pueo::trigger::kSoft;
   if (wfs->pps_trigger) trig_type |= pueo::trigger::kPPS0;
