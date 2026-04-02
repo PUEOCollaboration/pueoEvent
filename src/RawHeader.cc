@@ -23,10 +23,10 @@
 
 #include "pueo/RawHeader.h" 
 
-// int pueo::RawHeader::isInPhiMask(int phi, pueo::pol::pol_t pol) const
-// {
-//   return phi_trig_mask[pol] & ( 1 << phi); 
-// }
+int pueo::RawHeader::isInPhiMask(int phi, pueo::pol::pol_t pol) const
+{
+  return phi_trig_mask[pol] & ( 1 << phi); 
+}
 
 #ifdef HAVE_PUEORAWDATA
 pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs):
