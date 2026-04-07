@@ -253,6 +253,8 @@ namespace pueo
       /* Where was hical? Uses the current header realTime*/ 
       void hiCal(char which, Double_t& longitude,  Double_t& latitude, Double_t& altitude);
 
+      static int getRunAtTime(double t);
+
     protected:
       void unloadRun();
       TTree * fHeadTree;
@@ -291,7 +293,6 @@ namespace pueo
       Long64_t getPlaylistEvent() { return fPlaylist[fPlaylistIndex].second; }
 
 
-      static int getRunAtTime(double t);
 
       /* Blinding stuff */ 
       void zeroBlindPointers();
