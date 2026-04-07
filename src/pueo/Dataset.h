@@ -291,7 +291,7 @@ namespace pueo
       Long64_t getPlaylistEvent() { return fPlaylist[fPlaylistIndex].second; }
 
 
-      int getRunAtTime(double t);
+      static int getRunAtTime(double t);
 
       /* Blinding stuff */ 
       void zeroBlindPointers();
