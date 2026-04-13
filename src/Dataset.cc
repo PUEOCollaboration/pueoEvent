@@ -256,7 +256,7 @@ pueo::RawHeader * pueo::Dataset::header(bool force_load)
 
 
   if(theStrat & kInsertedVPolEvents){
-    Int_t fakeTreeEntry = needToOverwriteEvent(pol::kVertical, fHeader->event_number);
+    Int_t fakeTreeEntry = needToOverwriteEvent(pol::kVertical, fHeader->eventNumber);
     if(fakeTreeEntry > -1){
       overwriteHeader(fHeader, pol::kVertical, fakeTreeEntry);
     }
@@ -264,7 +264,7 @@ pueo::RawHeader * pueo::Dataset::header(bool force_load)
 
 
   if(theStrat & kInsertedHPolEvents){
-    Int_t fakeTreeEntry = needToOverwriteEvent(pol::kHorizontal, fHeader->event_number);
+    Int_t fakeTreeEntry = needToOverwriteEvent(pol::kHorizontal, fHeader->eventNumber);
     if(fakeTreeEntry > -1){
       overwriteHeader(fHeader, pol::kHorizontal, fakeTreeEntry);
     }
@@ -373,7 +373,7 @@ int pueo::Dataset::getEntry(int entryNumber)
     if (fDecimated)
     {
       fDecimatedHeadTree->GetEntry(fDecimatedEntry); 
-      fWantedEntry = fHeadTree->GetEntryNumberWithIndex(fHeader->event_number); 
+      fWantedEntry = fHeadTree->GetEntryNumberWithIndex(fHeader->eventNumber); 
 
     }
     if (!fHaveUsefulFile) fUsefulDirty = true; 
@@ -393,7 +393,7 @@ int pueo::Dataset::getEvent(int eventNumber, bool quiet)
 
   int entry  =  (fDecimated ? fDecimatedHeadTree : fHeadTree)->GetEntryNumberWithIndex(eventNumber); 
 
-  if (entry < 0 && (eventNumber < fHeadTree->GetMinimum("event_number") || eventNumber > fHeadTree->GetMaximum("event_number")))
+  if (entry < 0 && (eventNumber < fHeadTree->GetMinimum("eventNumber") || eventNumber > fHeadTree->GetMaximum("eventNumber")))
   {
       if (!quiet) fprintf(stderr,"WARNING: event %lld not found in header tree\n", fWantedEntry); 
       if (fDecimated) 
@@ -502,7 +502,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
       filesToClose.push_back(f); 
       fDecimatedHeadTree = (TTree*) f->Get("headTree"); 
       if (!fDecimatedHeadTree) fDecimatedHeadTree = (TTree*) f->Get("headerTree");
-      fDecimatedHeadTree->BuildIndex("event_number"); 
+      fDecimatedHeadTree->BuildIndex("eventNumber"); 
       fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
       fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
     }
@@ -548,7 +548,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
   if (!fDecimated) fHeadTree->SetBranchAddress("header",&fHeader); 
 
-  fHeadTree->BuildIndex("event_number"); 
+  fHeadTree->BuildIndex("eventNumber"); 
 
   if (!fDecimated) fIndices = ((TTreeIndex*) fHeadTree->GetTreeIndex())->GetIndex(); 
 
@@ -717,7 +717,7 @@ int pueo::Dataset::previousMinBiasEvent()
       fIndex = N() - 1;
     }
     fHeadTree->GetEntry(fIndex);
-    if((fHeader->trig_type&1) == 0) break;
+    if((fHeader->trigType&1) == 0) break;
   }
   
   return nthEvent(fIndex);
@@ -739,7 +739,7 @@ int pueo::Dataset::nextMinBiasEvent()
       fIndex = 0;
     }
     fHeadTree->GetEntry(fIndex);
-    if((fHeader->trig_type&1) == 0) break;
+    if((fHeader->trigType&1) == 0) break;
   }
   
   return nthEvent(fIndex);
@@ -1009,8 +1009,8 @@ int pueo::Dataset::getRunAtTime(double t)
                 run_info  ri; 
                 ri.run = run; 
                 //TODO do this to nanosecond precision 
-                ri.start_time= t->GetMinimum("event_second"); 
-                ri.stop_time = t->GetMaximum("event_second") + 1; 
+                ri.start_time= t->GetMinimum("triggerTime"); 
+                ri.stop_time = t->GetMaximum("triggerTime") + 1; 
                 run_times[version].push_back(ri); 
               }
             }
@@ -1201,13 +1201,13 @@ void pueo::Dataset::overwriteHeader(RawHeader* header, pol::pol_t pol, Int_t fak
 
   // Retain some of the header data for camouflage
   TTimeStamp trigger_time = header->corrected_trigger_time;
-  UInt_t event_number = header->event_number;
+  UInt_t event_number = header->eventNumber;
   Int_t run = header->run;
 
   (*header) = (*fBlindHeader[pol]);
 
   header->corrected_trigger_time = trigger_time;
-  header->event_number = event_number;
+  header->eventNumber = event_number;
   header->run = run;
 
 }

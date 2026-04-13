@@ -71,9 +71,6 @@ public:
   //                                +----  `triggerTime`, aka `event_second` in libpueorawdata
   //
 
-  [[deprecated("Not populated during raw data conversion nor corrected during post-processing. DO NOT USE.")]]
-  uint32_t triggerTimeNs = 0;///< This was intended to store the subsecond portion of the trigger time.
-
   // Originally a uint32_t in libpueorawdata but int32_t is okay before year 2038.
   // int32_t for easier arithmetics.
   int32_t  triggerTime = 0;  ///< Number of seconds since Unix epoch (1970 Jan 1 00:00:00)
