@@ -100,7 +100,7 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
 
   // Filter out events that are not close to the reference point
   auto narrow_range = [ref_readout](pueo::RawHeader& rhdr)
-    {return std::abs(static_cast<int32_t>(rhdr.readout_time.GetSec()) - ref_readout) < 3;};
+    {return std::abs(static_cast<int32_t>(rhdr.readoutTime) - ref_readout) < 3;};
   auto narrowed_rdf = header_rdf.Filter(narrow_range, {"header"});
 
   auto compute_subsec = 
@@ -108,15 +108,15 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
     (const pueo::RawHeader& rhdr)
     {
       double corrected_last_pps = 
-        pps_corrected_time_table->find(rhdr.event_second)->second.corrected_pps;
+        pps_corrected_time_table->find(rhdr.triggerTime)->second.corrected_pps;
 
       // around 125 million clock counts
       double avg_delta = static_cast<double>(NOMINAL_CLOCK_FREQ) + 
-        pps_corrected_time_table->find(rhdr.event_second)->second.avg_relative_delta;
+        pps_corrected_time_table->find(rhdr.triggerTime)->second.avg_relative_delta;
 
       // subsecond [clock counts]
       double subsecond = std::fmod(
-        static_cast<double>(rhdr.event_time) - corrected_last_pps + static_cast<double>(UINT32_MAX) + 1.,
+        static_cast<double>(rhdr.trigTime) - corrected_last_pps + static_cast<double>(UINT32_MAX) + 1.,
         static_cast<double>(UINT32_MAX) + 1
       );
 
@@ -142,7 +142,7 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
   if (maybe_timemarked_events.size() != 1) return -1;
 
   // use the timemarked event's rising.utc_secs to correct the `event_second` in the TimeTable
-  int32_t maybe_wrong_event_second = maybe_timemarked_events.begin()->second.event_second;
+  int32_t maybe_wrong_event_second = maybe_timemarked_events.begin()->second.triggerTime;
   *dont_use_first_row = pps_corrected_time_table->find(maybe_wrong_event_second);
   (*dont_use_first_row)->second.corrected_sec = static_cast<int32_t>(best_timemark.rising.GetSec());
   
@@ -320,7 +320,7 @@ int32_t prepare_table(ROOT::RDF::RNode header_rdf, uint32_t* run, TimeTable* tim
     [&time_table, &run_numbers]
     (pueo::RawHeader& rhdr)
     {
-      bool new_encounter = time_table->find((time_t)rhdr.event_second) == time_table->end();
+      bool new_encounter = time_table->find((time_t)rhdr.triggerTime) == time_table->end();
       if (new_encounter) 
       {
         run_numbers.push_back(static_cast<uint32_t>(rhdr.run));
@@ -328,11 +328,11 @@ int32_t prepare_table(ROOT::RDF::RNode header_rdf, uint32_t* run, TimeTable* tim
         // the last_pps of any event is actually the "this_pps" if we're sitting exactly on `event_second`.
         time_table->emplace
           (
-            rhdr.event_second, 
+            rhdr.triggerTime, 
             event_second_start_end
               {
-                .readout_time_sec=(int32_t)rhdr.readout_time.GetSec(), 
-                .this_pps=rhdr.last_pps
+                .readout_time_sec=(int32_t)rhdr.readoutTime,
+                .this_pps=rhdr.lastPPS
               }
           );
       }
