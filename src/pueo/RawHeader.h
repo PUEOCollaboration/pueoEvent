@@ -92,9 +92,15 @@ public:
 
   uint32_t lastLastPPS = 0;  ///< Same as `lastPPS` but one second prior; not corrected.
 
-  uint32_t deadTime = 0;     ///< @todo: no idea what these are, need help documenting
-  uint32_t deadTimeLastPPS = 0;
-  uint32_t deadTimeLastLastPPS = 0;
+  uint32_t deadTime = 0;     ///< Cumulative dead time up until `trigTime` [units: TURF clock ticks]
+                             ///< aka dead_time_counter in `rawdata.h`
+
+  uint32_t deadTimeLastPPS = 0; ///< Cumulative dead time up until the most recent GPS second
+                                ///< aka `dead_time_counter_last_pps` in `rawdata.h`
+                                ///< aka `last_dead` in `DawHsk.h`
+
+  uint32_t deadTimeLastLastPPS = 0; ///< Same as `deadTimeLastPPS` but one GPS second prior.
+  
   uint32_t L2Mask = 0;
 
   uint32_t trigType = 0;    ///< soft, pps, or ext trigger (see also pueo::trigger in Conventions.h)
