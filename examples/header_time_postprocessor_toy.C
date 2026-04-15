@@ -18,7 +18,7 @@
 namespace fs = std::filesystem;
 
 constexpr int32_t NOMINAL_CLOCK_FREQ=125000000;
-constexpr int32_t PUEO_FIRST_AMP_RUN=782; // will ignore all runs prior to this one
+constexpr int32_t PUEO_FIRST_AMP_RUN=783; // will ignore all runs prior to this one
 constexpr int32_t PUEO_LAUNCH_SECOND=1766163240;
 
 // Nominally, delta := (next_pps - this_pps) should yield approximately 125E6 
