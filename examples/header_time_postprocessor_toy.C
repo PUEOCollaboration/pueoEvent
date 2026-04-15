@@ -72,82 +72,8 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anch
 void print(const TimeTable* time_table, std::ostream& stream = std::cout);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
-int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* dont_use_first_row,
-                                 ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf)
-{
-  const int32_t ref_readout = (*dont_use_first_row)->second.readout_time_sec;
-
-  std::map<int32_t, pueo::Timemark> useful_timemarks;
-
-  // Pick timemarks whose rising.utc_secs ≈ reference readout time chosen above
-  auto distance_to_ref = [ref_readout](const pueo::Timemark& timemark)
-    {return std::abs(static_cast<int32_t>(timemark.rising.GetSec()) - ref_readout);};
-
-  auto fill_ordered_map = [&useful_timemarks] (int32_t dist, const pueo::Timemark& timemark)
-    {useful_timemarks[dist] = timemark;};
-
-  timemark_rdf.Define("distance", distance_to_ref, {"timemark"})
-              .Filter([](int32_t dist){return dist<=5;}, {"distance"})
-              .Foreach(fill_ordered_map, {"distance", "timemark"});
-    
-  // todo: maybe make this recoverable instead of erroring out
-  if (useful_timemarks.empty()) return -1;
-
-  // The one with the smallest distance, since the map is sorted
-  // We will try to find an event whose subsecond is close to this best_timemark's subsecond
-  // The matching row's event_second will be corrected using the bes_timemark's second
-  const pueo::Timemark &best_timemark = useful_timemarks.begin()->second;
-
-  // Filter out events that are not close to the reference point
-  auto narrow_range = [ref_readout](pueo::RawHeader& rhdr)
-    {return std::abs(static_cast<int32_t>(rhdr.readoutTime) - ref_readout) < 3;};
-  auto narrowed_rdf = header_rdf.Filter(narrow_range, {"header"});
-
-  auto compute_subsec = 
-    [pps_corrected_time_table]
-    (const pueo::RawHeader& rhdr)
-    {
-      double corrected_last_pps = 
-        pps_corrected_time_table->find(rhdr.triggerTime)->second.corrected_pps;
-
-      // around 125 million clock counts
-      double avg_delta = static_cast<double>(NOMINAL_CLOCK_FREQ) + 
-        pps_corrected_time_table->find(rhdr.triggerTime)->second.avg_relative_delta;
-
-      // subsecond [clock counts]
-      double subsecond = std::fmod(
-        static_cast<double>(rhdr.trigTime) - corrected_last_pps + static_cast<double>(UINT32_MAX) + 1.,
-        static_cast<double>(UINT32_MAX) + 1
-      );
-
-      subsecond /= avg_delta; // subsecond [sec]
-
-      return subsecond * 1e9; // subsecton [nanosec]
-    };
-  auto subsecond_rdf = narrowed_rdf.Define("subsecond", compute_subsec, {"header"});
-
-  // Locate the event that was timemarked (using subsecond as the identifier)
-  auto double_abs_diff = [best_timemark](double subsec)
-    {return std::fabs(subsec - best_timemark.rising.GetNanoSec());};
-  auto result_rdf = subsecond_rdf.Define("diff", double_abs_diff, {"subsecond"})
-                                 .Filter("diff < 200"); // todo: 200 is a magic-number tolerance
-
-  // extract the result from result_rdf
-  std::map<double, pueo::RawHeader> maybe_timemarked_events;
-  auto extract_row = [&maybe_timemarked_events](double diff, const pueo::RawHeader& rhdr)
-    {maybe_timemarked_events[diff] = rhdr;};
-  result_rdf.Foreach(extract_row, {"diff", "header"});
-
-  // todo: mayhap this is recoverable
-  if (maybe_timemarked_events.size() != 1) return -1;
-
-  // use the timemarked event's rising.utc_secs to correct the `event_second` in the TimeTable
-  int32_t maybe_wrong_event_second = maybe_timemarked_events.begin()->second.triggerTime;
-  *dont_use_first_row = pps_corrected_time_table->find(maybe_wrong_event_second);
-  (*dont_use_first_row)->second.corrected_sec = static_cast<int32_t>(best_timemark.rising.GetSec());
-  
-  return 0;
-}
+int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* row,
+                                 ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf);
 
 // second_correction HAS TO BE LATER than first_correction
 int32_t correct_all_event_seconds(TimeTable* time_table_twice_corrected, TimeTable::iterator first_correction,
@@ -190,13 +116,14 @@ enum err_code
   ERR_MissingSecond     = 1<<4, // recoverable
   ERR_LargeDelta        = 1<<5, // recoverable but won't happen, because they happen in pre-amp runs
   ERR_EmptyTable        = 1<<6, // fatal but probably won't be reached; we should have errored out already
-  ERR_NoStableRegion    = 1<<7  // recoverable
+  ERR_NoStableRegion    = 1<<7, // recoverable
+  ERR_NoNearbyTimemark  = 1<<8  // cannot find a timestamped event using the event's readout time, should be recoverable
 };
 
 int32_t header_time_postprocessor_toy()
 {
   gSystem->Load("libpueoEvent.so");
-  int32_t run=1103;
+  int32_t run=1023;
   analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
   // fs::recursive_directory_iterator run_dir("/work/headers/");
@@ -296,7 +223,13 @@ int32_t analyze(const char * header_file_path)
   // 10 seconds into the run so that the readout time is more or less stable and contiguous.
   // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
   TimeTable::iterator some_row = std::next(time_table.begin(), 10);
-  correct_one_event_second(&time_table, &some_row, header_rdf, timemark_rdf);
+  int32_t evt_corr_err = correct_one_event_second(&time_table, &some_row, header_rdf, timemark_rdf);
+  if (evt_corr_err&ERR_NoNearbyTimemark) 
+  {
+    fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find a "
+            "suitable timestamped event to work with (run %d).\n\e[0m", some_row->first, run);
+    return ERR_NoNearbyTimemark;
+  }
 
   TimeTable::iterator another_row = std::next(time_table.begin(), 15);
   correct_one_event_second(&time_table, &another_row, header_rdf, timemark_rdf);
@@ -540,6 +473,83 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator & anc
         static_cast<double>(UINT32_MAX) + 1
       );
   }
+}
+
+int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* row,
+                                 ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf)
+{
+  const int32_t ref_readout = (*row)->second.readout_time_sec;
+
+  std::map<int32_t, pueo::Timemark> useful_timemarks;
+
+  // Pick timemarks whose rising.utc_secs ≈ reference readout time chosen above
+  auto distance_to_ref = [ref_readout](const pueo::Timemark& timemark)
+    {return std::abs(static_cast<int32_t>(timemark.rising.GetSec()) - ref_readout);};
+
+  auto fill_ordered_map = [&useful_timemarks] (int32_t dist, const pueo::Timemark& timemark)
+    {useful_timemarks[dist] = timemark;};
+
+  timemark_rdf.Define("distance", distance_to_ref, {"timemark"})
+              .Filter([](int32_t dist){return dist<=5;}, {"distance"})
+              .Foreach(fill_ordered_map, {"distance", "timemark"});
+    
+  // todo: maybe make this recoverable instead of erroring out
+  if (useful_timemarks.empty()) return ERR_NoNearbyTimemark;
+
+  // The one with the smallest distance, since the map is sorted
+  // We will try to find an event whose subsecond is close to this best_timemark's subsecond
+  // The matching row's event_second will be corrected using the bes_timemark's second
+  const pueo::Timemark &best_timemark = useful_timemarks.begin()->second;
+
+  // Filter out events that are not close to the reference point
+  auto narrow_range = [ref_readout](pueo::RawHeader& rhdr)
+    {return std::abs(static_cast<int32_t>(rhdr.readoutTime) - ref_readout) < 3;};
+  auto narrowed_rdf = header_rdf.Filter(narrow_range, {"header"});
+
+  auto compute_subsec = 
+    [pps_corrected_time_table]
+    (const pueo::RawHeader& rhdr)
+    {
+      double corrected_last_pps = 
+        pps_corrected_time_table->find(rhdr.triggerTime)->second.corrected_pps;
+
+      // around 125 million clock counts
+      double avg_delta = static_cast<double>(NOMINAL_CLOCK_FREQ) + 
+        pps_corrected_time_table->find(rhdr.triggerTime)->second.avg_relative_delta;
+
+      // subsecond [clock counts]
+      double subsecond = std::fmod(
+        static_cast<double>(rhdr.trigTime) - corrected_last_pps + static_cast<double>(UINT32_MAX) + 1.,
+        static_cast<double>(UINT32_MAX) + 1
+      );
+
+      subsecond /= avg_delta; // subsecond [sec]
+
+      return subsecond * 1e9; // subsecton [nanosec]
+    };
+  auto subsecond_rdf = narrowed_rdf.Define("subsecond", compute_subsec, {"header"});
+
+  // Locate the event that was timemarked (using subsecond as the identifier)
+  auto double_abs_diff = [best_timemark](double subsec)
+    {return std::fabs(subsec - best_timemark.rising.GetNanoSec());};
+  auto result_rdf = subsecond_rdf.Define("diff", double_abs_diff, {"subsecond"})
+                                 .Filter("diff < 200"); // todo: 200 is a magic-number tolerance
+
+  // extract the result from result_rdf
+  std::map<double, pueo::RawHeader> maybe_timemarked_events;
+  auto extract_row = [&maybe_timemarked_events](double diff, const pueo::RawHeader& rhdr)
+    {maybe_timemarked_events[diff] = rhdr;};
+  result_rdf.Foreach(extract_row, {"diff", "header"});
+
+  // todo: mayhap this is recoverable
+  if (maybe_timemarked_events.size() != 1) return -1;
+
+  // use the timemarked event's rising.utc_secs to correct the `event_second` in the TimeTable
+  int32_t maybe_wrong_event_second = maybe_timemarked_events.begin()->second.triggerTime;
+  *row = pps_corrected_time_table->find(maybe_wrong_event_second);
+  (*row)->second.corrected_sec = static_cast<int32_t>(best_timemark.rising.GetSec());
+  
+  return 0;
 }
 
 void print(const TimeTable* time_table, std::ostream& stream)
