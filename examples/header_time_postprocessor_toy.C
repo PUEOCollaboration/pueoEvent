@@ -76,32 +76,20 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
                                  ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf);
 
 // second_correction HAS TO BE LATER than first_correction
-int32_t correct_all_event_seconds(TimeTable* time_table_twice_corrected, TimeTable::iterator first_correction,
-                                  TimeTable::iterator second_correction)
+int32_t correct_all_event_seconds(TimeTable* time_table, const int32_t first_corrected)
 {
 
   // the difference between event_second (the key of the map)
-  auto key_diff = second_correction->first - first_correction->first;
-  if (key_diff <= 0) return -1;
-  // the if above guarantees second comes later than first
-  // second_correction HAS TO BE later than first_correction otherwise this will be UB
-  auto distance = std::distance(first_correction, second_correction);
-
-  auto correction_diff = second_correction->second.corrected_sec - first_correction->second.corrected_sec;
-  if (correction_diff!=key_diff) return -1;
-  if (correction_diff!=distance) return -1;
-
-  for (auto it=std::make_reverse_iterator(first_correction); it!=(*time_table_twice_corrected).rend(); ++it)
-  {
-    it->second.corrected_sec = first_correction->second.corrected_sec - (first_correction->first - it->first);
+  auto first_good_row = time_table->find(first_corrected);
+  for (auto it = std::make_reverse_iterator(first_good_row); it!=time_table->rend(); ++it){
+    it->second.corrected_sec = std::prev(it)->second.corrected_sec - 1;
   }
-  for (auto it=std::next(first_correction); it!=second_correction; ++it)
+  for (auto it = std::next(first_good_row); it!=time_table->end(); ++it)
   {
-    it->second.corrected_sec = first_correction->second.corrected_sec + (it->first - first_correction->first);
-  }
-  for (auto it=std::next(second_correction); it!=(*time_table_twice_corrected).end(); ++it)
-  {
-    it->second.corrected_sec = second_correction->second.corrected_sec + (it->first - second_correction->first);
+    if(!it->second.corrected_sec)
+    {
+      it->second.corrected_sec = std::prev(it)->second.corrected_sec+1;
+    }
   }
 
   return 0;
@@ -109,37 +97,38 @@ int32_t correct_all_event_seconds(TimeTable* time_table_twice_corrected, TimeTab
 
 enum err_code
 {
-  ERR_MoreThanOneRun    = 1<<0, // fatal, more than one run present in headerFile<run>.root
-  ERR_PreAmpRun         = 1<<1, // fatal, because we are just going to ignore these
-  ERR_Year1970          = 1<<2, // should be recoverable
-  ERR_TimeTableTooShort = 1<<3, // fatal, time tables with only 1 or 2 seconds can't be processed
-  ERR_MissingSecond     = 1<<4, // recoverable
-  ERR_LargeDelta        = 1<<5, // recoverable but won't happen, because they happen in pre-amp runs
-  ERR_EmptyTable        = 1<<6, // fatal but probably won't be reached; we should have errored out already
-  ERR_NoStableRegion    = 1<<7, // recoverable
-  ERR_NoNearbyTimemark  = 1<<8  // cannot find a timestamped event using the event's readout time, should be recoverable
+  ERR_MoreThanOneRun       = 1<<0, // fatal, more than one run present in headerFile<run>.root
+  ERR_PreAmpRun            = 1<<1, // fatal, because we are just going to ignore these
+  ERR_Year1970             = 1<<2, // should be recoverable
+  ERR_TimeTableTooShort    = 1<<3, // fatal, time tables with only 1 or 2 seconds can't be processed
+  ERR_MissingSecond        = 1<<4, // recoverable
+  ERR_LargeDelta           = 1<<5, // recoverable but won't happen, because they happen in pre-amp runs
+  ERR_EmptyTable           = 1<<6, // fatal but probably won't be reached; we should have errored out already
+  ERR_NoStableRegion       = 1<<7, // recoverable
+  ERR_NoNearbyTimemark     = 1<<8, // cannot find a timestamped event using the event's readout time, should be recoverable
+  ERR_NoMatchingSubsecond  = 1<<9  // cannot find the timestamped event in the header tree
 };
 
 int32_t header_time_postprocessor_toy()
 {
-  gSystem->Load("libpueoEvent.so");
-  int32_t run=1023;
-  analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
+  // gSystem->Load("libpueoEvent.so");
+  // int32_t run=1023;
+  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
 
-  // fs::recursive_directory_iterator run_dir("/work/headers/");
-  // const std::regex pattern(R"(headFile(\d+))");
-  // for(auto const& entry: run_dir)
-  // {
-  //   if (!entry.is_regular_file()) continue;
-  //
-  //   std::string name = entry.path().stem().string(); 
-  //   // skip other root files in the run folder
-  //   if (!std::regex_match(name, pattern)) continue;
-  //
-  //   std::cout << entry.path() << "\n";
-  //   analyze(entry.path().c_str());
-  // }
-  //
+  fs::recursive_directory_iterator run_dir("/work/headers/");
+  const std::regex pattern(R"(headFile(\d+))");
+  for(auto const& entry: run_dir)
+  {
+    if (!entry.is_regular_file()) continue;
+
+    std::string name = entry.path().stem().string(); 
+    // skip other root files in the run folder
+    if (!std::regex_match(name, pattern)) continue;
+
+    std::cout << entry.path() << "\n";
+    analyze(entry.path().c_str());
+  }
+
   return 0;
 }
 
@@ -176,9 +165,6 @@ int32_t analyze(const char * header_file_path)
 
   if (err & ERR_LargeDelta)
     fprintf(stderr, "\e[1;33mWarning: large pps delta detected (run %d).\n\e[0m", run);
-
-  if (check_event_seconds(&time_table))
-    fprintf(stderr, "\e[1;31mWarning: problematic event_second (run %d).\n\e[0m", run);
 
   if(simple_moving_average(&time_table))
   {
@@ -219,24 +205,40 @@ int32_t analyze(const char * header_file_path)
 
   ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
 
+  int32_t evt_sec_err = check_event_seconds(&time_table);
+  if (evt_sec_err&ERR_Year1970)
+    fprintf(stderr, "\e[1;31mWarning: `event_second` < launch second %d (run %d).\n\e[0m",
+            PUEO_LAUNCH_SECOND, run);
   // Pick a somewhat arbitray reference readout time, say,
   // 10 seconds into the run so that the readout time is more or less stable and contiguous.
   // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
-  TimeTable::iterator some_row = std::next(time_table.begin(), 10);
-  int32_t evt_corr_err = correct_one_event_second(&time_table, &some_row, header_rdf, timemark_rdf);
-  if (evt_corr_err&ERR_NoNearbyTimemark) 
-  {
-    fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find a "
-            "suitable timestamped event to work with (run %d).\n\e[0m", some_row->first, run);
-    return ERR_NoNearbyTimemark;
+  // TimeTable::iterator some_row = std::next(time_table.begin(), 10);
+  if (evt_sec_err) {
+    std::set<int32_t> corrected_seconds;
+    for (auto it = time_table.begin(); it!=time_table.end(); ++it){
+      auto tmp = it; // tmp might be changed such that it's different from `it`
+
+      if (corrected_seconds.size() > time_table.size()/10) break;
+      int32_t evt_corr_err = correct_one_event_second(&time_table, &tmp, header_rdf, timemark_rdf);
+
+      std::cerr << "attempting to correct `event_second` near " << it->first << "\n";
+      if (evt_corr_err == 0){
+        fprintf(stderr, "\e[1;32mSuccess: Found a timemark to correct `event_second` %d.\n\e[0m", tmp->first);
+        corrected_seconds.insert(tmp->first);
+      }
+      else if (evt_corr_err&ERR_NoNearbyTimemark) 
+        fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find a "
+                "suitable timestamped event to work with (run %d).\n\e[0m", it->first, run);
+      else if (evt_corr_err&ERR_NoMatchingSubsecond) 
+        fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find the"
+                "event in the header tree with the time stamped event's subsecond (run %d).\n\e[0m",
+                it->first, run);
+      
+    }
+
+    correct_all_event_seconds(&time_table, *corrected_seconds.begin());
+    print(&time_table, std::cerr);
   }
-
-  TimeTable::iterator another_row = std::next(time_table.begin(), 15);
-  correct_one_event_second(&time_table, &another_row, header_rdf, timemark_rdf);
-
-  correct_all_event_seconds(&time_table, some_row, another_row);
-
-  print(&time_table, std::cerr);
 
   return 0;
 }
@@ -484,7 +486,7 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
 
   // Pick timemarks whose rising.utc_secs ≈ reference readout time chosen above
   auto distance_to_ref = [ref_readout](const pueo::Timemark& timemark)
-    {return std::abs(static_cast<int32_t>(timemark.rising.GetSec()) - ref_readout);};
+    {return std::abs(static_cast<int32_t>(timemark.readout_time.GetSec()) - ref_readout);};
 
   auto fill_ordered_map = [&useful_timemarks] (int32_t dist, const pueo::Timemark& timemark)
     {useful_timemarks[dist] = timemark;};
@@ -542,7 +544,7 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
   result_rdf.Foreach(extract_row, {"diff", "header"});
 
   // todo: mayhap this is recoverable
-  if (maybe_timemarked_events.size() != 1) return -1;
+  if (maybe_timemarked_events.size() != 1) return ERR_NoMatchingSubsecond;
 
   // use the timemarked event's rising.utc_secs to correct the `event_second` in the TimeTable
   int32_t maybe_wrong_event_second = maybe_timemarked_events.begin()->second.triggerTime;
