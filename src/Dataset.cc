@@ -202,7 +202,7 @@ pueo::nav::Attitude * pueo::Dataset::gps(bool force_load)
   {
     if (fGpsTree->GetReadEntry() != fWantedEntry || force_load) 
     {
-      fGpsTree->GetEntry(fWantedEntry); 
+      fGpsTree->GetEntry(fWantedEntry);
     }
   }
   else
@@ -210,31 +210,14 @@ pueo::nav::Attitude * pueo::Dataset::gps(bool force_load)
     if (fGpsDirty || force_load)
     {
       //try one that matches realtime
-      int gpsEntry = fGpsTree->GetEntryNumberWithBestIndex(round(header()->corrected_trigger_time.GetSec() + header()->corrected_trigger_time.GetNanoSec()  / 1e9)); 
-//      int offset = 0; 
-      fGpsTree->GetEntry(gpsEntry); 
-      /*
-      while (fGps->attFlag == 1 && abs(offset) < 30)
-      {
-        offset = offset >= 0 ? -(offset+1) : -offset; 
-        if (gpsEntry + offset < 0) continue; 
-        if (gpsEntry + offset >= fGpsTree->GetEntries()) continue; 
-        fGpsTree->GetEntry(gpsEntry+offset); 
-      }
-      if (fGps->attFlag==1)
-      {
-        fprintf(stderr,"WARNING: Could not find good GPS within 30 entries... reverting to closest bad one\n"); 
-        fGpsTree->GetEntry(gpsEntry); 
-      }
-      */
-
-      fGpsDirty = false; 
+      //TODO use the correct values once they're available
+      int gpsEntry = fGpsTree->GetEntryNumberWithBestIndex(header()->corrected_trigger_time.GetSec(), header()->corrected_trigger_time.GetNanoSec());
+      fGpsTree->GetEntry(gpsEntry);
+      fGpsDirty = false;
     }
-
   }
 
   return fGps; 
-
 }
 
 
@@ -502,7 +485,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
       filesToClose.push_back(f); 
       fDecimatedHeadTree = (TTree*) f->Get("headTree"); 
       if (!fDecimatedHeadTree) fDecimatedHeadTree = (TTree*) f->Get("headerTree");
-      fDecimatedHeadTree->BuildIndex("event_number"); 
+      fDecimatedHeadTree->BuildIndex("eventNumber"); 
       fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
       fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
     }
@@ -548,7 +531,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
   if (!fDecimated) fHeadTree->SetBranchAddress("header",&fHeader); 
 
-  fHeadTree->BuildIndex("event_number"); 
+  fHeadTree->BuildIndex("eventNumber"); 
 
   if (!fDecimated) fIndices = ((TTreeIndex*) fHeadTree->GetTreeIndex())->GetIndex(); 
 
@@ -560,7 +543,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   {
      TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
-     fGpsTree = (TTree*) f->Get("gpsTree"); 
+     fGpsTree = (TTree*) f->Get("attitudeTree"); 
      fHaveGpsEvent = true; 
 
   }
@@ -572,19 +555,25 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     {
        TFile * f = new TFile(the_right_file); 
        filesToClose.push_back(f); 
-       fGpsTree = (TTree*) f->Get("gpsTree"); 
-       fGpsTree->BuildIndex("realTime"); 
+       fGpsTree = (TTree*) f->Get("attitudeTree"); 
+       if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime"); 
        fHaveGpsEvent = false; 
     }
-    else 
+    else
     {
-      fprintf(stderr,"Could not find gps file for run %d, giving up!\n",run); 
+      fprintf(stderr,"Could not find gps file for run %d, using global file\n",run); 
+      fname = TString::Format("%s/attitude.root", data_dir);
+      TFile * f = new TFile(fname); 
+      filesToClose.push_back(f); 
+      fGpsTree = (TTree*) f->Get("attitudeTree"); 
+      fGpsTree->BuildIndex("realTime"); 
+      fHaveGpsEvent = false; 
   //    fRunLoaded = false;
   //    return false; 
     }
   }
 
-  if (fGpsTree) fGpsTree->SetBranchAddress("gps",&fGps); 
+  if (fGpsTree) fGpsTree->SetBranchAddress("attitude",&fGps); 
 
 
   //try to load useful event file 
