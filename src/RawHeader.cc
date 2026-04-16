@@ -25,29 +25,30 @@
 
 int pueo::RawHeader::isInPhiMask(int phi, pueo::pol::pol_t pol) const
 {
-  return phi_trig_mask[pol] & ( 1 << phi); 
+  return phiTrigMask[pol] & ( 1 << phi); 
 }
 
 #ifdef HAVE_PUEORAWDATA
 pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs):
   run(wfs->run), 
-  event_number(wfs->event),
-  event_second(wfs->event_second),
-  event_time(wfs->event_time),
-  last_pps(wfs->last_pps),
-  llast_pps(wfs->llast_pps),
-  deadtime_counter(wfs->deadtime_counter),
-  deadtime_counter_last_pps(wfs->deadtime_counter_last_pps),
-  deadtime_counter_llast_pps(wfs->deadtime_counter_llast_pps),
-  L2_mask(wfs->L2_mask),
-  readout_time((time_t)wfs->readout_time.utc_secs, wfs->readout_time.utc_nsecs),
+  eventNumber(wfs->event),
+  triggerTime(wfs->event_second),
+  trigTime(wfs->event_time),
+  lastPPS(wfs->last_pps),
+  lastLastPPS(wfs->llast_pps),
+  deadTime(wfs->deadtime_counter),
+  deadTimeLastPPS(wfs->deadtime_counter_last_pps),
+  deadTimeLastLastPPS(wfs->deadtime_counter_llast_pps),
+  L2Mask(wfs->L2_mask),
+  readoutTime(wfs->readout_time.utc_secs),
+  readoutTimeNs(wfs->readout_time.utc_nsecs),
   corrected_readout_time((time_t)0, 0), // cannot know this without post-processing, so initialize to year 1970
   corrected_trigger_time((time_t)0, 0)  // cannot know this without post-processing, so initialize to year 1970
 {
-  if (wfs->soft_trigger) trig_type |= pueo::trigger::kSoft;
-  if (wfs->pps_trigger) trig_type |= pueo::trigger::kPPS0;
-  if (wfs->ext_trigger) trig_type |= pueo::trigger::kExt;
-  if (wfs->L2_mask) trig_type |= pueo::trigger::kRFMI;
+  if (wfs->soft_trigger) trigType |= pueo::trigger::kSoft;
+  if (wfs->pps_trigger)  trigType |= pueo::trigger::kPPS0;
+  if (wfs->ext_trigger)  trigType |= pueo::trigger::kExt;
+  if (wfs->L2_mask)      trigType |= pueo::trigger::kRFMI;
 
   //TODO convert L2 mask ,L1 mask as needed
 }
