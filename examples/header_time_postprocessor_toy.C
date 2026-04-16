@@ -9,6 +9,7 @@
 #include "TCanvas.h"
 #include "TLegend.h"
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <iomanip>
 #include <map>
@@ -40,7 +41,7 @@ struct event_second_start_end
 using TimeTable=std::map<int32_t, event_second_start_end>;
 
 // The "main" function. Returns the run number or error code
-int32_t analyze(const char * header_file_path);
+int32_t analyze(const char * header_file_path, const char * output_dir = nullptr);
 
 // Prepares two printable TimeTables, see #print().
 // @param[out] run Run number
@@ -69,7 +70,7 @@ void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_secon
 // Relies on `simple_moving_average()` to have computed `avg_relative_delta`.
 void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anchor_point);
 
-void print(const TimeTable* time_table, std::ostream& stream = std::cout);
+void print(const TimeTable* time_table, std::ostream& stream = std::cout, bool color=true);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
 
 int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* row,
@@ -113,7 +114,7 @@ int32_t header_time_postprocessor_toy()
 {
   // gSystem->Load("libpueoEvent.so");
   // int32_t run=1023;
-  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run));
+  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run), "time_table/");
 
   fs::recursive_directory_iterator run_dir("/work/headers/");
   const std::regex pattern(R"(headFile(\d+))");
@@ -126,13 +127,13 @@ int32_t header_time_postprocessor_toy()
     if (!std::regex_match(name, pattern)) continue;
 
     std::cout << entry.path() << "\n";
-    analyze(entry.path().c_str());
+    analyze(entry.path().c_str(), "time_table/");
   }
 
   return 0;
 }
 
-int32_t analyze(const char * header_file_path)
+int32_t analyze(const char * header_file_path, const char * output_dir)
 {
   ROOT::RDataFrame header_rdf("headerTree", header_file_path);
   TimeTable time_table;
@@ -206,19 +207,18 @@ int32_t analyze(const char * header_file_path)
   ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
 
   int32_t evt_sec_err = check_event_seconds(&time_table);
-  if (evt_sec_err&ERR_Year1970)
-    fprintf(stderr, "\e[1;31mWarning: `event_second` < launch second %d (run %d).\n\e[0m",
+  if (evt_sec_err&ERR_Year1970) 
+  {
+    fprintf(stderr, "\e[1;33mWarning: `event_second` < launch second %d (run %d).\n\e[0m",
             PUEO_LAUNCH_SECOND, run);
-  // Pick a somewhat arbitray reference readout time, say,
-  // 10 seconds into the run so that the readout time is more or less stable and contiguous.
-  // (not sure if it matters whether the readout is stable or not, probably doesn't hurt though)
-  // TimeTable::iterator some_row = std::next(time_table.begin(), 10);
-  if (evt_sec_err) {
+
     std::set<int32_t> corrected_seconds;
-    for (auto it = time_table.begin(); it!=time_table.end(); ++it){
+    for (auto it = time_table.begin(); it!=time_table.end(); ++it)
+    {
       auto tmp = it; // tmp might be changed such that it's different from `it`
 
-      if (corrected_seconds.size() > time_table.size()/10) break;
+      // if (corrected_seconds.size() > time_table.size()/10) break;
+      if (corrected_seconds.size() > 1) break;
       int32_t evt_corr_err = correct_one_event_second(&time_table, &tmp, header_rdf, timemark_rdf);
 
       std::cerr << "attempting to correct `event_second` near " << it->first << "\n";
@@ -233,11 +233,17 @@ int32_t analyze(const char * header_file_path)
         fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find the"
                 "event in the header tree with the time stamped event's subsecond (run %d).\n\e[0m",
                 it->first, run);
-      
     }
 
     correct_all_event_seconds(&time_table, *corrected_seconds.begin());
-    print(&time_table, std::cerr);
+  }
+
+  if (output_dir && !fs::exists(output_dir))
+    fs::create_directories(output_dir);
+  if (output_dir)
+  {
+    std::ofstream fout(Form("%s/run%d_time_table.txt", output_dir, run));
+    print(&time_table, fout, false);
   }
 
   return 0;
@@ -554,10 +560,10 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
   return 0;
 }
 
-void print(const TimeTable* time_table, std::ostream& stream)
+void print(const TimeTable* time_table, std::ostream& stream, bool color)
 {
 
-  stream << "\nColor: \e[1;33m Invalid Delta \e[1;31m Missing and Invalid Delta\e[0m\n";
+  if (color) stream << "\nColor: \e[1;33m Invalid Delta \e[1;31m Missing and Invalid Delta\e[0m\n";
   stream << "Relative delta is defined to be (next_pps - this_pps) - 125000000\n";
   stream << "--------------------------------------------------------------------------------------------------------\n"
          << " event_second | corrected    | readout     | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
@@ -565,24 +571,28 @@ void print(const TimeTable* time_table, std::ostream& stream)
          << " int32_t      | int32_t      | int32_t     | uint32_t  | uint32_t  | int32_t  | double    | double     \n"
          << "--------------------------------------------------------------------------------------------------------\n";
 
-  TString color;
+  TString whitespace;
   for (auto it=time_table->begin(); it!=time_table->end(); ++it)
   {
-    if (it->second.missing && it->second.invalid_delta) color = "\033[1;31m ";  // red
-    else if (it->second.invalid_delta) color = "\033[1;33m "; // yellow
-    else color = "\033[0m ";
+    if(!color) whitespace = " ";
+    else 
+    {
+      if (it->second.missing && it->second.invalid_delta) whitespace = "\033[1;31m ";  // red
+      else if (it->second.invalid_delta) whitespace = "\033[1;33m "; // yellow
+      else whitespace = "\033[0m ";
+    }
 
-    stream << color << std::setw(14) << std::left << it->first
-           << color << std::setw(14) << std::left << it->second.corrected_sec
-           << color << std::setw(13) << std::left << it->second.readout_time_sec
-           << color << std::setw(11) << it->second.this_pps
-           << color << std::setw(11) << it->second.next_pps
-           << color << std::setw(10) << it->second.relative_delta
-           << color << std::setw(9)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
-           << color << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\n";
+    stream << whitespace << std::setw(14) << std::left << it->first
+           << whitespace << std::setw(14) << std::left << it->second.corrected_sec
+           << whitespace << std::setw(13) << std::left << it->second.readout_time_sec
+           << whitespace << std::setw(11) << it->second.this_pps
+           << whitespace << std::setw(11) << it->second.next_pps
+           << whitespace << std::setw(10) << it->second.relative_delta
+           << whitespace << std::setw(9)  << std::fixed << std::setprecision(2) << it->second.avg_relative_delta
+           << whitespace << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\n";
   }
 
-  stream << "\033[0m---------------------------------------------------------------------------------------\n";
+  stream << whitespace << "---------------------------------------------------------------------------------------\n";
 }
 
 void plot(TimeTable& time_table, TString name)
