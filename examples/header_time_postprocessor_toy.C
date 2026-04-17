@@ -1,5 +1,7 @@
 #include "pueo/RawHeader.h"
 #include "pueo/Timemark.h"
+#include "TFile.h"
+#include "TTree.h"
 #include "ROOT/RDataFrame.hxx"
 #include "TTimeStamp.h"
 #include "TAttMarker.h"
@@ -72,6 +74,7 @@ void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anch
 
 void print(const TimeTable* time_table, std::ostream& stream = std::cout, bool color=true);
 void plot (TimeTable& time_table, TString name="pps_correction.svg");
+void save_as_root(const TimeTable* time_table, const char * file_name);
 
 int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* row,
                                  ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf);
@@ -97,7 +100,7 @@ int32_t header_time_postprocessor_toy()
 {
   // gSystem->Load("libpueoEvent.so");
   // int32_t run=1023;
-  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run), "time_table/");
+  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run), Form("time_table/run%d/",run));
 
   fs::recursive_directory_iterator run_dir("/work/headers/");
   const std::regex pattern(R"(headFile(\d+))");
@@ -106,11 +109,12 @@ int32_t header_time_postprocessor_toy()
     if (!entry.is_regular_file()) continue;
 
     std::string name = entry.path().stem().string(); 
+    std::smatch match;
     // skip other root files in the run folder
-    if (!std::regex_match(name, pattern)) continue;
+    if (!std::regex_match(name, match, pattern)) continue;
 
     std::cout << entry.path() << "\n";
-    analyze(entry.path().c_str(), "time_table/");
+    analyze(entry.path().c_str(), Form("time_table/run%s/", match[1].str().c_str()));
   }
 
   return 0;
@@ -222,10 +226,12 @@ int32_t analyze(const char * header_file_path, const char * output_dir)
 
   if (output_dir && !fs::exists(output_dir))
     fs::create_directories(output_dir);
+
   if (output_dir)
   {
-    std::ofstream fout(Form("%s/run%d_time_table.txt", output_dir, run));
+    std::ofstream fout(Form("%s/time_table.txt", output_dir));
     print(&time_table, fout, false);
+    save_as_root(&time_table, Form("%s/time_table.root", output_dir));
   }
 
   return 0;
@@ -714,3 +720,32 @@ void plot(TimeTable& time_table, TString name)
 
   c1.SaveAs(name);
 }
+
+void save_as_root(const TimeTable* time_table, const char * file_name)
+{
+  TFile f(file_name, "RECREATE");
+  TTree * t = new TTree("time_table_tree", "time_table_tree");
+
+  int32_t key;
+  event_second_start_end  dummy;
+
+  t->Branch("event_second"                ,&key                     );
+  t->Branch("corrected_event_second"      ,&dummy.corrected_sec     );
+  t->Branch("readout_time_sec"            ,&dummy.readout_time_sec  );
+  t->Branch("this_pps"                    ,&dummy.this_pps          );
+  t->Branch("next_pps"                    ,&dummy.next_pps          );
+  t->Branch("relative_delta"              ,&dummy.relative_delta    );
+  t->Branch("avg_relative_delta"          ,&dummy.avg_relative_delta);
+  t->Branch("corrected_pps"               ,&dummy.corrected_pps     );
+  t->Branch("missing"                     ,&dummy.missing           );
+  t->Branch("invalid_delta"               ,&dummy.invalid_delta     );
+
+  for (auto row: *time_table)
+  {
+    key = row.first;
+    dummy = row.second;
+    t->Fill();
+  }
+
+  f.Write();
+} 
