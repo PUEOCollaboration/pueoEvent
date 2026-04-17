@@ -76,25 +76,8 @@ void plot (TimeTable& time_table, TString name="pps_correction.svg");
 int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* row,
                                  ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf);
 
-// second_correction HAS TO BE LATER than first_correction
-int32_t correct_all_event_seconds(TimeTable* time_table, const int32_t first_corrected)
-{
-
-  // the difference between event_second (the key of the map)
-  auto first_good_row = time_table->find(first_corrected);
-  for (auto it = std::make_reverse_iterator(first_good_row); it!=time_table->rend(); ++it){
-    it->second.corrected_sec = std::prev(it)->second.corrected_sec - 1;
-  }
-  for (auto it = std::next(first_good_row); it!=time_table->end(); ++it)
-  {
-    if(!it->second.corrected_sec)
-    {
-      it->second.corrected_sec = std::prev(it)->second.corrected_sec+1;
-    }
-  }
-
-  return 0;
-}
+// Should be called after `correct_one_event_second()`
+int32_t correct_all_event_seconds(TimeTable* time_table, const int32_t first_corrected);
 
 enum err_code
 {
@@ -217,8 +200,7 @@ int32_t analyze(const char * header_file_path, const char * output_dir)
     {
       auto tmp = it; // tmp might be changed such that it's different from `it`
 
-      // if (corrected_seconds.size() > time_table.size()/10) break;
-      if (corrected_seconds.size() > 1) break;
+      if (corrected_seconds.size() > time_table.size()/10) break;
       int32_t evt_corr_err = correct_one_event_second(&time_table, &tmp, header_rdf, timemark_rdf);
 
       std::cerr << "attempting to correct `event_second` near " << it->first << "\n";
@@ -557,6 +539,25 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
   *row = pps_corrected_time_table->find(maybe_wrong_event_second);
   (*row)->second.corrected_sec = static_cast<int32_t>(best_timemark.rising.GetSec());
   
+  return 0;
+}
+
+int32_t correct_all_event_seconds(TimeTable* time_table, const int32_t first_corrected)
+{
+
+  // the difference between event_second (the key of the map)
+  auto first_good_row = time_table->find(first_corrected);
+  for (auto it = std::make_reverse_iterator(first_good_row); it!=time_table->rend(); ++it){
+    it->second.corrected_sec = std::prev(it)->second.corrected_sec - 1;
+  }
+  for (auto it = std::next(first_good_row); it!=time_table->end(); ++it)
+  {
+    if(!it->second.corrected_sec)
+    {
+      it->second.corrected_sec = std::prev(it)->second.corrected_sec+1;
+    }
+  }
+
   return 0;
 }
 
