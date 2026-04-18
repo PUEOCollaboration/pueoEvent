@@ -43,16 +43,12 @@ struct event_second_start_end
 using TimeTable=std::map<int32_t, event_second_start_end>;
 
 // The "main" function. Returns the run number or error code
-int32_t analyze(const char * header_file_path, const char * output_dir = nullptr);
+int32_t analyze(const char * header_file_path, const char * timemark_path, const char * output_dir = nullptr);
 
 // Prepares two printable TimeTables, see #print().
 // @param[out] run Run number
 // @retval Success (0), Error (eg. ERR_TimeTableTooShort), or Warning (eg. ERR_MissingSecond)
 int32_t prepare_table(ROOT::RDF::RNode header_rdf, uint32_t * run, TimeTable * time_table, TimeTable * invalid_seconds);
-
-// Checks if the first column of the table (`event_second`) starts out wrong.
-// Rumor has it that some runs started erroneously from year 1970 (Unix epoch).
-int32_t check_event_seconds(const TimeTable * time_table);
 
 // Computes `avg_relative_delta` for each second using neighboring seconds. 
 // @retval Success (0) or error (ERR_TimeTableTooShort) if the TimeTable is too short compared to `half_width`.
@@ -72,15 +68,29 @@ void insert_invalid_seconds_back(TimeTable* time_table, TimeTable* invalid_secon
 // Relies on `simple_moving_average()` to have computed `avg_relative_delta`.
 void stupid_extrapolation(TimeTable* time_table, const TimeTable::iterator& anchor_point);
 
-void print(const TimeTable* time_table, std::ostream& stream = std::cout, bool color=true);
-void plot (TimeTable& time_table, TString name="pps_correction.svg");
-void save_as_root(const TimeTable* time_table, const char * file_name);
+// Checks if the first column of the table (`event_second`) starts out wrong.
+// Rumor has it that some runs started erroneously from year 1970 (Unix epoch).
+// @retval Success (0) or Warning (ERR_Year1970)
+int32_t check_event_seconds(const TimeTable * time_table);
 
+// Attempt to correct the event second of one row by searching for a timestamped event in that second.
+// This might fail for two reasons: 
+//   1. there are no timesmarked events near that second (ERR_NoNearbyTimemark), or
+//   2. there is a timemarked event near that second, but for some reason we can't locate it 
+//      in the RawHeader tree (ERR_NoMatchingSubsecond).
+// * We don't care if this fails when the run is "normal" (ie when ERR_Year1970 is not reported)
+//   Even when ERR_Year1970 is reported and the `event_second` are clearly wrong,
+// * We don't care if this fails just a couple times,
+//   since technically we only need one row in the table to be corrected.
 int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable::iterator* row,
                                  ROOT::RDF::RNode header_rdf, ROOT::RDF::RNode timemark_rdf);
 
-// Should be called after `correct_one_event_second()`
-int32_t correct_all_event_seconds(TimeTable* time_table, const int32_t first_corrected);
+// Should be called after `correct_one_event_second()` if at least one row has been successfully corrected.
+void correct_all_event_seconds(TimeTable* time_table, const int32_t first_corrected);
+
+void print(const TimeTable* time_table, std::ostream& stream = std::cout, bool color=true);
+void plot (TimeTable& time_table, TString name="pps_correction.svg");
+void save_as_root(const TimeTable* time_table, const char * file_name);
 
 enum err_code
 {
@@ -98,29 +108,31 @@ enum err_code
 
 int32_t header_time_postprocessor_toy()
 {
-  // gSystem->Load("libpueoEvent.so");
-  // int32_t run=1023;
-  // analyze(Form("/work/headers/run%d/headFile%d.root", run, run), Form("time_table/run%d/",run));
+  gSystem->Load("libpueoEvent.so");
+  const char * timemark_file_path = "/work/all_timemarks.root";
 
-  fs::recursive_directory_iterator run_dir("/work/headers/");
-  const std::regex pattern(R"(headFile(\d+))");
-  for(auto const& entry: run_dir)
-  {
-    if (!entry.is_regular_file()) continue;
+  int32_t run=889;
+  analyze(Form("/work/headers/run%d/headFile%d.root", run, run), timemark_file_path, Form("time_table/run%d/",run));
 
-    std::string name = entry.path().stem().string(); 
-    std::smatch match;
-    // skip other root files in the run folder
-    if (!std::regex_match(name, match, pattern)) continue;
-
-    std::cout << entry.path() << "\n";
-    analyze(entry.path().c_str(), Form("time_table/run%s/", match[1].str().c_str()));
-  }
+  // fs::recursive_directory_iterator run_dir("/work/headers/");
+  // const std::regex pattern(R"(headFile(\d+))");
+  // for(auto const& entry: run_dir)
+  // {
+  //   if (!entry.is_regular_file()) continue;
+  //
+  //   std::string name = entry.path().stem().string(); 
+  //   std::smatch match;
+  //   // skip other root files in the run folder
+  //   if (!std::regex_match(name, match, pattern)) continue;
+  //
+  //   std::cout << entry.path() << "\n";
+  //   analyze(entry.path().c_str(), timemark_file_path, Form("time_table/run%s/", match[1].str().c_str()));
+  // }
 
   return 0;
 }
 
-int32_t analyze(const char * header_file_path, const char * output_dir)
+int32_t analyze(const char * header_file_path, const char * timemark_path, const char * output_dir)
 {
   ROOT::RDataFrame header_rdf("headerTree", header_file_path);
   TimeTable time_table;
@@ -191,7 +203,7 @@ int32_t analyze(const char * header_file_path, const char * output_dir)
   stupid_extrapolation(&time_table, anchor_point);
   // plot(time_table);
 
-  ROOT::RDataFrame timemark_rdf("timemarkTree", "/work/all_timemarks.root");
+  ROOT::RDataFrame timemark_rdf("timemarkTree", timemark_path);
 
   int32_t evt_sec_err = check_event_seconds(&time_table);
   if (evt_sec_err&ERR_Year1970) 
@@ -218,9 +230,24 @@ int32_t analyze(const char * header_file_path, const char * output_dir)
               "suitable timestamped event to work with (run %d).\n\e[0m", it->first, run);
     else if (evt_corr_err&ERR_NoMatchingSubsecond) 
       fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find the "
-              "event in the header tree with the time stamped event's subsecond (run %d).\n\e[0m",
+              "event in the header tree with the timestamped event's subsecond (run %d).\n\e[0m",
               it->first, run);
+  }
 
+  if (corrected_seconds.size()==0 && evt_sec_err & ERR_Year1970)
+  {
+    fprintf(stderr, "\e[1;31mFatal Error: The `event_second` are clearly wrong and I have"
+            " failed to correct any of them (run %d).\n\e[0m", run);
+    return ERR_Year1970;
+  }
+  else if (corrected_seconds.size()==0 && !(evt_sec_err & ERR_Year1970))
+  {
+    fprintf(stderr, "\e[1;33mWarning: I have failed to correct the event seconds using the "
+            "timemarked events, but the `event_second` look to be correct (run %d).\n\e[0m", run);
+
+    for (auto &e: time_table) e.second.corrected_sec = e.first;
+    
+  } else {
     correct_all_event_seconds(&time_table, *corrected_seconds.begin());
   }
 
@@ -548,7 +575,7 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
   return 0;
 }
 
-int32_t correct_all_event_seconds(TimeTable* time_table, const int32_t first_corrected)
+void correct_all_event_seconds(TimeTable* time_table, const int32_t first_corrected)
 {
 
   // the difference between event_second (the key of the map)
@@ -563,8 +590,6 @@ int32_t correct_all_event_seconds(TimeTable* time_table, const int32_t first_cor
       it->second.corrected_sec = std::prev(it)->second.corrected_sec+1;
     }
   }
-
-  return 0;
 }
 
 void print(const TimeTable* time_table, std::ostream& stream, bool color)
