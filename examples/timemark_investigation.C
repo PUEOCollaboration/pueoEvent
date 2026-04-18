@@ -12,8 +12,8 @@ void timemark_investigation()
   gSystem->Load("libpueoEvent.so");
   ROOT::RDataFrame rdf("timemarkTree", "/work/all_timemarks.root");
 
-  // rdf.Filter("rising.utc_secs >= 1767235954-5 && rising.utc_secs <= 1767235954+5")
-  //    .Display({"readout_time.utc_secs","rising.utc_secs", "rising.utc_nsecs"}, 100)->Print();
+  rdf.Filter("readout_time.fSec - 1766189366 > 0 && readout_time.fSec - 1766189366 < 100000")
+     .Display({"readout_time.fSec","rising.fSec", "rising.fNanoSec"}, 100)->Print();
 
   auto diff_bw = [](TTimeStamp& readout_sec, TTimeStamp& rising)
     {return readout_sec.GetSec() - rising.GetSec();};
@@ -27,9 +27,13 @@ void timemark_investigation()
   gr->GetYaxis()->SetTitle("Difference [sec]");
   gr->GetXaxis()->SetTitle("Date");
   // gr->GetXaxis()->SetRangeUser(1766.5e6, 1767e6); // seems like there's a clock drift during Christmas
+  gr->GetXaxis()->SetRangeUser(1766189366-2000, 1766189366+2000); // seems like some days we were'nt timestamping
+  // gr->GetXaxis()->SetRangeUser(1766217891-2000, 1766217891+2000);
   gr->GetXaxis()->SetTimeDisplay(1);
   gr->GetXaxis()->SetTimeFormat("%m/%d/%Y%F1970-01-01 00:00:00");
   gr->Draw("ALP");
-  c1.SaveAs("timemark_investigation.png");
+  gr->SetMarkerStyle(kCircle);
+  gr->SetMarkerSize(3);
+  c1.SaveAs("timemark_investigation_2.png");
   
 }
