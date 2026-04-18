@@ -198,28 +198,28 @@ int32_t analyze(const char * header_file_path, const char * output_dir)
   {
     fprintf(stderr, "\e[1;33mWarning: `event_second` < launch second %d (run %d).\n\e[0m",
             PUEO_LAUNCH_SECOND, run);
+  }
 
-    std::set<int32_t> corrected_seconds;
-    for (auto it = time_table.begin(); it!=time_table.end(); ++it)
-    {
-      auto tmp = it; // tmp might be changed such that it's different from `it`
+  std::set<int32_t> corrected_seconds;
+  for (auto it = time_table.begin(); it!=time_table.end(); ++it)
+  {
+    auto tmp = it; // tmp might be changed such that it's different from `it`
 
-      if (corrected_seconds.size() > time_table.size()/10) break;
-      int32_t evt_corr_err = correct_one_event_second(&time_table, &tmp, header_rdf, timemark_rdf);
+    // if (corrected_seconds.size() > time_table.size()/10) break;
+    int32_t evt_corr_err = correct_one_event_second(&time_table, &tmp, header_rdf, timemark_rdf);
 
-      std::cerr << "attempting to correct `event_second` near " << it->first << "\n";
-      if (evt_corr_err == 0){
-        fprintf(stderr, "\e[1;32mSuccess: Found a timemark to correct `event_second` %d.\n\e[0m", tmp->first);
-        corrected_seconds.insert(tmp->first);
-      }
-      else if (evt_corr_err&ERR_NoNearbyTimemark) 
-        fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find a "
-                "suitable timestamped event to work with (run %d).\n\e[0m", it->first, run);
-      else if (evt_corr_err&ERR_NoMatchingSubsecond) 
-        fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find the"
-                "event in the header tree with the time stamped event's subsecond (run %d).\n\e[0m",
-                it->first, run);
+    std::cerr << "attempting to correct `event_second` near " << it->first << "\n";
+    if (evt_corr_err == 0){
+      fprintf(stderr, "\e[1;32mSuccess: Found a timemark to correct `event_second` %d.\n\e[0m", tmp->first);
+      corrected_seconds.insert(tmp->first);
     }
+    else if (evt_corr_err&ERR_NoNearbyTimemark) 
+      fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find a "
+              "suitable timestamped event to work with (run %d).\n\e[0m", it->first, run);
+    else if (evt_corr_err&ERR_NoMatchingSubsecond) 
+      fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find the "
+              "event in the header tree with the time stamped event's subsecond (run %d).\n\e[0m",
+              it->first, run);
 
     correct_all_event_seconds(&time_table, *corrected_seconds.begin());
   }
