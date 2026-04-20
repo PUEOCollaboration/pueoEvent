@@ -106,13 +106,16 @@ enum err_code
   ERR_NoMatchingSubsecond  = 1<<9  // cannot find the timestamped event in the header tree
 };
 
-int32_t header_time_postprocessor_toy(uint32_t run = 783, const char * timemark_file_path = "/work/all_timemarks.root")
+int32_t header_time_postprocessor_toy(uint32_t run, const char * timemark_file_path = "/work/all_timemarks.root", const char * time_table_dir_path = "/work/time_tables/")
 {
   gSystem->Load("libpueoEvent.so");
   const char * pueo_root_data = std::getenv("PUEO_ROOT_DATA");
   if (!pueo_root_data) std::cerr << "\e[1;31mEnvironment variable PUEO_ROOT_DATA not defined!\n";
 
-  analyze(Form("%s/run%d/headFile%d.root", pueo_root_data, run, run), timemark_file_path, Form("time_table/run%d/",run));
+  const char * header_file_path = Form("%s/run%d/headFile%d.root", pueo_root_data, run, run);
+  const char * output_path = Form("%s/run%d/",time_table_dir_path, run);
+  analyze(header_file_path, timemark_file_path, output_path);
+
 
   // fs::recursive_directory_iterator run_dir(pueo_root_data);
   // const std::regex pattern(R"(headFile(\d+))");
