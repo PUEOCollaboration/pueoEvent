@@ -298,11 +298,13 @@ int32_t prepare_table(ROOT::RDF::RNode header_rdf, uint32_t* run, TimeTable* tim
     };
   header_rdf.Foreach(search_and_fill, {"header"});
 
-  if (run_numbers.size() < 2) return ERR_TimeTableTooShort;
-  if (! std::equal(run_numbers.begin() + 1, run_numbers.end(), run_numbers.begin()) )
-    return ERR_MoreThanOneRun;
+  if (run_numbers.size() > 0)
+    *run = run_numbers.front();
 
-  *run = run_numbers.front();
+  for (auto r: run_numbers){
+    if (r!=*run) return ERR_MoreThanOneRun;
+  }
+
   if (*run < PUEO_FIRST_AMP_RUN) return ERR_PreAmpRun ;
 
   // It only makes sense if we have at least one valid second (ie 3 consecutive `event_second`s).
