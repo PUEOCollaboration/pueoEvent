@@ -233,6 +233,10 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
       fprintf(stdout, "\e[1;32mSuccess: Found a timemark to correct `event_second` %d.\n\e[0m", tmp->first);
       corrected_seconds.insert(tmp->first);
     }
+    else if (evt_corr_err & ERR_NotIdentical && (evt_sec_err & ERR_Year1970)){
+      fprintf(stdout, "\e[1;32mSuccess: Found a timemark to correct a clearly wrong `event_second` %d.\n\e[0m", tmp->first);
+      corrected_seconds.insert(tmp->first);
+    }
     else if (evt_corr_err&ERR_NoNearbyTimemark) 
       fprintf(stdout, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find a "
               "suitable timestamped event to work with (run %d).\n\e[0m", tmp->first, run);
