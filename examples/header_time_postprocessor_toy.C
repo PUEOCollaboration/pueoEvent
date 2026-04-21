@@ -40,6 +40,7 @@ struct event_second_start_end
   bool     missing = false;        // set to true if the second is a missing second
   bool     invalid_delta = false;  // set to true if relative_delta cannot be computed
   bool     is_anchor_row = false;  // anchor row: corrected_pps == this_pps; somewhat arbitrarily chosen
+  bool     has_timestamp = false;
 };
 
 using TimeTable=std::map<int32_t, event_second_start_end>;
@@ -105,10 +106,12 @@ enum err_code
   ERR_EmptyTable           = 1<<6, // fatal but probably won't be reached; we should have errored out already
   ERR_NoStableRegion       = 1<<7, // recoverable
   ERR_NoNearbyTimemark     = 1<<8, // cannot find a timestamped event using the event's readout time, should be recoverable
-  ERR_NoMatchingSubsecond  = 1<<9  // cannot find the timestamped event in the header tree
+  ERR_NoMatchingSubsecond  = 1<<9, // cannot find the timestamped event in the header tree
+  ERR_NotIdentical         = 1<<10,// corrected event second and the orignal are not identical
+  ERR_NotContiguous        = 1<<11 // corrected event second is not contiguous ...
 };
 
-int32_t header_time_postprocessor_toy(uint32_t run, const char * timemark_file_path = "/work/all_timemarks.root", const char * time_table_dir_path = "/work/time_tables/")
+int32_t header_time_postprocessor_toy(uint32_t run, const char * timemark_file_path = "/work/all_timemarks.root", const char * time_table_dir_path = "./time_tables/")
 {
   gSystem->Load("libpueoEvent.so");
   const char * pueo_root_data = std::getenv("PUEO_ROOT_DATA");
@@ -232,11 +235,17 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
     }
     else if (evt_corr_err&ERR_NoNearbyTimemark) 
       fprintf(stdout, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find a "
-              "suitable timestamped event to work with (run %d).\n\e[0m", it->first, run);
+              "suitable timestamped event to work with (run %d).\n\e[0m", tmp->first, run);
     else if (evt_corr_err&ERR_NoMatchingSubsecond) 
       fprintf(stdout, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find the "
               "event in the header tree with the timestamped event's subsecond (run %d).\n\e[0m",
-              it->first, run);
+              tmp->first, run);
+    else if (evt_corr_err&ERR_NotIdentical && !(evt_sec_err & ERR_Year1970) )  {
+      fprintf(stdout, "\e[1;33mWarning: found a timestamp for event_second %d, but the timestamp "
+              "and the event_second are not identical (run %d).\n\e[0m",
+              tmp->first, run);
+      tmp->second.corrected_sec = 0;
+    }
   }
 
   if (corrected_seconds.size()==0 && evt_sec_err & ERR_Year1970)
@@ -248,14 +257,27 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
   }
   else if (corrected_seconds.size()==0 && !(evt_sec_err & ERR_Year1970))
   {
-    // This does happen for early runs.
+    // This does happen for early runs. Don't do anything in this case
     fprintf(stderr, "\e[1;31mFatal Error: The `event_second` seem okay,"
             " but none of them is corrected because I have failed to find a single timestamped"
             " event in this run (run %d).\n\e[0m", run);
-    // don't do anything in this case
     // for (auto &e: time_table) e.second.corrected_sec = e.first;
   } else {
     correct_all_event_seconds(&time_table, *corrected_seconds.begin());
+  }
+
+  int32_t prev_second = time_table.begin()->second.corrected_sec;
+  for(auto it = std::next(time_table.begin(),1); it!=time_table.end(); ++it) {
+    int32_t this_second = it->second.corrected_sec;
+
+    // hopefully this doesn't happen either
+    if (this_second != prev_second+1) {
+      fprintf(stderr, "\e[1;31mFatal Error: The corrected `event_second` are not contigious for "
+            "some reason(run %d).\n\e[0m", run);
+      break;
+    } else {
+      prev_second++;
+    }
   }
 
   if (output_dir && !fs::exists(output_dir))
@@ -542,8 +564,8 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
   const pueo::Timemark &best_timemark = useful_timemarks.begin()->second;
 
   // Filter out events that are not close to the reference point
-  auto narrow_range = [ref_readout](pueo::RawHeader& rhdr)
-    {return std::abs(static_cast<int32_t>(rhdr.readoutTime) - ref_readout) < 3;};
+  auto narrow_range = [&best_timemark](pueo::RawHeader& rhdr)
+    {return std::abs(static_cast<int32_t>(rhdr.readoutTime) - best_timemark.readout_time.GetSec()) <= 1;};
   auto narrowed_rdf = header_rdf.Filter(narrow_range, {"header"});
 
   auto compute_subsec = 
@@ -588,14 +610,17 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
   int32_t maybe_wrong_event_second = maybe_timemarked_events.begin()->second.triggerTime;
   *row = pps_corrected_time_table->find(maybe_wrong_event_second);
   (*row)->second.corrected_sec = static_cast<int32_t>(best_timemark.rising.GetSec());
+
+  int32_t err = 0;
+  (*row)->second.has_timestamp = true;
+  if((*row)->second.corrected_sec != (*row)->first) err |= ERR_NotIdentical;
   
-  return 0;
+  return err;
 }
 
 void correct_all_event_seconds(TimeTable* time_table, const int32_t first_corrected)
 {
 
-  // the difference between event_second (the key of the map)
   auto first_good_row = time_table->find(first_corrected);
   for (auto it = std::make_reverse_iterator(first_good_row); it!=time_table->rend(); ++it){
     it->second.corrected_sec = std::prev(it)->second.corrected_sec - 1;
@@ -612,7 +637,7 @@ void correct_all_event_seconds(TimeTable* time_table, const int32_t first_correc
 void print(const TimeTable* time_table, std::ostream& stream, bool color)
 {
 
-  if (color) stream << "\nColor:\e[1;32m Anchor Row \e[1;33m Invalid Delta"
+  if (color) stream << "\nColor:\e[1;34m Has GPS Timestamp \e[1;32m Anchor Row \e[1;33m Invalid Delta"
                        "\e[1;31m (Inserted) Missing Second and Invalid Delta\e[0m\n";
   if (color) stream << "Anchor row is where corrected_this_pps equals this_pps exactly.\n";
   stream << "Relative delta is defined to be (next_pps - this_pps) - 125000000\n";
@@ -628,7 +653,8 @@ void print(const TimeTable* time_table, std::ostream& stream, bool color)
     if(!color) whitespace = " ";
     else 
     {
-      if (it->second.missing && it->second.invalid_delta) whitespace = "\033[1;31m ";  // red
+      if (it->second.has_timestamp) whitespace = "\033[1;34m ";  // blue
+      else if (it->second.missing && it->second.invalid_delta) whitespace = "\033[1;31m ";  // red
       else if (it->second.invalid_delta) whitespace = "\033[1;33m "; // yellow
       else if (it->second.is_anchor_row) whitespace = "\033[1;32m "; // green
       else whitespace = "\033[0m ";
@@ -787,6 +813,7 @@ void save_as_root(const TimeTable* time_table, const char * file_name)
   t->Branch("missing"                     ,&dummy.missing           );
   t->Branch("invalid_delta"               ,&dummy.invalid_delta     );
   t->Branch("is_anchor_row"               ,&dummy.is_anchor_row     );
+  t->Branch("has_timestamp"               ,&dummy.has_timestamp     );
 
   for (auto row: *time_table)
   {
