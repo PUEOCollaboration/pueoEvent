@@ -29,6 +29,7 @@ constexpr int32_t PUEO_LAUNCH_SECOND=1766163240;
 // `relative_delta` is then defined as (delta - 125E6).
 struct event_second_start_end 
 {
+  uint32_t run = 0;                // run number
   int32_t  corrected_sec = 0;      // Corrected event_second
   int32_t  readout_time_sec = 0;   // CPU readout time, not necessarily the same as event_second
   uint32_t this_pps = 0;           // value of the sysclk counter of the current second
@@ -38,6 +39,7 @@ struct event_second_start_end
   double   corrected_pps = 0;      // corrected this_pps (correction via avg_relative_delta)
   bool     missing = false;        // set to true if the second is a missing second
   bool     invalid_delta = false;  // set to true if relative_delta cannot be computed
+  bool     is_anchor_row = false;  // anchor row: corrected_pps == this_pps; somewhat arbitrarily chosen
 };
 
 using TimeTable=std::map<int32_t, event_second_start_end>;
@@ -223,33 +225,35 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
     // if (corrected_seconds.size() > time_table.size()/10) break;
     int32_t evt_corr_err = correct_one_event_second(&time_table, &tmp, header_rdf, timemark_rdf);
 
-    std::cerr << "attempting to correct `event_second` near " << it->first << "\n";
+    std::cout << "attempting to correct `event_second` near " << it->first << "\n";
     if (evt_corr_err == 0){
-      fprintf(stderr, "\e[1;32mSuccess: Found a timemark to correct `event_second` %d.\n\e[0m", tmp->first);
+      fprintf(stdout, "\e[1;32mSuccess: Found a timemark to correct `event_second` %d.\n\e[0m", tmp->first);
       corrected_seconds.insert(tmp->first);
     }
     else if (evt_corr_err&ERR_NoNearbyTimemark) 
-      fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find a "
+      fprintf(stdout, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find a "
               "suitable timestamped event to work with (run %d).\n\e[0m", it->first, run);
     else if (evt_corr_err&ERR_NoMatchingSubsecond) 
-      fprintf(stderr, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find the "
+      fprintf(stdout, "\e[1;33mWarning: can't correct `event_second` %d because I couldn't find the "
               "event in the header tree with the timestamped event's subsecond (run %d).\n\e[0m",
               it->first, run);
   }
 
   if (corrected_seconds.size()==0 && evt_sec_err & ERR_Year1970)
   {
+    // This does not actually happen for PUEO's first flight
     fprintf(stderr, "\e[1;31mFatal Error: The `event_second` are clearly wrong and I have"
             " failed to correct any of them (run %d).\n\e[0m", run);
     return ERR_Year1970;
   }
   else if (corrected_seconds.size()==0 && !(evt_sec_err & ERR_Year1970))
   {
-    fprintf(stderr, "\e[1;33mWarning: I have failed to correct the event seconds using the "
-            "timemarked events, but the `event_second` look to be correct (run %d).\n\e[0m", run);
-
-    for (auto &e: time_table) e.second.corrected_sec = e.first;
-    
+    // This does happen for early runs.
+    fprintf(stderr, "\e[1;31mFatal Error: The `event_second` seem okay,"
+            " but none of them is corrected because I have failed to find a single timestamped"
+            " event in this run (run %d).\n\e[0m", run);
+    // don't do anything in this case
+    // for (auto &e: time_table) e.second.corrected_sec = e.first;
   } else {
     correct_all_event_seconds(&time_table, *corrected_seconds.begin());
   }
@@ -261,6 +265,8 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
   {
     std::ofstream fout(Form("%s/time_table.txt", output_dir));
     print(&time_table, fout, false);
+    std::ofstream fout_color(Form("%s/time_table_color.txt", output_dir));
+    print(&time_table, fout_color, true);
     save_as_root(&time_table, Form("%s/time_table.root", output_dir));
   }
 
@@ -282,7 +288,8 @@ int32_t prepare_table(ROOT::RDF::RNode header_rdf, uint32_t* run, TimeTable* tim
       bool new_encounter = time_table->find((time_t)rhdr.triggerTime) == time_table->end();
       if (new_encounter) 
       {
-        run_numbers.push_back(static_cast<uint32_t>(rhdr.run));
+        uint32_t r = static_cast<uint32_t>(rhdr.run);
+        run_numbers.push_back(r);
         // If you think about it,
         // the last_pps of any event is actually the "this_pps" if we're sitting exactly on `event_second`.
         time_table->emplace
@@ -290,6 +297,7 @@ int32_t prepare_table(ROOT::RDF::RNode header_rdf, uint32_t* run, TimeTable* tim
             rhdr.triggerTime, 
             event_second_start_end
               {
+                .run = r,
                 .readout_time_sec=(int32_t)rhdr.readoutTime,
                 .this_pps=rhdr.lastPPS
               }
@@ -447,10 +455,14 @@ int32_t find_stable_region_mid_point(TimeTable * time_table, TimeTable::iterator
     else stable_seconds.clear();
   }
 
-  if (stable_seconds.size() != stable_length) return ERR_NoStableRegion;
+  if (stable_seconds.size() != stable_length) {
+    (*anchor_point)->second.is_anchor_row = true;
+    return ERR_NoStableRegion;
+  }
   else 
   {
     *anchor_point = stable_seconds.at(stable_length/2);
+    (*anchor_point)->second.is_anchor_row = true;
     return 0;
   }
 }
@@ -600,13 +612,15 @@ void correct_all_event_seconds(TimeTable* time_table, const int32_t first_correc
 void print(const TimeTable* time_table, std::ostream& stream, bool color)
 {
 
-  if (color) stream << "\nColor: \e[1;33m Invalid Delta \e[1;31m Missing and Invalid Delta\e[0m\n";
+  if (color) stream << "\nColor:\e[1;32m Anchor Row \e[1;33m Invalid Delta"
+                       "\e[1;31m (Inserted) Missing Second and Invalid Delta\e[0m\n";
+  if (color) stream << "Anchor row is where corrected_this_pps equals this_pps exactly.\n";
   stream << "Relative delta is defined to be (next_pps - this_pps) - 125000000\n";
-  stream << "--------------------------------------------------------------------------------------------------------\n"
-         << " event_second | corrected    | readout     | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
-         << " from DAQ     | event_second | time (sec)  |           |           | delta    | delta     | this_pps   \n"
-         << " int32_t      | int32_t      | int32_t     | uint32_t  | uint32_t  | int32_t  | double    | double     \n"
-         << "--------------------------------------------------------------------------------------------------------\n";
+  stream << "----------------------------------------------------------------------------------------------------------------------\n"
+         << "run      | event_second | corrected    | readout     | this_pps  | next_pps  | relative | avg. rel. | corrected  \n"
+         << "number   | from DAQ     | event_second | time (sec)  |           |           | delta    | delta     | this_pps   \n"
+         << "uint32_t | int32_t      | int32_t      | int32_t     | uint32_t  | uint32_t  | int32_t  | double    | double     \n"
+         << "----------------------------------------------------------------------------------------------------------------------\n";
 
   TString whitespace;
   for (auto it=time_table->begin(); it!=time_table->end(); ++it)
@@ -616,10 +630,12 @@ void print(const TimeTable* time_table, std::ostream& stream, bool color)
     {
       if (it->second.missing && it->second.invalid_delta) whitespace = "\033[1;31m ";  // red
       else if (it->second.invalid_delta) whitespace = "\033[1;33m "; // yellow
+      else if (it->second.is_anchor_row) whitespace = "\033[1;32m "; // green
       else whitespace = "\033[0m ";
     }
 
-    stream << whitespace << std::setw(14) << std::left << it->first
+    stream << whitespace << std::setw(9)  << std::left << it->second.run
+           << whitespace << std::setw(14) << std::left << it->first
            << whitespace << std::setw(14) << std::left << it->second.corrected_sec
            << whitespace << std::setw(13) << std::left << it->second.readout_time_sec
            << whitespace << std::setw(11) << it->second.this_pps
@@ -629,7 +645,7 @@ void print(const TimeTable* time_table, std::ostream& stream, bool color)
            << whitespace << std::setw(15) << std::right << std::fixed << std::setprecision(2) << it->second.corrected_pps << "\n";
   }
 
-  stream << whitespace << "---------------------------------------------------------------------------------------\n";
+  stream << whitespace << "----------------------------------------------------------------------------------------------------------------------\n";
 }
 
 void plot(TimeTable& time_table, TString name)
@@ -759,6 +775,7 @@ void save_as_root(const TimeTable* time_table, const char * file_name)
   int32_t key;
   event_second_start_end  dummy;
 
+  t->Branch("run"                         ,&dummy.run                     );
   t->Branch("event_second"                ,&key                     );
   t->Branch("corrected_event_second"      ,&dummy.corrected_sec     );
   t->Branch("readout_time_sec"            ,&dummy.readout_time_sec  );
@@ -769,6 +786,7 @@ void save_as_root(const TimeTable* time_table, const char * file_name)
   t->Branch("corrected_pps"               ,&dummy.corrected_pps     );
   t->Branch("missing"                     ,&dummy.missing           );
   t->Branch("invalid_delta"               ,&dummy.invalid_delta     );
+  t->Branch("is_anchor_row"               ,&dummy.is_anchor_row     );
 
   for (auto row: *time_table)
   {
