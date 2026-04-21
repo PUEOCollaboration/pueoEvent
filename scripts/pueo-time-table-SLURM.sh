@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -A PAS2608
-#SBATCH -t 2:30:00
+#SBATCH -t 3:00:00
 #SBATCH --ntasks-per-node=1
 
 #SBATCH --output=/dev/null
@@ -18,4 +18,4 @@ run_number=$(( SLURM_ARRAY_TASK_ID + 700 ))
 exec > /fs/scratch/PAS2608/jason/global_timing_calibration/${run_number}.out
 exec 2>/fs/scratch/PAS2608/jason/global_timing_calibration/${run_number}.err
 
-root -l -q "${PARENT_DIR}/examples/header_time_postprocessor_toy.C(${run_number}, \"${TIMEMARK_ROOTFILE_PATH}\", \"${TIME_TABLE_PATH}\")"
+time root -l -q "${PARENT_DIR}/examples/header_time_postprocessor_toy.C(${run_number}, \"${TIMEMARK_ROOTFILE_PATH}\", \"${TIME_TABLE_PATH}\")"

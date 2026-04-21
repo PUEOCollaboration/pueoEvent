@@ -19,15 +19,24 @@ if [[ -z "$ROOT_INCLUDE_PATH" ]]; then
 fi
 
 # get a list of all runs in PUEO_ROOT_DATA, use them to create time_tables/run<#>/ directories
-run_num_list=()
+long_run_list=()
+short_run_list=()
+
 for file in "${PUEO_ROOT_DATA}"/* ; do
   run=$(echo "$file" | sed -E 's/.*run([0-9]+)/\1/')
   mkdir -p ${TIME_TABLE_PATH}/run${run}
-  run_num_list+=($((run - 700)))  # very stupid, very dangerous, but SLURM id upperlimit is 1000
+
+  # 1392 is 6000 seconds long and takes a while
+  if [[ ${run} == "1392" ]]; then
+    long_run_list+=($((run - 700)))
+  else
+    short_run_list+=($((run - 700)))  # very stupid, probably dangerous, but SLURM id upperlimit is 1000
+  fi
 done
 
 # convert to comma separated
-IFS=, run_num_csv="${run_num_list[*]}"
+IFS=, short_run_list_csv="${short_run_list[*]}"
+IFS=, long_run_list_csv="${long_run_list[*]}"
 unset IFS
 
 # store stdout/stderr log: 
@@ -39,5 +48,10 @@ mkdir /fs/scratch/PAS2608/jason/global_timing_calibration/
 # `--export=ALL` is needed to forward current environment, else the job will fail 
 # (will complain about CERN ROOT not found)
 sbatch --export=ALL,PARENT_DIR=${PARENT_DIR},TIMEMARK_ROOTFILE_PATH=${TIMEMARK_ROOTFILE_PATH},TIME_TABLE_PATH=${TIME_TABLE_PATH} \
-       --array=${run_num_csv} \
+       --array=${long_run_list_csv} \
+       --time=06:00:00 \
+       ${PARENT_DIR}/scripts/pueo-time-table-SLURM.sh
+
+sbatch --export=ALL,PARENT_DIR=${PARENT_DIR},TIMEMARK_ROOTFILE_PATH=${TIMEMARK_ROOTFILE_PATH},TIME_TABLE_PATH=${TIME_TABLE_PATH} \
+       --array=${short_run_list_csv} \
        ${PARENT_DIR}/scripts/pueo-time-table-SLURM.sh
