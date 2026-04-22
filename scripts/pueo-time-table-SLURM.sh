@@ -18,4 +18,4 @@ run_number=$(( SLURM_ARRAY_TASK_ID + 700 ))
 exec > /fs/scratch/PAS2608/jason/global_timing_calibration/${run_number}.out
 exec 2>/fs/scratch/PAS2608/jason/global_timing_calibration/${run_number}.err
 
-time root -l -q "${PARENT_DIR}/examples/header_time_postprocessor_toy.C(${run_number}, \"${TIMEMARK_ROOTFILE_PATH}\", \"${TIME_TABLE_PATH}\")"
+time root -l -q "${PARENT_DIR}/macros/make_time_table.C(${run_number}, \"${TIMEMARK_ROOTFILE_PATH}\", \"${TIME_TABLE_PATH}\")"

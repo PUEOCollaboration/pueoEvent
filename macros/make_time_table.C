@@ -111,7 +111,7 @@ enum err_code
   ERR_NotContiguous        = 1<<11 // corrected event second is not contiguous ...
 };
 
-int32_t header_time_postprocessor_toy(uint32_t run, const char * timemark_file_path = "/work/all_timemarks.root", const char * time_table_dir_path = "./time_tables/")
+int32_t make_time_table(uint32_t run, const char * timemark_file_path = "/work/all_timemarks.root", const char * time_table_dir_path = "./time_tables/")
 {
   gSystem->Load("libpueoEvent.so");
   const char * pueo_root_data = std::getenv("PUEO_ROOT_DATA");
