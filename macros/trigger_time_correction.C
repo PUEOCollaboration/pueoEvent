@@ -24,7 +24,124 @@ struct relevant_shit{
 };
 using TimeTable=std::map<int32_t, relevant_shit>;
 
-int32_t correct_raw_header(const char * input_parent, const char * output_parent, uint32_t run, const char * time_table_path = nullptr){
+// correction only applied if time table of the run is 1. found and 2. valid (ie has corrected_event_second)
+// else this function just copies
+// TODO: double check trigger time subsection correction
+int32_t correct_raw_header(const char * input_parent, const char * output_parent, uint32_t run, const char * time_table_path = nullptr);
+
+// sanity check to see if things are copied over correctly.
+int32_t simple_equality_check(uint32_t run, const char * orig, const char * post);
+
+void trigger_time_correction(){
+
+  gSystem->Load("libpueoEvent.so");
+  const char * pueo_root_data = std::getenv("PUEO_ROOT_DATA");
+  if (!pueo_root_data) {
+    std::cerr << "\e[1;31mPUEO_ROOT_DATA not defined.\n";
+    exit(1);
+  }
+  const char * output_run_parent = "./headers";
+  // correct_raw_header(pueo_root_data, "./headers", 1392, "/work/time_tables/");
+
+  fs::directory_iterator time_tables_dir_iter( "/work/time_tables");
+  const std::regex run_pattern(R"(run(\d+))");
+  std::smatch run_number_match;
+
+  for(auto const& dir: time_tables_dir_iter)
+  {
+    std::string dirname = dir.path().filename().string();
+    if (!dir.is_directory())
+      continue;
+
+    if (!std::regex_match(dirname, run_number_match, run_pattern))
+      continue;
+
+    uint32_t run = std::atoi(run_number_match[1].str().c_str());
+
+    fs::path time_table_path = (dir.path()/ "time_table.root");
+
+    // case: not an empty run directory (ie no time table created for this run)
+    if (fs::exists(time_table_path)) {
+      std::cout << "Found " << time_table_path << " for " << run << "\n";
+      correct_raw_header(pueo_root_data, output_run_parent, run, time_table_path.c_str());
+    } else {
+      std::cout << "\e[1;31mNo time table for run " << run << "\e[0m\n";
+      correct_raw_header(pueo_root_data, output_run_parent, run);
+    }
+  }
+
+  // sanity check
+  fs::recursive_directory_iterator run_dir(pueo_root_data);
+  const std::regex pattern(R"(headFile(\d+))");
+  for(auto const& entry: run_dir)
+  {
+    if (!entry.is_regular_file()) continue;
+
+    std::string name = entry.path().stem().string(); 
+    std::smatch match;
+    // skip other root files in the run folder
+    if (!std::regex_match(name, match, pattern)) continue;
+
+    uint32_t r = std::atoi(match[1].str().c_str());
+    std::cout << "checking equality of run " << r << "...";
+    uint32_t equality_err= simple_equality_check(
+      r, entry.path().string().c_str(), Form("%s/run%d/headFile%d.root",output_run_parent, r, r)
+    );
+    if (!equality_err) std::cout << "passed\n";
+    else std::cerr << "failed!\n";
+
+  }
+}
+
+
+int32_t simple_equality_check(uint32_t run, const char * orig, const char * post){
+
+  int32_t global_error = 0;
+  pueo::RawHeader * original = nullptr;
+  TFile f_orig(orig);
+  TTree * t_orig = f_orig.Get<TTree>("headerTree");
+  t_orig->SetBranchAddress("header", &original);
+
+  pueo::RawHeader * corrected = nullptr;
+  TFile f_corr(post);
+  TTree * t_corr = f_corr.Get<TTree>("headerTree");
+  t_corr->SetBranchAddress("header", &corrected);
+
+  if (t_corr->GetEntries() != t_orig->GetEntries()) {
+    std::cout << "run " << run << ":unequal length\n";
+    global_error = 1;
+  }
+
+  int32_t local_error = 0;
+  for (int i=0; i<t_corr->GetEntries(); ++i){
+    t_corr->GetEntry(i);
+    t_orig->GetEntry(i);
+
+    if(original->run!=corrected->run) local_error = 1;
+    if(original->eventNumber!=corrected->eventNumber) local_error = 1;
+    if(original->trigTime!=corrected->trigTime) local_error = 1;
+    if(original->triggerTime!=corrected->triggerTime) local_error = 1;
+    if(original->lastPPS!=corrected->lastPPS) local_error = 1;
+    if(original->lastLastPPS!=corrected->lastLastPPS) local_error = 1;
+    if(original->deadTime!=corrected->deadTime) local_error = 1;
+    if(original->deadTimeLastPPS!=corrected->deadTimeLastPPS) local_error = 1;
+    if(original->deadTimeLastLastPPS!=corrected->deadTimeLastLastPPS) local_error = 1;
+    if(original->L2Mask!=corrected->L2Mask) local_error = 1;
+    if(original->trigType!=corrected->trigType) local_error = 1;
+    if(original->readoutTime!=corrected->readoutTime) local_error = 1;
+    if(original->readoutTimeNs!=corrected->readoutTimeNs) local_error = 1;
+
+    if (local_error) {
+      std::cerr << "run " << run << " event " << original->eventNumber << " is messed up\n";
+      global_error = 1;
+      local_error = 0;
+    }
+  }
+
+  return global_error;
+}
+
+int32_t correct_raw_header(const char * input_parent, const char * output_parent, uint32_t run, const char * time_table_path){
 
   TimeTable dictionary;
   if (time_table_path) {
@@ -104,44 +221,3 @@ int32_t correct_raw_header(const char * input_parent, const char * output_parent
   out_header=nullptr;
   return 0;
 }
-
-void trigger_time_correction(){
-
-  gSystem->Load("libpueoEvent.so");
-  const char * pueo_root_data = std::getenv("PUEO_ROOT_DATA");
-  if (!pueo_root_data) {
-    std::cerr << "\e[1;31mPUEO_ROOT_DATA not defined.\n";
-    exit(1);
-  }
-  const char * output_run_parent = "./header";
-  // correct_raw_header(pueo_root_data, "./headers", 1392, "/work/time_tables/");
-
-  fs::directory_iterator time_tables_dir_iter( "/work/time_tables");
-  const std::regex run_pattern(R"(run(\d+))");
-  std::smatch run_number_match;
-
-  for(auto const& dir: time_tables_dir_iter)
-  {
-    std::string dirname = dir.path().filename().string();
-    if (!dir.is_directory())
-      continue;
-
-    if (!std::regex_match(dirname, run_number_match, run_pattern))
-      continue;
-
-    uint32_t run = std::atoi(run_number_match[1].str().c_str());
-      
-    fs::path time_table_path = (dir.path()/ "time_table.root");
-
-    // case: not an empty run directory (ie no time table created for this run)
-    if (fs::exists(time_table_path)) {
-      std::cout << "Found " << time_table_path << " for " << run << "\n";
-      correct_raw_header(pueo_root_data, output_run_parent, run, time_table_path.c_str());
-    } else {
-      std::cout << "\e[1;31mNo time table for run " << run << "\e[0m\n";
-      correct_raw_header(pueo_root_data, output_run_parent, run);
-    }
-  }
-}
-
-

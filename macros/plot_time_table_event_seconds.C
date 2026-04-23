@@ -7,58 +7,6 @@
 
 namespace fs = std::filesystem;
 
-enum err_code
-{
-  ERR_NotContiguous = 1<<0,
-  ERR_NotIdentical = 1<<1
-};
-
-
-int32_t check_contiguity(ROOT::RDF::RNode rdf, uint32_t * run){
-  std::vector<std::pair<int32_t, int32_t>> event_second_and_correction;
-
-  auto run_vector = rdf.Take<uint32_t>("run");
-
-  rdf.Foreach(
-    [&event_second_and_correction]
-    (int32_t event_second, int32_t corrected_event_second)
-    {
-      event_second_and_correction.emplace_back(std::make_pair(event_second, corrected_event_second));
-    },
-    {"event_second", "corrected_event_second"}
-  );
-
-  (*run) = run_vector->front();
-  int32_t error_code = 0;
-
-  int32_t prev_second = event_second_and_correction.front().second;
-  for(std::size_t i=1; i<event_second_and_correction.size(); ++i){
-    int32_t this_second = event_second_and_correction.at(i).second;
-
-    if (this_second != prev_second+1) {
-      // std::cout << "\e[1;31m" << this_second << ", previous second: " << prev_second << "\e[0m\n";
-      error_code |= ERR_NotContiguous;
-      prev_second=event_second_and_correction.at(i).second;
-
-    } else {
-      // std::cout << this_second << ", previous second: " << prev_second << "\n";
-      prev_second++;
-    }
-  }
-
-  for(auto &p: event_second_and_correction){
-    if (p.second != p.first){
-      error_code |= ERR_NotIdentical;
-      // std::cout << "\e[1;31m" << p.first << ": " << p.second << "\e[0m\n";
-    } else {
-      // std::cout << p.first << ": " << p.second << "\n";
-    }
-
-  }
-
-  return error_code;
-}
-
 void plot_diff(ROOT::RDF::RNode rdf){
   auto diff_bw = [](int32_t readout_sec, int32_t corrected_event_second)
     {return readout_sec - corrected_event_second;};
@@ -119,45 +67,10 @@ void plot_diff(ROOT::RDF::RNode rdf){
   
 }
 
-void time_table_event_second_check_health(){
+void plot_time_table_event_seconds(){
 
-  const char * msg1 = " none-contiguous";
-  const char * msg2 = " none-identical";
-
-  // uint32_t run = 0;
-  // ROOT::RDataFrame time_table_rdf("time_table_tree", "/work/time_tables/run801/time_table.root");
-  // int32_t err = check_contiguity(time_table_rdf, &run);
-  // if (err & ERR_NotIdentical && err & ERR_NotContiguous)
-  //   std::cout << "run " << run << ":" << msg1 << "," << msg2 << '\n';
-  // else if (err & ERR_NotContiguous){
-  //   std::cout << "run " << run << ":" << msg1 << '\n';
-  // }
-  // else if (err & ERR_NotIdentical) {
-  //   std::cout << "run " << run << ":" << msg2 << '\n';
-  // }
-    
-  
   fs::recursive_directory_iterator time_tables_dir_iter( "/work/time_tables");
   const std::regex pattern(R"(time_table\.root)");
-  // for(auto const& entry: time_tables_dir_iter)
-  // {
-  //   if (!entry.is_regular_file()) continue;
-  //
-  //   std::string name = entry.path().filename();
-  //   if (!std::regex_match(name, pattern)) continue;
-  //   ROOT::RDataFrame time_table_rdf("time_table_tree", entry.path().c_str());
-  //
-  //   uint32_t run        = 0;
-  //   int32_t err = check_contiguity(time_table_rdf, &run);
-  //   if (err & ERR_NotIdentical && err & ERR_NotContiguous)
-  //     std::cout << "run " << run << ":" << msg1 << "," << msg2 << '\n';
-  //   else if (err & ERR_NotContiguous){
-  //     std::cout << "run " << run << ":" << msg1 << '\n';
-  //   }
-  //   else if (err & ERR_NotIdentical) {
-  //     std::cout << "run " << run << ":" << msg2 << "\n";
-  //   }
-  // }
   TChain time_table_chain("time_table_tree");
   for(auto const& entry: time_tables_dir_iter)
   {
