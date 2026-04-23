@@ -276,7 +276,7 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
 
     // hopefully this doesn't happen either
     if (this_second != prev_second+1) {
-      fprintf(stderr, "\e[1;31mFatal Error: The corrected `event_second` are not contigious for "
+      fprintf(stderr, "\e[1;31mFatal Error: The corrected `event_second` are not contiguous for "
             "some reason(run %d).\n\e[0m", run);
       break;
     } else {
@@ -365,6 +365,7 @@ int32_t prepare_table(ROOT::RDF::RNode header_rdf, uint32_t* run, TimeTable* tim
     // the missing second's delta couldn't be computed either, because it wouldn't have a this_pps
     if (actual_next_second != next->first)
     {
+      (*time_table)[actual_next_second].run = *run;
       (*time_table)[actual_next_second].missing = true;
       (*time_table)[actual_next_second].invalid_delta = true;
       current->second.invalid_delta = true;
