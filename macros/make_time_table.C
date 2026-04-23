@@ -569,16 +569,7 @@ int32_t correct_one_event_second(TimeTable* pps_corrected_time_table, TimeTable:
 
   // Filter out events that are not close to the reference point
   auto narrow_range = [&best_timemark](pueo::RawHeader& rhdr)
-    {
-      int32_t hdr_read = static_cast<int32_t>(rhdr.readoutTime);
-      int32_t tm_read = best_timemark.readout_time.GetSec();
-      int32_t sec_diff = tm_read - hdr_read;
-      int32_t hdr_read_ns = static_cast<int32_t>(rhdr.readoutTimeNs);
-      int32_t tm_read_ns = best_timemark.readout_time.GetNanoSec();
-      int32_t nanosec_diff = tm_read - hdr_read;
-
-      return sec_diff == 0 && nanosec_diff < 5e6;
-    };
+    {return std::abs(static_cast<int32_t>(rhdr.readoutTime) - best_timemark.readout_time.GetSec()) <= 1;};
   auto narrowed_rdf = header_rdf.Filter(narrow_range, {"header"});
 
   auto compute_subsec = 
