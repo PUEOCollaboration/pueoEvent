@@ -261,6 +261,10 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
     return ERR_NoTimemarkAtAll;
   }
 
+  if (accidentals.size()>0) {
+    fprintf(stderr, "\e[1;31mTotal Number of accidentals: %lu (run %d).\n\e[0m", accidentals.size(), run);
+  }
+
   if (corrected_seconds.size()==0 && evt_sec_err & ERR_Year1970)
   {
     // This does not actually happen for PUEO's first flight
