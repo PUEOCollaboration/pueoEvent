@@ -45,7 +45,7 @@ struct event_second_start_end
 
 using TimeTable=std::map<int32_t, event_second_start_end>;
 
-// The "main" function. Returns the run number or error code
+// The "main" function. Returns error codes
 int32_t analyze(const char * header_file_path, const char * timemark_path, const char * output_dir = nullptr);
 
 // Prepares two printable TimeTables, see #print().
@@ -107,8 +107,9 @@ enum err_code
   ERR_NoStableRegion       = 1<<7, // recoverable
   ERR_NoNearbyTimemark     = 1<<8, // cannot find a timestamped event using the event's readout time, should be recoverable
   ERR_NoMatchingSubsecond  = 1<<9, // cannot find the timestamped event in the header tree
-  ERR_NotIdentical         = 1<<10,// corrected event second and the orignal are not identical
-  ERR_NotContiguous        = 1<<11 // corrected event second is not contiguous ...
+  ERR_NoTimemarkAtAll      = 1<<10,// cannot find a single timestamped event in the run
+  ERR_NotIdentical         = 1<<11,// corrected event second and the orignal are not identical
+  ERR_NotContiguous        = 1<<12 // corrected event second is not contiguous ...
 };
 
 int32_t make_time_table(uint32_t run, const char * timemark_file_path = "/work/all_timemarks.root", const char * time_table_dir_path = "./time_tables/")
@@ -198,7 +199,7 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
         print(&time_table, std::cerr);
         fprintf(
           stderr,
-          "\e[31;1mWarning: couldn't find a stable region where `next_pps` - `this_pps` ≈ 125 million.\n"
+          "\e[1;32mWarning: couldn't find a stable region where `next_pps` - `this_pps` ≈ 125 million.\n"
           "Will use the first second as the anchor point (run %d).\n\e[0m", run
         );
         break;
@@ -221,6 +222,7 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
   }
 
   std::set<int32_t> corrected_seconds;
+  std::set<int32_t> accidentals;
   for (auto it = time_table.begin(); it!=time_table.end(); ++it)
   {
     auto tmp = it; // tmp might be changed such that it's different from `it`
@@ -245,11 +247,18 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
               "event in the header tree with the timestamped event's subsecond (run %d).\n\e[0m",
               tmp->first, run);
     else if (evt_corr_err&ERR_NotIdentical && !(evt_sec_err & ERR_Year1970) )  {
-      fprintf(stdout, "\e[1;33mWarning: found a timestamp for event_second %d, but the timestamp "
+      fprintf(stderr, "\e[1;33mWarning: found a timestamp for event_second %d, but the timestamp "
               "and the event_second are not identical (run %d).\n\e[0m",
               tmp->first, run);
       tmp->second.corrected_sec = 0;
+      accidentals.insert(tmp->first);
     }
+  }
+
+  if (corrected_seconds.size() < accidentals.size()){
+    fprintf(stderr, "\e[1;31mFatal Error: event second correction failed -- too many"
+            "accidental matches (run %d).\n\e[0m", run);
+    return ERR_NoTimemarkAtAll;
   }
 
   if (corrected_seconds.size()==0 && evt_sec_err & ERR_Year1970)
@@ -262,25 +271,28 @@ int32_t analyze(const char * header_file_path, const char * timemark_path, const
   else if (corrected_seconds.size()==0 && !(evt_sec_err & ERR_Year1970))
   {
     // This does happen for early runs. Don't do anything in this case
+    // for (auto &e: time_table) e.second.corrected_sec = e.first;
     fprintf(stderr, "\e[1;31mFatal Error: The `event_second` seem okay,"
             " but none of them is corrected because I have failed to find a single timestamped"
             " event in this run (run %d).\n\e[0m", run);
-    // for (auto &e: time_table) e.second.corrected_sec = e.first;
+    evt_sec_err |= ERR_NoTimemarkAtAll;
   } else {
     correct_all_event_seconds(&time_table, *corrected_seconds.begin());
   }
 
   int32_t prev_second = time_table.begin()->second.corrected_sec;
-  for(auto it = std::next(time_table.begin(),1); it!=time_table.end(); ++it) {
-    int32_t this_second = it->second.corrected_sec;
 
-    // hopefully this doesn't happen either
-    if (this_second != prev_second+1) {
-      fprintf(stderr, "\e[1;31mFatal Error: The corrected `event_second` are not contiguous for "
-            "some reason(run %d).\n\e[0m", run);
-      break;
-    } else {
-      prev_second++;
+  if (!(evt_sec_err&ERR_NoTimemarkAtAll)){
+    for(auto it = std::next(time_table.begin(),1); it!=time_table.end(); ++it) {
+      int32_t this_second = it->second.corrected_sec;
+      // hopefully this doesn't happen...
+      if (this_second != prev_second+1) {
+        fprintf(stderr, "\e[1;31mFatal Error: The corrected `event_second` are not contiguous for "
+                "some reason(run %d).\n\e[0m", run);
+        break;
+      } else {
+        prev_second++;
+      }
     }
   }
 
