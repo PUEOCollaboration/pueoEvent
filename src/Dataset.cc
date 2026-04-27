@@ -164,7 +164,7 @@ pueo::Dataset::Dataset(int run,  DataDirectory version, bool decimated, Blinding
   fHaveUsefulFile = false;
   setStrategy(strategy); 
   currRun = run;
-  loadRun(run, version, decimated); 
+  loadRun(run, version, decimated);
   loadedBlindTrees = false;
   zeroBlindPointers();
   loadBlindTrees(); // want this to come after opening the data files to try to have correct ANITA flight
@@ -530,7 +530,6 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   }
 
   if (!fDecimated) fHeadTree->SetBranchAddress("header",&fHeader); 
-
   fHeadTree->BuildIndex("eventNumber"); 
 
   if (!fDecimated) fIndices = ((TTreeIndex*) fHeadTree->GetTreeIndex())->GetIndex(); 

@@ -97,7 +97,7 @@ Int_t pueo::GeomTool::getSurfChanAntFromRingPhiPol(ring::ring_t ring,Int_t phi, 
 
 static TMutex instance_lock; 
 static std::unordered_map<std::string,pueo::GeomTool*> instances[pueo::k::NUM_PUEO]; 
-static std::array<std::string, pueo::k::NUM_PUEO> default_sources = { "dec23", }; 
+static std::array<std::string, pueo::k::NUM_PUEO> default_sources = { "jun25", }; 
 static std::string empty (""); 
 void pueo::GeomTool::setDefaultGeometry(Int_t v, const std::string & src) 
 {
