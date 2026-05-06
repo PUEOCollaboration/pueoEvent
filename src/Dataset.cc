@@ -45,6 +45,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "TMath.h"
+#include "TPluginManager.h"
 #include "TROOT.h"
 #include "TEventList.h" 
 #include "TCut.h" 
@@ -467,6 +468,21 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
   const char * data_dir = getDataDir(dir); 
 
+  if (strstr(data_dir,"https://") == data_dir)
+  {
+    static bool gtfo_davix = false;
+
+     // Set up TWebFile because DAVIX is broken
+    if (!gtfo_davix)
+    {
+          // tell ROOT to load all of its plugin handlers, otherwise the first time you open a file this will happen again and override what you are about to do after this
+       gPluginMgr->LoadHandlersFromPluginDirs();
+
+        // Override the plugin handler for web files to use the legacy TWebFile instead of the newer davix which seems to be buggy
+       gPluginMgr->AddHandler("TFile", "^http[s]?:", "TWebFile","Net", "TWebFile(const char*,Option_t*)");
+       gtfo_davix = true;
+    }
+  }
   //seems like a good idea 
   
   int version = (int) dir; 
