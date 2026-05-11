@@ -582,7 +582,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
       TFile * f = new TFile(fname); 
       filesToClose.push_back(f); 
       fGpsTree = (TTree*) f->Get("attitudeTree"); 
-      fGpsTree->BuildIndex("realTime"); 
+      if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime","realTimeNsecs"); 
       fHaveGpsEvent = false; 
   //    fRunLoaded = false;
   //    return false; 
@@ -615,7 +615,6 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
        fEventTree = (TTree*) f->Get("eventTree"); 
        fHaveUsefulFile = false; 
        fEventTree->SetBranchAddress("event",&fRawEvent); 
-       
     }
   }
 
