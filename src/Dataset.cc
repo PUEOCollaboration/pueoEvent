@@ -616,7 +616,6 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
        fEventTree = (TTree*) f->Get("eventTree"); 
        fHaveUsefulFile = false; 
        fEventTree->SetBranchAddress("event",&fRawEvent); 
-       
     }
   }
 
