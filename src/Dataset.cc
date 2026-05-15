@@ -71,12 +71,12 @@ static Int_t fHiCalUnixTime[2];
 
 
 
-static bool checkIfFileExists(const char * file)
+static TFile * openIfExists(const char * file)
 {
-  return access(file, R_OK) !=-1; 
+  return TFile::Open(file);
 }
 
-static const char * checkIfFilesExist(int num, ...)
+static TFile * openIfAnyExist(int num, ...)
 {
 
   va_list args; 
@@ -86,11 +86,11 @@ static const char * checkIfFilesExist(int num, ...)
   {
     const char * f = va_arg(args, const char *); 
 
-    if (checkIfFileExists(f))
+    TFile * opened = openIfExists(f);
+    if (opened)
     {
-      return f; 
+      return opened; 
     }
-
   }
 
   va_end(args); 
@@ -227,7 +227,7 @@ pueo::RawHeader * pueo::Dataset::header(bool force_load)
 {
   if (fDecimated)
   {
-    if (force_load) 
+    if (force_load)
     {
       fDecimatedHeadTree->GetEntry(fDecimatedEntry); 
     }
@@ -495,15 +495,16 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
     fDecimatedEntry = 0; 
     TString fname = TString::Format("%s/run%d/decimatedHeadFile%d.root", data_dir, run, run); 
-    if (checkIfFileExists(fname.Data()))
+    TFile * f = openIfExists(fname.Data());
+
+    if (f) 
     {
-      TFile * f = new TFile(fname.Data()); 
-      filesToClose.push_back(f); 
-      fDecimatedHeadTree = (TTree*) f->Get("headTree"); 
-      if (!fDecimatedHeadTree) fDecimatedHeadTree = (TTree*) f->Get("headerTree");
-      fDecimatedHeadTree->BuildIndex("eventNumber"); 
-      fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
-      fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
+        filesToClose.push_back(f); 
+        fDecimatedHeadTree = (TTree*) f->Get("headTree"); 
+        if (!fDecimatedHeadTree) fDecimatedHeadTree = (TTree*) f->Get("headerTree");
+        fDecimatedHeadTree->BuildIndex("eventNumber"); 
+        fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
+        fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
     }
     else
     {
@@ -527,13 +528,11 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
   bool simulated = false; 
 
-  if (const char * the_right_file = checkIfFilesExist(5, fname0.Data(), fname1.Data(), fname2.Data(), fname3.Data(), fname4.Data()))
+  if (TFile * f = openIfAnyExist(5, fname0.Data(), fname1.Data(), fname2.Data(), fname3.Data(), fname4.Data()))
   {
 
-    if (strcasestr(the_right_file,"Simulated")) simulated = true; 
-
-    fprintf(stderr,"Using head file: %s\n",the_right_file); 
-    TFile * f = new TFile(the_right_file); 
+    if (strcasestr(f->GetName(),"Simulated")) simulated = true; 
+    fprintf(stderr,"Using head file: %s\n",f->GetEndpointUrl()->GetUrl()); 
     filesToClose.push_back(f); 
     fHeadTree = (TTree*) f->Get("headTree"); 
     if (!fHeadTree) fHeadTree = (TTree*) f->Get("headerTree");
@@ -555,9 +554,8 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   TString fname = TString::Format("%s/run%d/gpsEvent%d.root", data_dir, run, run);
   fname2 = TString::Format("%s/run%d/SimulatedGpsFile%d.root", data_dir, run, run); 
   fname3 = TString::Format("%s/run%d/SimulatedPueoGpsFile%d.root", data_dir, run, run); 
-  if (const char * the_right_file = checkIfFilesExist(3,fname.Data(),fname2.Data(), fname3.Data()))
+  if (TFile  * f = openIfAnyExist(3,fname.Data(),fname2.Data(), fname3.Data()))
   {
-     TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
      fGpsTree = (TTree*) f->Get("attitudeTree"); 
      fHaveGpsEvent = true; 
@@ -567,9 +565,8 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   else 
   {
     fname = TString::Format("%s/run%d/gpsFile%d.root", data_dir, run, run);
-    if (const char * the_right_file = checkIfFilesExist(1, fname.Data()))
+    if (TFile * f = openIfAnyExist(1, fname.Data()))
     {
-       TFile * f = new TFile(the_right_file); 
        filesToClose.push_back(f); 
        fGpsTree = (TTree*) f->Get("attitudeTree"); 
        if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime"); 
@@ -579,7 +576,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     {
       fprintf(stderr,"Could not find gps file for run %d, using global file\n",run); 
       fname = TString::Format("%s/attitude.root", data_dir);
-      TFile * f = new TFile(fname); 
+      f = new TFile(fname); 
       filesToClose.push_back(f); 
       fGpsTree = (TTree*) f->Get("attitudeTree"); 
       fGpsTree->BuildIndex("realTime"); 
@@ -597,9 +594,8 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   fname = TString::Format("%s/run%d/usefulEventFile%d.root", data_dir, run, run);
   fname2 = TString::Format("%s/run%d/SimulatedEventFile%d.root", data_dir, run, run); 
   fname3 = TString::Format("%s/run%d/SimulatedPueoEventFile%d.root", data_dir, run, run); 
-  if (const char * the_right_file = checkIfFilesExist(3, fname.Data(), fname2.Data(), fname3.Data()))
+  if (TFile * f = openIfAnyExist(3, fname.Data(), fname2.Data(), fname3.Data()))
   {
-     TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
      fEventTree = (TTree*) f->Get("eventTree"); 
      fHaveUsefulFile = true; 
@@ -608,9 +604,8 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   else 
   {
     fname = TString::Format("%s/run%d/eventFile%d.root", data_dir, run, run); 
-    if (checkIfFileExists(fname.Data()))
+    if (TFile *f = openIfExists(fname.Data()))
     {
-       TFile * f = new TFile(fname.Data()); 
        filesToClose.push_back(f); 
        fEventTree = (TTree*) f->Get("eventTree"); 
        fHaveUsefulFile = false; 
@@ -631,9 +626,8 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   {
     fname = TString::TString::Format("%s/run%d/SimulatedTruthFile%d.root",data_dir,run,run);
     fname2 = TString::TString::Format("%s/run%d/SimulatedPueoTruthFile%d.root",data_dir,run,run);
-    if ( const char * the_right_file = checkIfFilesExist(2, fname.Data(), fname2.Data()))
+    if (TFile* f = openIfAnyExist(2, fname.Data(), fname2.Data()))
     {
-     TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
      fTruthTree = (TTree*) f->Get("truthPueoTree"); 
      fTruthTree->SetBranchAddress("truth",&fTruth); 
