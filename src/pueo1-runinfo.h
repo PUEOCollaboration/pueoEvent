@@ -14,7 +14,7 @@ struct pueo1_runinfo {
   int start_time = 0;
   int end_time = 0;
   unsigned nevents = 0;
-  bool operator<(const pueo1_runinfo & other) const { return start_time < other.start_time ; }
+  bool operator<(const pueo1_runinfo & other) const { return end_time < other.end_time ; }
 };
 
 const pueo1_runinfo pueo1_flight[] =  {
@@ -653,7 +653,7 @@ inline int pueo1_find_run(int t)
     return -1;
   }
   if (idx == 0 && t < pueo1_flight[0].start_time) return -1;
-  return idx;
+  return pueo1_flight[idx].run;
 }
 
 
