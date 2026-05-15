@@ -69,12 +69,10 @@ static Int_t fHiCalUnixTime[2];
 
 
 
+static bool verbose = false;
 
+void pueo::Dataset::setVerboseOutput(bool v) { verbose = v; }
 
-static TFile * openIfExists(const char * file)
-{
-  return TFile::Open(file);
-}
 
 static TFile * openIfAnyExist(int num, ...)
 {
@@ -86,7 +84,11 @@ static TFile * openIfAnyExist(int num, ...)
   {
     const char * f = va_arg(args, const char *); 
 
-    TFile * opened = openIfExists(f);
+    int olderr = gErrorIgnoreLevel;
+    if (!verbose) gErrorIgnoreLevel = kFatal;
+    TFile * opened = TFile::Open(f);
+    gErrorIgnoreLevel = olderr;
+    
     if (opened)
     {
       return opened; 
@@ -97,6 +99,12 @@ static TFile * openIfAnyExist(int num, ...)
 
   return 0; 
 }
+static TFile * openIfExists(const char * file)
+{
+  return openIfAnyExist(1, file);
+}
+
+
 
 static const char  pueo_root_data_dir_env[]  = "PUEO_ROOT_DATA"; 
 static const char  pueo_versioned_root_data_dir_env[]  = "PUEO%d_ROOT_DATA"; 
@@ -176,7 +184,7 @@ void  pueo::Dataset::unloadRun()
 
   for (unsigned i = 0; i < filesToClose.size(); i++) 
   {
-    filesToClose[i]->Close(); 
+    if (verbose) std::cout << "Closing " << filesToClose[i]->GetName() << std::endl;
     delete filesToClose[i]; 
   }
 
@@ -218,7 +226,7 @@ pueo::nav::Attitude * pueo::Dataset::gps(bool force_load)
     }
   }
 
-  return fGps; 
+  return fGps;
 }
 
 
@@ -569,20 +577,18 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     {
        filesToClose.push_back(f); 
        fGpsTree = (TTree*) f->Get("attitudeTree"); 
-       if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime"); 
+       if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime","realTimeNsecs"); 
        fHaveGpsEvent = false; 
     }
     else
     {
-      fprintf(stderr,"Could not find gps file for run %d, using global file\n",run); 
+      fprintf(stderr,"Could not find gps file for run %d, using global file\n",run);
       fname = TString::Format("%s/attitude.root", data_dir);
-      f = TFile::Open(fname); 
-      filesToClose.push_back(f); 
+      f = TFile::Open(fname);
+      filesToClose.push_back(f);
       fGpsTree = (TTree*) f->Get("attitudeTree"); 
-      fGpsTree->BuildIndex("realTime"); 
-      fHaveGpsEvent = false; 
-  //    fRunLoaded = false;
-  //    return false; 
+      if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime","realTimeNsecs");
+      fHaveGpsEvent = false;
     }
   }
 
