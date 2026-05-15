@@ -927,134 +927,20 @@ pueo::TruthEvent * pueo::Dataset::truth(bool force_reload)
   return fTruth; 
 }
 
+#include "pueo1-runinfo.h"
 
 
-struct run_info
-{
-
-  double start_time; 
-  double stop_time; 
-  int run;
-
-  bool operator< (const run_info & other) const 
-  {
-    return stop_time < other.stop_time; 
-  }
-
-
-}; 
-
-static std::vector<run_info> run_times[pueo::k::NUM_PUEO+1]; 
-
-static TMutex run_at_time_mutex; 
 int pueo::Dataset::getRunAtTime(double t)
 {
 
-  int version= version::getVersionFromUnixTime(t); 
+  int version = version::getVersionFromUnixTime(t); 
 
-  if (!run_times[version].size())
+  if (version == 1)
   {
-    TLockGuard lock(&run_at_time_mutex); 
-    if (!run_times[version].size()) 
-    {
-
-      // load from cache
-      bool found_cache = false; 
-
-
-      TString cache_file1= TString::Format("%s/timerunmap_%d.txt", getenv("PUEO_CALIB_DIR"),version) ; 
-      TString cache_file2= TString::Format("%s/share/pueoCalib/timerunmap_%d.txt", getenv("PUEO_UTIL_INSTALL_DIR"),version) ; 
-      TString cache_file3= TString::Format("./calib/timerunmap_%d.txt",version); 
-
-      const char * cache_file_name = checkIfFilesExist(3, cache_file1.Data(), cache_file2.Data(), cache_file3.Data()); 
-
-      if (checkIfFileExists(cache_file_name))
-      {
-
-          found_cache = true; 
-          FILE * cf = fopen(cache_file_name,"r"); 
-          run_info r; 
-          while(!feof(cf))
-          {
-            fscanf(cf,"%d %lf %lf\n", &r.run, &r.start_time, &r.stop_time); 
-            run_times[version].push_back(r); 
-          }
-          fclose(cf); 
-      }
-
-
-      if (!found_cache) 
-      {
-        //temporarily suppress errors and disable recovery
-        int old_level = gErrorIgnoreLevel;
-        int recover = gEnv->GetValue("TFile.Recover",1); 
-        gEnv->SetValue("TFile.Recover",1); 
-        gErrorIgnoreLevel = kFatal; 
-
-        const char * data_dir = getDataDir((DataDirectory)version); 
-        fprintf(stderr,"Couldn't find run file map. Regenerating %s from header files in %s\n", cache_file_name,data_dir); 
-        DIR * dir = opendir(data_dir); 
-
-        while(struct dirent * ent = readdir(dir))
-        {
-          int run; 
-          if (sscanf(ent->d_name,"run%d",&run))
-          {
-
-            TString fname1 = TString::Format("%s/run%d/timedHeadFile%d.root", data_dir, run, run); 
-            TString fname2 = TString::Format("%s/run%d/headFile%d.root", data_dir, run, run); 
-
-            if (const char * the_right_file = checkIfFilesExist(2, fname1.Data(), fname2.Data()))
-            {
-              TFile f(the_right_file); 
-              TTree * t = (TTree*) f.Get("headTree"); 
-              if (!t) t = (TTree*) f.Get("headerTree");
-              if (t) 
-              {
-                run_info  ri; 
-                ri.run = run; 
-                //TODO do this to nanosecond precision 
-                ri.start_time= t->GetMinimum("triggerTime"); 
-                ri.stop_time = t->GetMaximum("triggerTime") + 1; 
-                run_times[version].push_back(ri); 
-              }
-            }
-          }
-        }
-
-        gErrorIgnoreLevel = old_level; 
-        gEnv->SetValue("TFile.Recover",recover); 
-        std::sort(run_times[version].begin(), run_times[version].end()); 
-
-        TString try2write;  
-        try2write.Form("./calib/timerunmap_%d.txt",version); 
-        FILE * cf = fopen(try2write.Data(),"w"); 
-
-        if (cf) 
-        {
-          const std::vector<run_info> &  v = run_times[version]; 
-          for (unsigned i = 0; i < v.size(); i++)
-          {
-              printf("%d %0.9f %0.9f\n", v[i].run, v[i].start_time, v[i].stop_time); 
-              fprintf(cf,"%d %0.9f %0.9f\n", v[i].run, v[i].start_time, v[i].stop_time); 
-          }
-
-         fclose(cf); 
-        }
-
-      }
-    }
+    return pueo1_find_run(t);
   }
-  
-  run_info test; 
-  test.start_time =t; 
-  test.stop_time =t; 
-  const std::vector<run_info> & v = run_times[version]; 
-  std::vector<run_info>::const_iterator it = std::upper_bound(v.begin(), v.end(), test); 
 
-  if (it == v.end()) return -1; 
-  if (it == v.begin() && (*it).start_time >t) return -1; 
-  return (*it).run; 
+  return -1;
 }
 
 void pueo::Dataset::zeroBlindPointers(){
