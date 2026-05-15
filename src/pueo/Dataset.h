@@ -254,6 +254,7 @@ namespace pueo
       void hiCal(char which, Double_t& longitude,  Double_t& latitude, Double_t& altitude);
 
       static int getRunAtTime(double t);
+      static void setVerboseOutput(bool v);
 
     protected:
       void unloadRun();
