@@ -69,14 +69,12 @@ static Int_t fHiCalUnixTime[2];
 
 
 
+static bool verbose = false;
+
+void pueo::Dataset::setVerboseOutput(bool v) { verbose = v; }
 
 
-static bool checkIfFileExists(const char * file)
-{
-  return access(file, R_OK) !=-1; 
-}
-
-static const char * checkIfFilesExist(int num, ...)
+static TFile * openIfAnyExist(int num, ...)
 {
 
   va_list args; 
@@ -86,17 +84,27 @@ static const char * checkIfFilesExist(int num, ...)
   {
     const char * f = va_arg(args, const char *); 
 
-    if (checkIfFileExists(f))
+    int olderr = gErrorIgnoreLevel;
+    if (!verbose) gErrorIgnoreLevel = kFatal;
+    TFile * opened = TFile::Open(f);
+    gErrorIgnoreLevel = olderr;
+    
+    if (opened)
     {
-      return f; 
+      return opened; 
     }
-
   }
 
   va_end(args); 
 
   return 0; 
 }
+static TFile * openIfExists(const char * file)
+{
+  return openIfAnyExist(1, file);
+}
+
+
 
 static const char  pueo_root_data_dir_env[]  = "PUEO_ROOT_DATA"; 
 static const char  pueo_versioned_root_data_dir_env[]  = "PUEO%d_ROOT_DATA"; 
@@ -176,7 +184,7 @@ void  pueo::Dataset::unloadRun()
 
   for (unsigned i = 0; i < filesToClose.size(); i++) 
   {
-    filesToClose[i]->Close(); 
+    if (verbose) std::cout << "Closing " << filesToClose[i]->GetName() << std::endl;
     delete filesToClose[i]; 
   }
 
@@ -218,7 +226,7 @@ pueo::nav::Attitude * pueo::Dataset::gps(bool force_load)
     }
   }
 
-  return fGps; 
+  return fGps;
 }
 
 
@@ -227,7 +235,7 @@ pueo::RawHeader * pueo::Dataset::header(bool force_load)
 {
   if (fDecimated)
   {
-    if (force_load) 
+    if (force_load)
     {
       fDecimatedHeadTree->GetEntry(fDecimatedEntry); 
     }
@@ -495,15 +503,16 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
     fDecimatedEntry = 0; 
     TString fname = TString::Format("%s/run%d/decimatedHeadFile%d.root", data_dir, run, run); 
-    if (checkIfFileExists(fname.Data()))
+    TFile * f = openIfExists(fname.Data());
+
+    if (f) 
     {
-      TFile * f = new TFile(fname.Data()); 
-      filesToClose.push_back(f); 
-      fDecimatedHeadTree = (TTree*) f->Get("headTree"); 
-      if (!fDecimatedHeadTree) fDecimatedHeadTree = (TTree*) f->Get("headerTree");
-      fDecimatedHeadTree->BuildIndex("eventNumber"); 
-      fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
-      fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
+        filesToClose.push_back(f); 
+        fDecimatedHeadTree = (TTree*) f->Get("headTree"); 
+        if (!fDecimatedHeadTree) fDecimatedHeadTree = (TTree*) f->Get("headerTree");
+        fDecimatedHeadTree->BuildIndex("eventNumber"); 
+        fDecimatedHeadTree->SetBranchAddress("header",&fHeader); 
+        fIndices = ((TTreeIndex*) fDecimatedHeadTree->GetTreeIndex())->GetIndex(); 
     }
     else
     {
@@ -527,13 +536,11 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
   bool simulated = false; 
 
-  if (const char * the_right_file = checkIfFilesExist(5, fname0.Data(), fname1.Data(), fname2.Data(), fname3.Data(), fname4.Data()))
+  if (TFile * f = openIfAnyExist(5, fname0.Data(), fname1.Data(), fname2.Data(), fname3.Data(), fname4.Data()))
   {
 
-    if (strcasestr(the_right_file,"Simulated")) simulated = true; 
-
-    fprintf(stderr,"Using head file: %s\n",the_right_file); 
-    TFile * f = new TFile(the_right_file); 
+    if (strcasestr(f->GetName(),"Simulated")) simulated = true; 
+    fprintf(stderr,"Using head file: %s\n",f->GetEndpointUrl()->GetUrl()); 
     filesToClose.push_back(f); 
     fHeadTree = (TTree*) f->Get("headTree"); 
     if (!fHeadTree) fHeadTree = (TTree*) f->Get("headerTree");
@@ -555,9 +562,8 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   TString fname = TString::Format("%s/run%d/gpsEvent%d.root", data_dir, run, run);
   fname2 = TString::Format("%s/run%d/SimulatedGpsFile%d.root", data_dir, run, run); 
   fname3 = TString::Format("%s/run%d/SimulatedPueoGpsFile%d.root", data_dir, run, run); 
-  if (const char * the_right_file = checkIfFilesExist(3,fname.Data(),fname2.Data(), fname3.Data()))
+  if (TFile  * f = openIfAnyExist(3,fname.Data(),fname2.Data(), fname3.Data()))
   {
-     TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
      fGpsTree = (TTree*) f->Get("attitudeTree"); 
      fHaveGpsEvent = true; 
@@ -567,25 +573,22 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   else 
   {
     fname = TString::Format("%s/run%d/gpsFile%d.root", data_dir, run, run);
-    if (const char * the_right_file = checkIfFilesExist(1, fname.Data()))
+    if (TFile * f = openIfAnyExist(1, fname.Data()))
     {
-       TFile * f = new TFile(the_right_file); 
        filesToClose.push_back(f); 
        fGpsTree = (TTree*) f->Get("attitudeTree"); 
-       if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime"); 
+       if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime","realTimeNsecs"); 
        fHaveGpsEvent = false; 
     }
     else
     {
-      fprintf(stderr,"Could not find gps file for run %d, using global file\n",run); 
+      fprintf(stderr,"Could not find gps file for run %d, using global file\n",run);
       fname = TString::Format("%s/attitude.root", data_dir);
-      TFile * f = new TFile(fname); 
-      filesToClose.push_back(f); 
+      f = TFile::Open(fname);
+      filesToClose.push_back(f);
       fGpsTree = (TTree*) f->Get("attitudeTree"); 
-      if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime","realTimeNsecs"); 
-      fHaveGpsEvent = false; 
-  //    fRunLoaded = false;
-  //    return false; 
+      if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime","realTimeNsecs");
+      fHaveGpsEvent = false;
     }
   }
 
@@ -597,9 +600,8 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   fname = TString::Format("%s/run%d/usefulEventFile%d.root", data_dir, run, run);
   fname2 = TString::Format("%s/run%d/SimulatedEventFile%d.root", data_dir, run, run); 
   fname3 = TString::Format("%s/run%d/SimulatedPueoEventFile%d.root", data_dir, run, run); 
-  if (const char * the_right_file = checkIfFilesExist(3, fname.Data(), fname2.Data(), fname3.Data()))
+  if (TFile * f = openIfAnyExist(3, fname.Data(), fname2.Data(), fname3.Data()))
   {
-     TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
      fEventTree = (TTree*) f->Get("eventTree"); 
      fHaveUsefulFile = true; 
@@ -608,9 +610,8 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   else 
   {
     fname = TString::Format("%s/run%d/eventFile%d.root", data_dir, run, run); 
-    if (checkIfFileExists(fname.Data()))
+    if (TFile *f = openIfExists(fname.Data()))
     {
-       TFile * f = new TFile(fname.Data()); 
        filesToClose.push_back(f); 
        fEventTree = (TTree*) f->Get("eventTree"); 
        fHaveUsefulFile = false; 
@@ -630,9 +631,8 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   {
     fname = TString::TString::Format("%s/run%d/SimulatedTruthFile%d.root",data_dir,run,run);
     fname2 = TString::TString::Format("%s/run%d/SimulatedPueoTruthFile%d.root",data_dir,run,run);
-    if ( const char * the_right_file = checkIfFilesExist(2, fname.Data(), fname2.Data()))
+    if (TFile* f = openIfAnyExist(2, fname.Data(), fname2.Data()))
     {
-     TFile * f = new TFile(the_right_file); 
      filesToClose.push_back(f); 
      fTruthTree = (TTree*) f->Get("truthPueoTree"); 
      fTruthTree->SetBranchAddress("truth",&fTruth); 
@@ -926,134 +926,20 @@ pueo::TruthEvent * pueo::Dataset::truth(bool force_reload)
   return fTruth; 
 }
 
+#include "pueo1-runinfo.h"
 
 
-struct run_info
-{
-
-  double start_time; 
-  double stop_time; 
-  int run;
-
-  bool operator< (const run_info & other) const 
-  {
-    return stop_time < other.stop_time; 
-  }
-
-
-}; 
-
-static std::vector<run_info> run_times[pueo::k::NUM_PUEO+1]; 
-
-static TMutex run_at_time_mutex; 
 int pueo::Dataset::getRunAtTime(double t)
 {
 
-  int version= version::getVersionFromUnixTime(t); 
+  int version = version::getVersionFromUnixTime(t); 
 
-  if (!run_times[version].size())
+  if (version == 1)
   {
-    TLockGuard lock(&run_at_time_mutex); 
-    if (!run_times[version].size()) 
-    {
-
-      // load from cache
-      bool found_cache = false; 
-
-
-      TString cache_file1= TString::Format("%s/timerunmap_%d.txt", getenv("PUEO_CALIB_DIR"),version) ; 
-      TString cache_file2= TString::Format("%s/share/pueoCalib/timerunmap_%d.txt", getenv("PUEO_UTIL_INSTALL_DIR"),version) ; 
-      TString cache_file3= TString::Format("./calib/timerunmap_%d.txt",version); 
-
-      const char * cache_file_name = checkIfFilesExist(3, cache_file1.Data(), cache_file2.Data(), cache_file3.Data()); 
-
-      if (checkIfFileExists(cache_file_name))
-      {
-
-          found_cache = true; 
-          FILE * cf = fopen(cache_file_name,"r"); 
-          run_info r; 
-          while(!feof(cf))
-          {
-            fscanf(cf,"%d %lf %lf\n", &r.run, &r.start_time, &r.stop_time); 
-            run_times[version].push_back(r); 
-          }
-          fclose(cf); 
-      }
-
-
-      if (!found_cache) 
-      {
-        //temporarily suppress errors and disable recovery
-        int old_level = gErrorIgnoreLevel;
-        int recover = gEnv->GetValue("TFile.Recover",1); 
-        gEnv->SetValue("TFile.Recover",1); 
-        gErrorIgnoreLevel = kFatal; 
-
-        const char * data_dir = getDataDir((DataDirectory)version); 
-        fprintf(stderr,"Couldn't find run file map. Regenerating %s from header files in %s\n", cache_file_name,data_dir); 
-        DIR * dir = opendir(data_dir); 
-
-        while(struct dirent * ent = readdir(dir))
-        {
-          int run; 
-          if (sscanf(ent->d_name,"run%d",&run))
-          {
-
-            TString fname1 = TString::Format("%s/run%d/timedHeadFile%d.root", data_dir, run, run); 
-            TString fname2 = TString::Format("%s/run%d/headFile%d.root", data_dir, run, run); 
-
-            if (const char * the_right_file = checkIfFilesExist(2, fname1.Data(), fname2.Data()))
-            {
-              TFile f(the_right_file); 
-              TTree * t = (TTree*) f.Get("headTree"); 
-              if (!t) t = (TTree*) f.Get("headerTree");
-              if (t) 
-              {
-                run_info  ri; 
-                ri.run = run; 
-                //TODO do this to nanosecond precision 
-                ri.start_time= t->GetMinimum("triggerTime"); 
-                ri.stop_time = t->GetMaximum("triggerTime") + 1; 
-                run_times[version].push_back(ri); 
-              }
-            }
-          }
-        }
-
-        gErrorIgnoreLevel = old_level; 
-        gEnv->SetValue("TFile.Recover",recover); 
-        std::sort(run_times[version].begin(), run_times[version].end()); 
-
-        TString try2write;  
-        try2write.Form("./calib/timerunmap_%d.txt",version); 
-        FILE * cf = fopen(try2write.Data(),"w"); 
-
-        if (cf) 
-        {
-          const std::vector<run_info> &  v = run_times[version]; 
-          for (unsigned i = 0; i < v.size(); i++)
-          {
-              printf("%d %0.9f %0.9f\n", v[i].run, v[i].start_time, v[i].stop_time); 
-              fprintf(cf,"%d %0.9f %0.9f\n", v[i].run, v[i].start_time, v[i].stop_time); 
-          }
-
-         fclose(cf); 
-        }
-
-      }
-    }
+    return pueo1_find_run(t);
   }
-  
-  run_info test; 
-  test.start_time =t; 
-  test.stop_time =t; 
-  const std::vector<run_info> & v = run_times[version]; 
-  std::vector<run_info>::const_iterator it = std::upper_bound(v.begin(), v.end(), test); 
 
-  if (it == v.end()) return -1; 
-  if (it == v.begin() && (*it).start_time >t) return -1; 
-  return (*it).run; 
+  return -1;
 }
 
 void pueo::Dataset::zeroBlindPointers(){
