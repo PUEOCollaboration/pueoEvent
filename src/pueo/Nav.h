@@ -27,7 +27,7 @@
 #ifndef PUEO_NAV_H
 #define PUEO_NAV_H
 
-#include "Rtypes.h"
+#include "TObject.h"
 #include <array>
 #include <vector>
 #ifdef HAVE_PUEORAWDATA
@@ -41,7 +41,7 @@ namespace nav
      * These are the ROOT clases that make up the event reader
      */
 
-class Position
+class Position : public TObject
 {
 public:
   Position(){;}
@@ -64,11 +64,11 @@ public:
   Float_t         tdop = 0; //< 
   Int_t           flag = 0;
 
-  ClassDefNV(Position,2);
+  ClassDefNV(Position,3);
 };
 
 // position AND attitude
-class Attitude
+class Attitude : public TObject
 {
 public:
   Attitude(){;}
@@ -96,10 +96,10 @@ public:
   std::array<UShort_t, 3> antennaCurrents;
   Short_t        temperature = 0;
 
-  ClassDefNV(Attitude,3);
+  ClassDefNV(Attitude,4);
 };
 
-class Sat
+class Sat : public TObject
 {
 public: 
   Sat(){used=0;} 
@@ -108,10 +108,10 @@ public:
   uint8_t azimuth=0; 
   uint8_t snr=0; 
   uint8_t used : 1; 
-  ClassDefNV(Sat,2);
+  ClassDefNV(Sat,3);
 };
 
-class Sats
+class Sats : public TObject
 {
 public:
   Sats(){;}
@@ -121,10 +121,10 @@ public:
   UInt_t          payloadTimeUs = 0;
   std::vector<Sat> sats; 
 
-  ClassDefNV(Sats,2);
+  ClassDefNV(Sats,3);
 }; 
 
-class SunSensor
+class SunSensor : public TObject
 {
 public:
   SunSensor(){;}
@@ -190,7 +190,7 @@ public:
   UInt_t sequence_number = 0;
   UInt_t flags = 0;
 
-  ClassDefNV(SunSensors,2);
+  ClassDefNV(SunSensors,3);
 }; 
 
 } // nav namespace

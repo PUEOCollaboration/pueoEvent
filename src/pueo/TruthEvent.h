@@ -28,12 +28,12 @@
 
 #include "pueo/Conventions.h" 
 #include "TVector3.h"
-#include "Rtypes.h"
+#include "TObject.h"
 
 namespace pueo 
 {
 
-  class TruthEvent
+  class TruthEvent : public TObject
   {
     public: 
       TruthEvent(){;}
@@ -60,7 +60,7 @@ namespace pueo
 
       std::vector<double> signal[k::NUM_DIGITIZED_CHANNELS];  ///<Noise-less signal
 
-    ClassDefNV(TruthEvent,1); 
+    ClassDefNV(TruthEvent,2); 
   }; 
 }
 

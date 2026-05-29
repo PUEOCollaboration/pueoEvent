@@ -26,7 +26,7 @@
 #ifndef PUEO_RAW_EVENT_H
 #define PUEO_RAW_EVENT_H
 
-#include "Rtypes.h"
+#include "TObject.h"
 #include "pueo/Conventions.h"
 
 #ifdef HAVE_PUEORAWDATA
@@ -43,7 +43,7 @@
 namespace pueo
 {
 
-  class RawEvent
+  class RawEvent : public TObject
   {
    public:
      RawEvent(){;} ///< Default constructor
@@ -66,7 +66,7 @@ namespace pueo
 
      std::array<std::array<Short_t, pueo::k::NUM_SAMPLES>, pueo::k::NUM_DIGITIZED_CHANNELS> data;
 
-    ClassDefNV(RawEvent,3);
+    ClassDefNV(RawEvent,4);
   };
 
 }

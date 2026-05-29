@@ -26,7 +26,7 @@
 #ifndef PUEO_DAQHSK_H
 #define PUEO_DAQHSK_H
 
-#include "Rtypes.h"
+#include "TObject.h"
 #include "pueo/Conventions.h"
 #include <array>
 #ifdef HAVE_PUEORAWDATA
@@ -65,7 +65,7 @@ public:
 // per class there will be a surf array that has the surf information and beam array inside it
 
 // then totally different class for the trigger information and l2 readout time, etc
-class DaqHsk{
+class DaqHsk : public TObject{
 public:
   DaqHsk() {;}
 #ifdef HAVE_PUEORAWDATA
@@ -104,7 +104,7 @@ public:
   UShort_t offset = 0;
   UShort_t pps_trig_offset = 0;
   std::array<daqhsk::Surf, pueo::k::NUM_SURF_SLOTS> Surfs;
-  ClassDefNV(DaqHsk,2);
+  ClassDefNV(DaqHsk,3);
 };
 }
 }

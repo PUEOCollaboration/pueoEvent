@@ -26,7 +26,7 @@
 #ifndef PUEO_HSK_H
 #define PUEO_HSK_H
 
-#include "Rtypes.h"
+#include "TObject.h"
 #ifdef HAVE_PUEORAWDATA
 #include "pueo/rawdata.h"
 #endif
@@ -35,7 +35,7 @@ namespace pueo
 namespace hsk 
 {
 // per obj there will be a sensor that has values and time for measurement
-class Sensor
+class Sensor : public TObject
 {
 public:
   Sensor() {;}
@@ -64,7 +64,7 @@ public:
   std::string sens_name;
   char typetag;
   char kind_unit;
-  ClassDefNV(Sensor,3);
+  ClassDefNV(Sensor,4);
 };
 }
 }
