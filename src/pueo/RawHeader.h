@@ -74,8 +74,9 @@ public:
   // Originally a uint32_t in libpueorawdata but int32_t is okay before year 2038.
   // int32_t for easier arithmetics.
   int32_t  triggerTime = 0;  ///< Number of seconds since Unix epoch (1970 Jan 1 00:00:00)
-                             ///< This stores the ORIGINAL RAW DATA VALUE WHICH CAN BE WRONG prior to post-processing.
-                             ///< The corrected value is stored in `corrected_trigger_time`.
+                             ///< This stores the either the postprocessed value, if available, or otherwise ORIGINAL RAW DATA VALUE WHICH CAN BE WRONG prior to post-processing.
+                             ///< The corrected value is stored in `corrected_trigger_time` while the original value is stored in orig_trigger_time;
+  int32_t  triggerTimeNs = 0; /// < The number of nanosseconds part of the trigger time. Could be corrected or raw, depending.
 
   uint32_t trigTime = 0;     ///< 32-bit free running TURF clock value very briefly after trigger.
 
@@ -100,16 +101,14 @@ public:
                                 ///< aka `last_dead` in `DawHsk.h`
 
   uint32_t deadTimeLastLastPPS = 0; ///< Same as `deadTimeLastPPS` but one GPS second prior.
-  
+                                    ///
   uint32_t L2Mask = 0;
 
   uint32_t trigType = 0;    ///< soft, pps, or ext trigger (see also pueo::trigger in Conventions.h)
 
   int32_t  readoutTime = 0;  ///< Number of seconds since Unix epoch (1970 Jan 1 00:00:00)
                              ///< Tagged by the flight computer upon packet creation (ie event reception)
-                             ///< This stores the original raw-data value,
-                             ///< which can drift and is accurate to only a few seconds.
-                             ///< Prefer `corrected_trigger_time` for timing.
+                             ///< This stores the corrected raw-data value, if possible.
 
   uint32_t readoutTimeNs = 0;///< Subsecond portion of the readout time [nanosec]
                              ///< This stores the original raw-data value, likely not trust-worthy.
@@ -120,9 +119,17 @@ public:
                                      ///< second: from (corrected) `triggerTime`
                                      ///< nanosecond: from `trigTime`, `corrected_last_pps` and `clock_frequency`
 
+  TTimeStamp origReadoutTime; ///< uncorrected value, for posterity
+
+  TTimeStamp origTriggerTime; ///< correction via post-processing with pueo::Timemark
+                                     ///< second: from (corrected) `triggerTime`
+                                     ///< nanosecond: from `trigTime`, `corrected_last_pps` and `clock_frequency`
+
+  TTimeStamp matchingTimeMarkRising;  /// < If there is a matching timemark for this event, this is the rise time of it. Usually this will be 0
+
   uint32_t  flags = 0; /// @todo: not implemented yet (2026Apr2)
   uint8_t   L1_octants[k::NUM_SURF_SLOTS] ={0}; ///< @todo not implemented yet (2026Apr2)
-  uint32_t  phiTrigMask[k::NUM_POLS] = {0}; ///< 24-bit phi mask (from TURF) 
+  uint32_t  phiTrigMask[k::NUM_POLS] = {0}; ///< 24-bit phi mask (from TURF)
                                             ///< @note: not quite the same as L2_mask
                                             ///< @todo: not implemented yet (2026Apr2)
 
