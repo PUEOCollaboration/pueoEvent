@@ -104,6 +104,8 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   const char * typetag = getName<RootType>();
   const char * treename = getTreeName<RootType>();
 
+  Long64_t old_max_size = TTree::GetMaxTreeSize();
+  TTree::SetMaxTreeSize(1000000000000LL);
   TTree * t = new TTree(treename, treename);
   t->SetAutoSave(0);
   RootType * R = new RootType();
@@ -243,6 +245,9 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
       return -1;
     }
   }
+
+  //restore
+  TTree::SetMaxTreeSize(old_max_size);
 
   return nprocessed;
 }

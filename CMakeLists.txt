@@ -84,6 +84,9 @@ if (pueorawdata_FOUND)
   target_compile_options(${PROJECT_NAME} PRIVATE -DHAVE_PUEORAWDATA)
   target_link_libraries(${PROJECT_NAME} PRIVATE PUEO::pueorawdata)
 
+  add_executable(dataset-leak-test src/dataset-leak-test.cc)
+  target_link_libraries(dataset-leak-test ${PROJECT_NAME})
+ 
   add_executable(pueo-convert src/pueo-convert.cc)
   target_link_libraries(pueo-convert ${PROJECT_NAME})
   install(
