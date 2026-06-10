@@ -19,11 +19,11 @@
 
 
 #pragma link C++ namespace     pueo::pol;
-#pragma link C++ enum          pueo::pol::pol_t;
+#pragma link C++ enum          pueo::pol::pol_t
 #pragma link C++ function      pueo::pol::asChar;
 
 #pragma link C++ namespace     pueo::Locations;
-#pragma link C++ namespace pueo::version;
+#pragma link C++ namespace     pueo::version;
 
 
 #pragma link C++ class pueo::GeomTool-;
