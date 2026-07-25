@@ -38,7 +38,7 @@ pueo::daqhsk::DaqHsk::DaqHsk(const pueo_daq_hsk_t *daqhsk) :
   LF_total_V(daqhsk->LF_total_V),
   aux_total(daqhsk->aux_total),
   global_total(daqhsk->global_total),
-  l2_enable_mask(daqhsk->l2_enable_mask),
+  //l2_enable_mask(daqhsk->l2_enable_mask),
   qwords_sent(daqhsk->qwords_sent),
   events_sent(daqhsk->events_sent),
   trigger_count(daqhsk->trigger_count),
@@ -54,10 +54,21 @@ pueo::daqhsk::DaqHsk::DaqHsk(const pueo_daq_hsk_t *daqhsk) :
   offset(daqhsk->offset),
   pps_trig_offset(daqhsk->pps_trig_offset)
 {
+  // Reset mask to zero before filling
+  this->l2_enable_mask = 0;
   for (size_t i = 0; i < H_scalers.size(); ++i)
   {
     H_scalers[i] = daqhsk->Hscalers[i];
     V_scalers[i] = daqhsk->Vscalers[i];
+    // Set bit i (0-11) for H_scalers
+    if (H_scalers[i] <= 30) {
+        this->l2_enable_mask |= (1U << i);
+    }
+
+    // Set bit i+12 (12-23) for V_scalers
+    if (V_scalers[i] <= 30) {
+        this->l2_enable_mask |= (1U << (i + 12));
+    }
   }
 
   for (size_t i = 0; i < turfio_L1_rate.size(); ++i)
