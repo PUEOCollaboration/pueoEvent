@@ -707,7 +707,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   fname = TString::Format("%s/attitude.root", data_dir);
   if(TFile * f = openIfAnyExist(1, fname.Data())){
     if(verbose) fprintf(stdout,"Loading daqhsk file for run %d, using global file\n",run);
-    fname = TString::Format("%s/daqhsk.root", data_dir);
+    fname = TString::Format("%s/daqhsk_l2fix.root", data_dir);
     f = TFile::Open(fname);
     filesToClose.push_back(f);
     fDaqHskTree = (TTree*) f->Get("daqhskTree"); 
