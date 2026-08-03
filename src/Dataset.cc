@@ -232,7 +232,7 @@ pueo::nav::Attitude * pueo::Dataset::gps(bool force_load)
 }
 
 // Keth's daq hsk playground for Scrandis
-pueo::daqhsk::DaqHsk * pueo::Dataset::daqh(bool force_load)
+pueo::daqhsk::DaqHsk * pueo::Dataset::daqhsk(bool force_load)
 {
 
   if (fHaveDaqHskEvent) // something else?
@@ -257,23 +257,6 @@ pueo::daqhsk::DaqHsk * pueo::Dataset::daqh(bool force_load)
   return fDaqH;
 }
 
-UInt_t pueo::Dataset::gimmeL2ReadoutTime(){
-  return fDaqH->l2_readout_time;
-}
-
-UInt_t pueo::Dataset::gimmeL2Mask(){
-  return fDaqH->l2_enable_mask;
-}
-
-UInt_t pueo::Dataset::gimmeTriggerCount(int inentry){
-  fDaqHskTree->GetEntry(inentry);
-  return fDaqH->trigger_count;
-}
-
-UInt_t pueo::Dataset::gimmeCurrentSecond(int inentry){
-  fDaqHskTree->GetEntry(inentry);
-  return fDaqH->current_second;
-}
 
 // This function returns a UInt_t representing the lower 24 bits of the L2 mask, but with the logic inverted: a 1 means the phi sector was NOT excluded (it is enabled), and a 0 means it was excluded (masked out due to high trigger rate) and waveforms from channels participating in those L2s should be neglected during analysis like map recon.
 UInt_t pueo::Dataset::gimmePhisExlcudeBits(){
@@ -425,15 +408,11 @@ Bool_t pueo::Dataset::maybeInvertPolarity(UInt_t eventNumber){
   return false;
 }
 
-UInt_t pueo::Dataset::gimmeHeaderL2(){
-  return fHeader->L2Mask;
-}
-
 
 bool pueo::Dataset::IsL2PhiBitSet(int pol, int L2bit, bool override_test,UInt_t test){
   if (L2bit < 0 || L2bit > 11) return false;
   if(!override_test){ 
-    UInt_t thismask = gimmeHeaderL2();
+    UInt_t thismask = fHeader->L2Mask;
     return ( thismask >> ((pol * 12) + L2bit)) & 1;
   }
   else return ( test >> ((pol * 12) + L2bit)) & 1;
@@ -704,10 +683,9 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   if (fGpsTree) fGpsTree->SetBranchAddress("attitude",&fGps); 
 
   // try to load daq hsk (no simulation yet)
-  fname = TString::Format("%s/attitude.root", data_dir);
+  fname = TString::Format("%s/daqhsk_l2fix.root", data_dir);
   if(TFile * f = openIfAnyExist(1, fname.Data())){
     if(verbose) fprintf(stdout,"Loading daqhsk file for run %d, using global file\n",run);
-    fname = TString::Format("%s/daqhsk_l2fix.root", data_dir);
     f = TFile::Open(fname);
     filesToClose.push_back(f);
     fDaqHskTree = (TTree*) f->Get("daqhskTree"); 

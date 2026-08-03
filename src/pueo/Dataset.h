@@ -232,7 +232,7 @@ namespace pueo
        * been loaded */
       nav::Attitude * gps(bool force_reload = false);
 
-      daqhsk::DaqHsk * daqh(bool force_reload = false);
+      daqhsk::DaqHsk * daqhsk(bool force_reload = false);
 
       /** Loads the Header. This will preferentially be from the timedHeader tree
        * but will fall back to the less glamorous one if need be. If the
@@ -251,16 +251,10 @@ namespace pueo
       /** Want to see what run you previously loaded?  Look no further */
       int getCurrRun() { return currRun; };
 
-      //DAQHSK L2 excluded/masked bit crap
-      UInt_t gimmeL2ReadoutTime();
-      UInt_t gimmeL2Mask();
-      UInt_t gimmeTriggerCount(int inentry=0);
-      UInt_t gimmeCurrentSecond (int inentry=0);
       UInt_t gimmePhisExlcudeBits();
       bool IsL2PhiMasked(int whichPhi, int whichPol, bool override_test=false,UInt_t test=0);
       bool IsThisPhiPolExcluded(int whichPhi, int whichPol, bool override_test=false,UInt_t test=0);
       //RawHeader L2 triggered bit crap
-      UInt_t gimmeHeaderL2();
       bool IsL2PhiBitSet(int pol, int L2bit, bool override_test=false,UInt_t test=0);
       bool IsPolPhiTriggered(int pol, int phi, bool override_test=false, UInt_t test=0);
 
