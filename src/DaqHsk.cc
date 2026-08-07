@@ -55,7 +55,7 @@ pueo::daqhsk::DaqHsk::DaqHsk(const pueo_daq_hsk_t *daqhsk) :
   pps_trig_offset(daqhsk->pps_trig_offset)
 {
   // Reset mask to zero before filling
-  this->l2_enable_mask = 0;
+  this->l2_enable_mask = daqhsk->l2_enable_mask;
   for (size_t i = 0; i < H_scalers.size(); ++i)
   {
     H_scalers[i] = daqhsk->Hscalers[i];
