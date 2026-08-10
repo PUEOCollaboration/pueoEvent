@@ -60,14 +60,26 @@ pueo::daqhsk::DaqHsk::DaqHsk(const pueo_daq_hsk_t *daqhsk) :
   {
     H_scalers[i] = daqhsk->Hscalers[i];
     V_scalers[i] = daqhsk->Vscalers[i];
-    // Set bit i (0-11) for H_scalers
-    if (H_scalers[i] <= 30) {
-        this->l2_enable_mask |= (1U << i);
+    // the only time this is wrong is beginning of the flight. but we just check them all
+    // if the bit is ==0 then the scaler better be >30 (unless of course it was falling and needed to get back to <15 to be set back to 1)
+    // if the bit is ==1 then the scaler better be <30 (unless of course it was the reading we needed to see before setting it to 0 so we do that now)
+    uint32_t h_bit = (1U << i);
+    // Check if bit is 1 and scaler > 30 -> Clear bit (AND with bitwise NOT)
+    if ((daqhsk->l2_enable_mask & h_bit) && (H_scalers[i] > 30)) {
+        this->l2_enable_mask &= ~h_bit;
+    } 
+    // Check if bit is 0 and scaler < 15 -> Set bit (OR with bitmask)
+    else if (!(daqhsk->l2_enable_mask & h_bit) && (H_scalers[i] < 15)) {
+        this->l2_enable_mask |= h_bit;
     }
-
-    // Set bit i+12 (12-23) for V_scalers
-    if (V_scalers[i] <= 30) {
-        this->l2_enable_mask |= (1U << (i + 12));
+    uint32_t v_bit = (1U << (i + 12));
+    // Check if bit is 1 and scaler > 30 -> Clear bit
+    if ((daqhsk->l2_enable_mask & v_bit) && (V_scalers[i] > 30)) {
+        this->l2_enable_mask &= ~v_bit;
+    }
+    // Check if bit is 0 and scaler < 15 -> Set bit
+    else if (!(daqhsk->l2_enable_mask & v_bit) && (V_scalers[i] < 15)) {
+        this->l2_enable_mask |= v_bit;
     }
   }
 
