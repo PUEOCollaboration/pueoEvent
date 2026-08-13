@@ -65,15 +65,15 @@ namespace pueo
 // template specialization below should also be defined
 //
 #define PUEO_CONVERTIBLE_TYPES(PUEO_CONVERT_TYPE)\
-/*                  |  tag           |     raw type        | ROOT type                |  postprocessor  | has_arity    */\
-/*==================================================================================================================== */\
-PUEO_CONVERT_TYPE(/*|*/ event,     /*|*/  full_waveforms, /*|*/ pueo::RawEvent,       /*|*/ nullptr,    /*|*/ 0           )\
-PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,      /*|*/ nullptr,    /*|*/ 0           )\
-PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attitude,  /*|*/ nullptr,    /*|*/ 0           )\
-PUEO_CONVERT_TYPE(/*|*/ sunsensors,/*|*/  ss,             /*|*/ pueo::nav::SunSensors,/*|*/ nullptr,    /*|*/ 0           )\
-PUEO_CONVERT_TYPE(/*|*/ hsk,       /*|*/  sensors_disk,   /*|*/ pueo::hsk::Sensor,    /*|*/ nullptr,    /*|*/ 1           )\
-PUEO_CONVERT_TYPE(/*|*/ daqhsk,    /*|*/  daq_hsk,        /*|*/ pueo::daqhsk::DaqHsk, /*|*/ nullptr,    /*|*/ 0           )\
-PUEO_CONVERT_TYPE(/*|*/ timemark,  /*|*/  timemark,       /*|*/ pueo::Timemark,       /*|*/ nullptr,    /*|*/ 0           )\
+/*                  |  tag           |     raw type        | ROOT type                |  postprocessor  | has_arity | index_major, minor   */\
+/*========================================================================================================================================================= */\
+PUEO_CONVERT_TYPE(/*|*/ event,     /*|*/  full_waveforms, /*|*/ pueo::RawEvent,       /*|*/ nullptr,    /*|*/ 0,  /*|*/ "eventNumber", nullptr             )\
+PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,      /*|*/ nullptr,    /*|*/ 0,  /*|*/ "eventNumber" , nullptr            )\
+PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attitude,  /*|*/ nullptr,    /*|*/ 0,  /*|*/ "realTime", "realTimeNsecs"        )\
+PUEO_CONVERT_TYPE(/*|*/ sunsensors,/*|*/  ss,             /*|*/ pueo::nav::SunSensors,/*|*/ nullptr,    /*|*/ 0,  /*|*/ "readoutTime", "readoutTimeNsecs"  )\
+PUEO_CONVERT_TYPE(/*|*/ hsk,       /*|*/  sensors_disk,   /*|*/ pueo::hsk::Sensor,    /*|*/ nullptr,    /*|*/ 1,  /*|*/ "time_secs", "time_ms"             )\
+PUEO_CONVERT_TYPE(/*|*/ daqhsk,    /*|*/  daq_hsk,        /*|*/ pueo::daqhsk::DaqHsk, /*|*/ nullptr,    /*|*/ 0,  /*|*/ "readoutTime","readoutTimeNsecs"   )\
+PUEO_CONVERT_TYPE(/*|*/ timemark,  /*|*/  timemark,       /*|*/ pueo::Timemark,       /*|*/ nullptr,    /*|*/ 0,  /*|*/ "rising.fSec", "rising.fNanoSec"   )\
 
 
 
@@ -84,6 +84,7 @@ template <typename T> int arity(const T * t) { (void) t ; return -1; }
 //template <> inline int arity<pueo_sensors_telem_t> (const pueo_sensors_telem_t * telem) { return telem->num_packets; }
 template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * disk) { return disk->num_packets; }
 #endif
+
 
 
     struct ConvertOpts
@@ -122,7 +123,7 @@ template <> inline int arity<pueo_sensors_disk_t> (const pueo_sensors_disk_t * d
     namespace tags
     {
       constexpr const char * automatic = "auto"; //since we can't use auto as a token :)
-#define DEFINE_TAG(TAG, IG,NO,RE,D) constexpr const char * TAG = #TAG;
+#define DEFINE_TAG(TAG, IG,NO,RE,D,T,OO) constexpr const char * TAG = #TAG;
       PUEO_CONVERTIBLE_TYPES(DEFINE_TAG)
     }
 
