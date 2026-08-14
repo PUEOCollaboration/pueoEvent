@@ -64,8 +64,8 @@ template <typename T> const char * getIndexMinor() { return 0; }
 
 #define NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getName<ROOT>() { return #TAG; }
 #define TREE_NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getTreeName<ROOT>() { return #TAG "Tree"; }
-#define INIDEX_MAJOR_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getIndexMajor<ROOT>() { return IMAJOR; }
-#define INIDEX_MINOR_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getIndexMinor<ROOT>() { return IMINOR; }
+#define INDEX_MAJOR_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getIndexMajor<ROOT>() { return IMAJOR; }
+#define INDEX_MINOR_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getIndexMinor<ROOT>() { return IMINOR; }
 
 PUEO_CONVERTIBLE_TYPES(NAME_TEMPLATE)
 PUEO_CONVERTIBLE_TYPES(TREE_NAME_TEMPLATE)
