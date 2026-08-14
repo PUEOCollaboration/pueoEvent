@@ -65,15 +65,15 @@ namespace pueo
 // template specialization below should also be defined
 //
 #define PUEO_CONVERTIBLE_TYPES(PUEO_CONVERT_TYPE)\
-/*                  |  tag           |     raw type        | ROOT type                |  postprocessor  | has_arity | index_major, minor   */\
+/*                  |  tag           |     raw type        | ROOT type                |  postprocessor  | has_arity | index_major | minor   */\
 /*========================================================================================================================================================= */\
-PUEO_CONVERT_TYPE(/*|*/ event,     /*|*/  full_waveforms, /*|*/ pueo::RawEvent,       /*|*/ nullptr,    /*|*/ 0,  /*|*/ "eventNumber", nullptr             )\
-PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,      /*|*/ nullptr,    /*|*/ 0,  /*|*/ "eventNumber" , nullptr            )\
-PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attitude,  /*|*/ nullptr,    /*|*/ 0,  /*|*/ "realTime", "realTimeNsecs"        )\
-PUEO_CONVERT_TYPE(/*|*/ sunsensors,/*|*/  ss,             /*|*/ pueo::nav::SunSensors,/*|*/ nullptr,    /*|*/ 0,  /*|*/ "readoutTime", "readoutTimeNsecs"  )\
-PUEO_CONVERT_TYPE(/*|*/ hsk,       /*|*/  sensors_disk,   /*|*/ pueo::hsk::Sensor,    /*|*/ nullptr,    /*|*/ 1,  /*|*/ "time_secs", "time_ms"             )\
-PUEO_CONVERT_TYPE(/*|*/ daqhsk,    /*|*/  daq_hsk,        /*|*/ pueo::daqhsk::DaqHsk, /*|*/ nullptr,    /*|*/ 0,  /*|*/ "readoutTime","readoutTimeNsecs"   )\
-PUEO_CONVERT_TYPE(/*|*/ timemark,  /*|*/  timemark,       /*|*/ pueo::Timemark,       /*|*/ nullptr,    /*|*/ 0,  /*|*/ "rising.fSec", "rising.fNanoSec"   )\
+PUEO_CONVERT_TYPE(/*|*/ event,     /*|*/  full_waveforms, /*|*/ pueo::RawEvent,       /*|*/ nullptr,    /*|*/ 0,  /*|*/ "eventNumber", /*|*/ nullptr             )\
+PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,      /*|*/ nullptr,    /*|*/ 0,  /*|*/ "eventNumber" , /*|*/  nullptr            )\
+PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attitude,  /*|*/ nullptr,    /*|*/ 0,  /*|*/ "realTime", /*|*/  "realTimeNsecs"        )\
+PUEO_CONVERT_TYPE(/*|*/ sunsensors,/*|*/  ss,             /*|*/ pueo::nav::SunSensors,/*|*/ nullptr,    /*|*/ 0,  /*|*/ "readoutTime", /*|*/  "readoutTimeNsecs"  )\
+PUEO_CONVERT_TYPE(/*|*/ hsk,       /*|*/  sensors_disk,   /*|*/ pueo::hsk::Sensor,    /*|*/ nullptr,    /*|*/ 1,  /*|*/ "time_secs", /*|*/  "time_ms"             )\
+PUEO_CONVERT_TYPE(/*|*/ daqhsk,    /*|*/  daq_hsk,        /*|*/ pueo::daqhsk::DaqHsk, /*|*/ nullptr,    /*|*/ 0,  /*|*/ "l2_readout_time", /*|*/  "l2_readout_timeNsecs"   )\
+PUEO_CONVERT_TYPE(/*|*/ timemark,  /*|*/  timemark,       /*|*/ pueo::Timemark,       /*|*/ nullptr,    /*|*/ 0,  /*|*/ "rising.fSec", /*|*/  "rising.fNanoSec"   )\
 
 
 
