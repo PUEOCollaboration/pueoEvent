@@ -129,7 +129,7 @@ public:
   // Trigger info
   int isInPhiMask(int phi, pol::pol_t=pol::kVertical) const; ///< Returns 1 if given phi-pol is in mask
 
-  ClassDefNV(RawHeader,4);
+  ClassDefNV(RawHeader,5);
 };
 }
 

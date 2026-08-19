@@ -49,7 +49,12 @@ pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs):
   if (wfs->pps_trigger)  trigType |= pueo::trigger::kPPS0;
   if (wfs->ext_trigger)  trigType |= pueo::trigger::kExt;
   if (wfs->L2_mask)      trigType |= pueo::trigger::kRFMI;
-
+  for (size_t i = 0; i < PUEO_NCHAN; i++){
+    if(i%8==0){
+      int thisSurf=i/8;
+      L1_octants[thisSurf] = raw->wfs[i].surf_word;
+    }
+  }
   //TODO convert L2 mask ,L1 mask as needed
 }
 #endif
