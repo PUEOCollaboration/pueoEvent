@@ -59,12 +59,18 @@
 
 template <typename T> const char * getName() { return "unnamed"; } 
 template <typename T> const char * getTreeName() { return "unnamedTree"; } 
+template <typename T> const char * getIndexMajor() { return 0; } 
+template <typename T> const char * getIndexMinor() { return 0; } 
 
-#define NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY) template <> const char * getName<ROOT>() { return #TAG; }
-#define TREE_NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY) template <> const char * getTreeName<ROOT>() { return #TAG "Tree"; }
+#define NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getName<ROOT>() { return #TAG; }
+#define TREE_NAME_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getTreeName<ROOT>() { return #TAG "Tree"; }
+#define INDEX_MAJOR_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getIndexMajor<ROOT>() { return IMAJOR; }
+#define INDEX_MINOR_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) template <> const char * getIndexMinor<ROOT>() { return IMINOR; }
 
 PUEO_CONVERTIBLE_TYPES(NAME_TEMPLATE)
 PUEO_CONVERTIBLE_TYPES(TREE_NAME_TEMPLATE)
+PUEO_CONVERTIBLE_TYPES(INDEX_MAJOR_TEMPLATE)
+PUEO_CONVERTIBLE_TYPES(INDEX_MINOR_TEMPLATE)
 
 static const char * getTagFromRawName(const char* raw_name)
 {
@@ -73,7 +79,7 @@ static const char * getTagFromRawName(const char* raw_name)
   static bool init = false;
   if (!init)
   {
-#define RAWTABLE(TAG, RAW, ROOT, POST, ARITY) table[#RAW] = #TAG;
+#define RAWTABLE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR) table[#RAW] = #TAG;
     PUEO_CONVERTIBLE_TYPES(RAWTABLE)
 
     init = true;
@@ -197,6 +203,11 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
   }
 
 
+  if ( (!opts.sort_by || !out_of_sorts) && ( getIndexMajor<RootType>()))
+  {
+    t->BuildIndex(getIndexMajor<RootType>(), getIndexMinor<RootType>());
+  }
+
   outf.Write();
 
   if (opts.sort_by && out_of_sorts)
@@ -215,6 +226,13 @@ static int converterImpl(size_t N, const char ** infiles,  const char * outfile,
     }
 
     outf.Close();
+
+    if (getIndexMajor<RootType>())
+    {
+      t_sorted->BuildIndex(getIndexMajor<RootType>(), getIndexMinor<RootType>());
+    }
+
+
     fsorted.Write();
     fsorted.Close();
   }
@@ -301,7 +319,7 @@ int pueo::convert::convertFiles(const char * typetag, int nfiles, const char ** 
     return -1;
   }
 
-#define CONVERT_TEMPLATE(TAG, RAW, ROOT, POST, ARITY)\
+#define CONVERT_TEMPLATE(TAG, RAW, ROOT, POST, ARITY, IMAJOR, IMINOR)\
   else if (!strcmp(typetag,#TAG))\
   {\
     return converterImpl<ROOT,pueo_##RAW##_t,pueo_read_##RAW,POST, ARITY>(nfiles, infiles, outfile, opts);\
