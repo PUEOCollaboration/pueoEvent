@@ -68,7 +68,7 @@ namespace pueo
 /*                  |  tag           |     raw type        | ROOT type                |  postprocessor  | has_arity | index_major | minor   */\
 /*========================================================================================================================================================= */\
 PUEO_CONVERT_TYPE(/*|*/ event,     /*|*/  full_waveforms, /*|*/ pueo::RawEvent,       /*|*/ nullptr,    /*|*/ 0,  /*|*/ "eventNumber", /*|*/ nullptr             )\
-PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,      /*|*/ nullptr,    /*|*/ 0,  /*|*/ "eventNumber" , /*|*/  nullptr            )\
+PUEO_CONVERT_TYPE(/*|*/ header,    /*|*/  full_waveforms, /*|*/ pueo::RawHeader,      /*|*/ nullptr,    /*|*/ 0,  /*|*/ "eventNumber" , /*|*/  "0"           )\
 PUEO_CONVERT_TYPE(/*|*/ attitude,  /*|*/  nav_att,        /*|*/ pueo::nav::Attitude,  /*|*/ nullptr,    /*|*/ 0,  /*|*/ "realTime", /*|*/  "realTimeNsecs"        )\
 PUEO_CONVERT_TYPE(/*|*/ sunsensors,/*|*/  ss,             /*|*/ pueo::nav::SunSensors,/*|*/ nullptr,    /*|*/ 0,  /*|*/ "readoutTime", /*|*/  "readoutTimeNsecs"  )\
 PUEO_CONVERT_TYPE(/*|*/ hsk,       /*|*/  sensors_disk,   /*|*/ pueo::hsk::Sensor,    /*|*/ nullptr,    /*|*/ 1,  /*|*/ "time_secs", /*|*/  "time_ms"             )\
