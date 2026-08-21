@@ -33,6 +33,7 @@
 #include "pueo/Dataset.h"
 #include "pueo/UsefulEvent.h"
 #include "pueo/RawHeader.h"
+#include "pueo/DaqHsk.h"
 #include "pueo/Nav.h"
 #include "pueo/TruthEvent.h" 
 #include "pueo/Version.h" 
@@ -167,6 +168,7 @@ pueo::Dataset::Dataset(int run,  DataDirectory version, bool decimated, Blinding
   fHeadTree(0), fHeader(0), 
   fEventTree(0), fRawEvent(0), fUsefulEvent(0), 
   fGpsTree(0), fGps(0), 
+  fDaqHskTree(0),fDaqH(0),
   fTruthTree(0), fTruth(0), 
   fCutList(0), fRandy()
 {
@@ -227,6 +229,65 @@ pueo::nav::Attitude * pueo::Dataset::gps(bool force_load)
   }
 
   return fGps;
+}
+
+// Keth's daq hsk playground for Scrandis
+pueo::daqhsk::DaqHsk * pueo::Dataset::daqhsk(bool force_load)
+{
+
+  if (fHaveDaqHskEvent) // something else?
+  {
+    if (fDaqHskTree->GetReadEntry() != fWantedEntry || force_load) 
+    {
+      fDaqHskTree->GetEntry(fWantedEntry);
+    }
+  }
+  else
+  {
+    if (fGpsDirty || force_load) // what is dirty and havegpsevent
+    {
+      //try one that matches realtime
+      //TODO use the correct values once they're available
+      int daqhEntry = fDaqHskTree->GetEntryNumberWithBestIndex(header()->corrected_trigger_time.GetSec(), header()->corrected_trigger_time.GetNanoSec());
+      fDaqHskTree->GetEntry(daqhEntry);
+      fGpsDirty = false;
+    }
+  }
+
+  return fDaqH;
+}
+
+
+// This function returns a UInt_t representing the lower 24 bits of the L2 mask, but with the logic inverted: a 1 means the phi sector was NOT excluded (it is enabled), and a 0 means it was excluded (masked out due to high trigger rate) and waveforms from channels participating in those L2s should be neglected during analysis like map recon.
+UInt_t pueo::Dataset::gimmePhisExlcudeBits(){
+  UInt_t theOrigL2Mask = fDaqH->l2_enable_mask;
+  return 0x00FFFFFF & (~theOrigL2Mask);
+}
+
+// this function returns false if you send it values out of the bounds or if the 
+bool pueo::Dataset::IsL2PhiMasked(int whichPhi, int whichPol, bool override_test,UInt_t test){
+  if(whichPhi>11 || whichPhi<0) return false;
+  if(whichPol!=0 && whichPol!=1) return false;
+  int bit_position = (whichPol*12) + whichPhi;
+  if(!override_test){
+    UInt_t thisphiexclude = gimmePhisExlcudeBits();
+    return ( (UInt_t) (thisphiexclude) >> bit_position) & 1;
+  }
+  else return ( (UInt_t) (test) >> bit_position) & 1;
+}
+/**
+ * Wrapper function that accepts a wide phi sector (1-24) and maps it 
+ * to the underlying overlapping bit mask structure.
+ */
+bool pueo::Dataset::IsThisPhiPolExcluded(int whichPhi, int whichPol,bool override_test,UInt_t test) {
+    if (whichPhi < 1 || whichPhi > 24 || whichPol<0 || whichPol>1) {
+      return false;
+    }
+    int bit_a = phi_to_bits[whichPhi][0];
+    int bit_b = phi_to_bits[whichPhi][1];
+    bool match_a = IsL2PhiMasked(bit_a,whichPol, override_test,test);
+    bool match_b = IsL2PhiMasked(bit_b,whichPol, override_test,test);
+    return match_a || match_b;
 }
 
 
@@ -345,6 +406,33 @@ Bool_t pueo::Dataset::maybeInvertPolarity(UInt_t eventNumber){
     return (aboveZeroFiftyPercentOfTheTime < 0);
   }
   return false;
+}
+
+
+bool pueo::Dataset::IsL2PhiBitSet(int pol, int L2bit, bool override_test,UInt_t test){
+  if (L2bit < 0 || L2bit > 11) return false;
+  if(!override_test){ 
+    UInt_t thismask = fHeader->L2Mask;
+    return ( thismask >> ((pol * 12) + L2bit)) & 1;
+  }
+  else return ( test >> ((pol * 12) + L2bit)) & 1;
+}
+
+bool pueo::Dataset::IsPolPhiTriggered(int pol, int phi, bool override_test, UInt_t test){
+  if (phi < 1 || phi > 24) return false;
+  int bit_a = -1;
+  int bit_b = -1;
+  if (pol == 0) {
+    bit_a = pol0_to_bits[phi][0];
+    bit_b = pol0_to_bits[phi][1];
+  }
+  else if (pol == 1) {
+    // Subtracting 12 normalizes the global bits (12-23) down to local bits (0-11)
+    bit_a = pol1_to_bits[phi][0] - 12;
+    bit_b = pol1_to_bits[phi][1] - 12;
+  }
+  else return false; // Invalid pol
+  return IsL2PhiBitSet(pol, bit_a,override_test,test) || IsL2PhiBitSet(pol, bit_b,override_test,test);
 }
 
 int pueo::Dataset::getEntry(int entryNumber)
@@ -594,6 +682,17 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
   if (fGpsTree) fGpsTree->SetBranchAddress("attitude",&fGps); 
 
+  // try to load daq hsk (no simulation yet)
+  fname = TString::Format("%s/daqhsk.root", data_dir);
+  if(TFile * f = openIfAnyExist(1, fname.Data())){
+    if(verbose) fprintf(stdout,"Loading daqhsk file for run %d, using global file\n",run);
+    f = TFile::Open(fname);
+    filesToClose.push_back(f);
+    fDaqHskTree = (TTree*) f->Get("daqhskTree"); 
+    if (!fDaqHskTree->GetTreeIndex()) fDaqHskTree->BuildIndex("l2_readout_time","l2_readout_timeNsecs"); // this should not run now that we have built the index by default in the file and saved it in there.
+    fHaveDaqHskEvent = false;
+  }
+  if (fDaqHskTree) fDaqHskTree->SetBranchAddress("daqhsk",&fDaqH);
 
   //try to load useful event file 
 
