@@ -670,9 +670,10 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     }
     else
     {
-      fprintf(stderr,"Could not find gps file for run %d, using global file\n",run);
-      fname = TString::Format("%s/attitude.root", data_dir);
-      f = TFile::Open(fname);
+//      fprintf(stderr,"Could not find gps file for run %d, using global file\n",run);
+      fname = TString::Format("%s/attitude_postprocessed.root", data_dir);
+      fname2 = TString::Format("%s/attitude.root", data_dir);
+      f = openIfAnyExist(2,fname.Data(), fname2.Data());
       filesToClose.push_back(f);
       fGpsTree = (TTree*) f->Get("attitudeTree"); 
       if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime","realTimeNsecs");
