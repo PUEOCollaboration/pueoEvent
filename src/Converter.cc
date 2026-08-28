@@ -453,6 +453,7 @@ int pueo::convert::postprocess_attitudes(const char * infile, const char * outfi
   TFile fout(outfile,"RECREATE");
   TTree * tout = new TTree("attitudeTree","attitudeTree");
   tout->Branch("attitude",att);
+  tout->SetAutoSave(0);
 
 
 
