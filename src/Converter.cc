@@ -34,7 +34,9 @@
 
 
 #include "TFile.h"
+#include "TTreeIndex.h"
 #include "TTree.h"
+#include "TH2.h"
 
 #include <vector>
 #include <iostream>
@@ -413,5 +415,81 @@ int pueo::convert::convertFilesOrDirectories(const char * typetag,  int N, const
   for (auto f : files) free(f);
 
   return ret;
+
+
 }
 
+// FIX MSL -> WGS84 
+
+int pueo::convert::postprocess_attitudes(const char * infile, const char * outfile, const char * args) 
+{
+
+  const char * geoid_file = args;
+  if (!geoid_file) geoid_file = getenv("PUEO_GEOID_FILE");
+  if (!geoid_file && getenv("PUEO_ROOT_DATA")) geoid_file = Form("%s/geoids.root", getenv("PUEO_ROOT_DATA"));
+  if (!geoid_file) geoid_file = "geoids.root";
+
+  TFile geoid(geoid_file);
+  if (!geoid.IsOpen())
+  {
+    std::cerr << "Despite my best atttemps, I can't find a geoid file. " << std::endl;
+    return -1;
+  }
+
+
+  TH2 * egm96_5deg = (TH2*) geoid.Get("egm96_5deg");
+  TH2 * egm96_30 = (TH2*) geoid.Get("egm96_30");
+  TH2 * egm08_gpsd = (TH2*) geoid.Get("egm08_5deg");
+
+  TFile *fin = TFile::Open(infile);
+
+
+  TTree * tin = (TTree*) fin->Get("attitudeTree");
+  assert(tin);  //does what it says on the tin
+
+  pueo::nav::Attitude * att = 0;
+  tin->SetBranchAddress("attitude",&att);
+
+  TFile fout(outfile,"RECREATE");
+  TTree * tout = new TTree("attitudeTree","attitudeTree");
+  tout->Branch("attitude",att);
+
+
+
+  for (Long_t i  = 0; i < tin->GetEntries() ; i++)
+  {
+    tin->GetEntry(i);
+
+    switch (att->source)
+    {
+
+      // THE ABX geoid might be an interpolated 5-degree EGM96? Maybe. At least it's only 7 cm at McM from my attempt at doing that.
+      case 'A':
+        att->altitude += egm96_5deg->Interpolate(att->longitude, att->latitude);
+        break;
+
+      // The BOREAS reports in WGS84 but gpsd helpfully converts it to MSL. At least we know its lookup table.
+      case 'B':
+        att->altitude += egm08_gpsd->Interpolate(att->longitude, att->latitude);
+        break;
+
+      // The CPT7 uses a 0.5 degree EGM96. Unclear if it interpolates, but you know, it makes a difference of < 10 cm
+      // Quin's postprocessing uses the CPT7, I think
+      default:
+        att->altitude += egm96_30->Interpolate(att->longitude, att->latitude);
+        break;
+    }
+
+    tout->Fill();
+  }
+  if (tin->GetTreeIndex())
+  {
+    tout->BuildIndex(tin->GetTreeIndex()->GetMajorName(), tin->GetTreeIndex()->GetMinorName());
+  }
+
+  fout.Write();
+  fout.Close();
+  delete fin;
+
+  return 0;
+}
