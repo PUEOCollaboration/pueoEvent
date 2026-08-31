@@ -671,9 +671,26 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     else
     {
 //      fprintf(stderr,"Could not find gps file for run %d, using global file\n",run);
-      fname = TString::Format("%s/attitude_postprocessed.root", data_dir);
-      fname2 = TString::Format("%s/attitude.root", data_dir);
-      f = openIfAnyExist(2,fname.Data(), fname2.Data());
+      char * attitude_override = getenv("PUEO_ATTITUDE_FILE");
+      if (attitude_override)
+      {
+        f = TFile::Open(attitude_override);
+      }
+
+      if (!f)
+      {
+        fname = TString::Format("%s/attitude_postprocessed_wgs84.root", data_dir);
+        fname2 = TString::Format("%s/attitude_postprocessed.root", data_dir);
+        fname3 = TString::Format("%s/attitude.root", data_dir);
+        f = openIfAnyExist(3,fname.Data(), fname2.Data());
+      }
+
+      if (!f)
+      {
+        std::cerr << "Bad attitude. GRRRRR. " << std::endl;
+
+      }
+
       filesToClose.push_back(f);
       fGpsTree = (TTree*) f->Get("attitudeTree"); 
       if (!fGpsTree->GetTreeIndex()) fGpsTree->BuildIndex("realTime","realTimeNsecs");
