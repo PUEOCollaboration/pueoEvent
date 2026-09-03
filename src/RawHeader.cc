@@ -30,10 +30,10 @@ int pueo::RawHeader::isInPhiMask(int phi, pueo::pol::pol_t pol) const
 
 #ifdef HAVE_PUEORAWDATA
 pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs):
-  run(wfs->run), 
+  run(wfs->run),
   eventNumber(wfs->event),
   triggerTime(wfs->event_second),
-  triggerTimeNs(PUEO_SUBSECOND((*wfs)),
+  triggerTimeNs(PUEO_SUBSECOND((*wfs))),
   trigTime(wfs->event_time),
   lastPPS(wfs->last_pps),
   lastLastPPS(wfs->llast_pps),
@@ -44,9 +44,9 @@ pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs):
   readoutTime(wfs->readout_time.utc_secs),
   readoutTimeNs(wfs->readout_time.utc_nsecs),
   corrected_readout_time((time_t)0, 0), // cannot know this without post-processing, so initialize to year 1970
-  corrected_trigger_time((time_t)0, 0)  // cannot know this without post-processing, so initialize to year 1970
-  orig_readout_time(readOutTime,  readoutTimeNs),
-  orig_trigger_time(triggerTime, triggerTimeNs)
+  corrected_trigger_time((time_t)0, 0),  // cannot know this without post-processing, so initialize to year 1970
+  origReadoutTime((time_t) readoutTime,  readoutTimeNs),
+  origTriggerTime(triggerTime, triggerTimeNs)
 {
   if (wfs->soft_trigger) trigType |= pueo::trigger::kSoft;
   if (wfs->pps_trigger)  trigType |= pueo::trigger::kPPS0;
