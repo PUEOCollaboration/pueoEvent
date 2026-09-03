@@ -22,6 +22,7 @@
 ****************************************************************************************/ 
 
 #include "pueo/GeomTool.h"
+#include "pueo/Conventions.h"
 #include "pueo/Version.h" 
 #include <assert.h>
 #include <unordered_map>
@@ -473,7 +474,7 @@ Int_t pueo::GeomTool::getTopAntFaceNearestPhiWave(Double_t phiWave) const {
 
 Int_t pueo::GeomTool::getPhiFromAnt(Int_t ant) const
 {
-  auto ch = r.fromAntIdxPol(ant, pol::kHorizontal); 
+  auto ch = r.fromAntIdxPol(ant, pueo::pol::asChar(pueo::pol::kHorizontal)); 
   if (!ch) return -1; 
   return ch->phiSector; 
 }
@@ -481,7 +482,7 @@ Int_t pueo::GeomTool::getPhiFromAnt(Int_t ant) const
 
 Int_t pueo::GeomTool::getAntFromPhiRing(Int_t phi, ring::ring_t ring) const
 {
-  auto ch = r.fromPhiRingPol(phi,ring,pol::kHorizontal); 
+  auto ch = r.fromPhiRingPol(phi,ring,pueo::pol::asChar(pueo::pol::kHorizontal)); 
   if (!ch) return -1; 
   return ch->antIdx; 
 }
