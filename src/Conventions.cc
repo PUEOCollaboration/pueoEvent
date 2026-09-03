@@ -63,9 +63,9 @@ char pueo::pol::asChar(pueo::pol::pol_t pol)
 static const double locations[4][3] = 
 {
   [pueo::Locations::WAIS] = { -79.468116, -112.059258, 1779.80},
-  [pueo::Locations::LDB] = {-(77 + (51.23017/60)), (167 + (12.16908/60)), 0},
-  [pueo::Locations::TAYLOR_DOME] = {  -77.78695, 158.66555, 2395 },
-  [pueo::Locations::SOUTH_PLUS_200] = { -81.9457,178.392, 0},
+  [pueo::Locations::LDB] = {-(77 + (51.23017/60)), (167 + (12.16908/60)), -30},
+  [pueo::Locations::TAYLOR_DOME] = {  -77.78695, 158.66555, 2367},
+  [pueo::Locations::SOUTH_PLUS_200] = { -81 + (57.799)/60, 178 + (23.548)/60., 11},
 };
 
 
