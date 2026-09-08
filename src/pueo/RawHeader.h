@@ -77,6 +77,8 @@ public:
                              ///< This stores the ORIGINAL RAW DATA VALUE WHICH CAN BE WRONG prior to post-processing.
                              ///< The corrected value is stored in `corrected_trigger_time`.
 
+  int32_t  triggerTimeNs = 0; /// < The number of nanosseconds part of the trigger time. Could be corrected or raw, depending.
+
   uint32_t trigTime = 0;     ///< 32-bit free running TURF clock value very briefly after trigger.
 
   uint32_t lastPPS = 0;      ///< TURF clock value at the nearest prior second (ie. at `triggerTime`).
