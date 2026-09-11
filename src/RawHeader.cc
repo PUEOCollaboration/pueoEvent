@@ -22,18 +22,31 @@
 ****************************************************************************************/ 
 
 #include "pueo/RawHeader.h" 
+#include <cmath>
 
 int pueo::RawHeader::isInPhiMask(int phi, pueo::pol::pol_t pol) const
 {
   return phiTrigMask[pol] & ( 1 << phi); 
 }
 
+static inline uint32_t  pueo_subsec(uint32_t trig_time, uint32_t last_pps, uint32_t llast_pps)
+{
+  uint32_t period = last_pps - llast_pps;
+  if (fabs(period - 125e6) > 1e6) period = 125e6; // probably bogus, use nominal value
+
+  uint32_t these_cycles = trig_time - last_pps;
+  if (these_cycles  > period) these_cycles %= period;  // could this be right? who knows
+
+  return 1e9 * (double(these_cycles)/period);
+}
+
+
 #ifdef HAVE_PUEORAWDATA
 pueo::RawHeader:: RawHeader(const pueo_full_waveforms_t * wfs):
   run(wfs->run),
   eventNumber(wfs->event),
   triggerTime(wfs->event_second),
-  triggerTimeNs(PUEO_SUBSECOND((*wfs))),
+  triggerTimeNs(pueo_subsec(wfs->event_time, wfs->last_pps, wfs->llast_pps)),
   trigTime(wfs->event_time),
   lastPPS(wfs->last_pps),
   lastLastPPS(wfs->llast_pps),
