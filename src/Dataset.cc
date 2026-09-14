@@ -710,6 +710,9 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
     fHaveDaqHskEvent = false;
   }
   if (fDaqHskTree) fDaqHskTree->SetBranchAddress("daqhsk",&fDaqH);
+  else {
+    std::cerr << "WARNING: did not load a DAQ housekeeping tree for run " << run << " in " << data_dir << std::endl; 
+  }
 
   //try to load useful event file 
 
