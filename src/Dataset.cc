@@ -704,7 +704,6 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
   fname = TString::Format("%s/daqhsk.root", data_dir);
   if(TFile * f = openIfAnyExist(1, fname.Data())){
     if(verbose) fprintf(stdout,"Loading daqhsk file for run %d, using global file\n",run);
-    f = TFile::Open(fname);
     filesToClose.push_back(f);
     fDaqHskTree = (TTree*) f->Get("daqhskTree"); 
     if (!fDaqHskTree->GetTreeIndex()) fDaqHskTree->BuildIndex("l2_readout_time","l2_readout_timeNsecs"); // this should not run now that we have built the index by default in the file and saved it in there.
