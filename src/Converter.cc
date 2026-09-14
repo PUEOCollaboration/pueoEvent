@@ -419,12 +419,51 @@ int pueo::convert::convertFilesOrDirectories(const char * typetag,  int N, const
 
 }
 
-// FIX MSL -> WGS84 
 
-int pueo::convert::postprocess_attitudes(const char * infile, const char * outfile, const char * args) 
+
+// utility routines for ABX2-like interpolation
+static inline float smoothstep(float t) { return t * t * (3.0f - 2.0f * t); }
+static double hermite_interpolate(TH2 * h, float x, float y)
+{
+
+  //use floats to match ABX2
+  float dx = h->GetXaxis()->GetBinWidth(1);
+  float dy = h->GetYaxis()->GetBinWidth(1);
+
+  // we interpolate between centers, not edges!
+  float x0 = h->GetXaxis()->GetBinCenter(1);
+  float y0 = h->GetYaxis()->GetBinCenter(1);
+
+  int ix = (x - x0)/dx;
+  int iy = (y - y0)/dy;
+
+  float tx = (x - (ix * dx + x0))/dx;
+  float ty = (y - (iy * dy + y0))/dy;
+
+  //for ROOT bin offset
+  ix+=1;
+  iy+=1;
+
+  float h00 = h->GetBinContent(ix,iy);
+  float h10 = h->GetBinContent(ix+1,iy);
+  float h01 = h->GetBinContent(ix,iy+1);
+  float h11 = h->GetBinContent(ix+1,iy+1);
+
+//  printf("(%f,%f) -> (%d,%d) :: [ %f, %f -> (%f,%f) ]\n",x,y,ix,iy, tx,ty, smoothstep(tx), smoothstep(ty));
+
+  return h00 * smoothstep(1-tx) * smoothstep(1-ty)
+       + h01 * smoothstep(1-tx) * smoothstep( ty )
+       + h10 * smoothstep( tx ) * smoothstep(1-ty)
+       + h11 * smoothstep( tx ) * smoothstep( ty );
+}
+
+// FIX MSL -> WGS84
+// Probably should eventually move this stuff in a different file
+int pueo::convert::postprocess_attitudes(const char * infile, const char * outfile, const char * args)
 {
 
   const char * geoid_file = args;
+  //TODO could compile these coefficients into the binary. But the geoids file works too...
   if (!geoid_file) geoid_file = getenv("PUEO_GEOID_FILE");
   if (!geoid_file && getenv("PUEO_ROOT_DATA")) geoid_file = Form("%s/geoids.root", getenv("PUEO_ROOT_DATA"));
   if (!geoid_file) geoid_file = "geoids.root";
@@ -432,12 +471,11 @@ int pueo::convert::postprocess_attitudes(const char * infile, const char * outfi
   TFile geoid(geoid_file);
   if (!geoid.IsOpen())
   {
-    std::cerr << "Despite my best atttemps, I can't find a geoid file. " << std::endl;
+    std::cerr << "Despite my best atttempts, I can't find a geoid file. " << std::endl;
     return -1;
   }
 
-
-  TH2 * egm96_5deg = (TH2*) geoid.Get("egm96_5deg");
+  TH2 * abx2_geoid = (TH2*) geoid.Get("abx2_5deg");
   TH2 * egm96_30 = (TH2*) geoid.Get("egm96_30");
   TH2 * egm08_gpsd = (TH2*) geoid.Get("egm08_5deg");
 
@@ -456,7 +494,6 @@ int pueo::convert::postprocess_attitudes(const char * infile, const char * outfi
   tout->SetAutoSave(0);
 
 
-
   for (Long_t i  = 0; i < tin->GetEntries() ; i++)
   {
     tin->GetEntry(i);
@@ -464,9 +501,9 @@ int pueo::convert::postprocess_attitudes(const char * infile, const char * outfi
     switch (att->source)
     {
 
-      // THE ABX geoid might be an interpolated 5-degree EGM96? Maybe. At least it's only 7 cm at McM from my attempt at doing that.
+      // THE ABX geoid uses Hermite (smoothstep) interpolation of a 5x5 deg OSU91A geoid
       case 'A':
-        att->altitude += egm96_5deg->Interpolate(att->longitude, att->latitude);
+        att->altitude += hermite_interpolate(abx2_geoid, att->longitude, att->latitude);
         break;
 
       // The BOREAS reports in WGS84 but gpsd helpfully converts it to MSL. At least we know its lookup table.
@@ -474,7 +511,7 @@ int pueo::convert::postprocess_attitudes(const char * infile, const char * outfi
         att->altitude += egm08_gpsd->Interpolate(att->longitude, att->latitude);
         break;
 
-      // The CPT7 uses a 0.5 degree EGM96. Unclear if it interpolates, but you know, it makes a difference of < 10 cm
+      // The CPT7 uses a 0.5 degree EGM96. Unclear if it interpolates or does NN, but you know, it makes a difference of < 10 cm
       // Quin's postprocessing uses the CPT7, I think
       default:
         att->altitude += egm96_30->Interpolate(att->longitude, att->latitude);
