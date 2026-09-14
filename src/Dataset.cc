@@ -260,7 +260,7 @@ pueo::daqhsk::DaqHsk * pueo::Dataset::daqhsk(bool force_load)
 
 // This function returns a UInt_t representing the lower 24 bits of the L2 mask, but with the logic inverted: a 1 means the phi sector was NOT excluded (it is enabled), and a 0 means it was excluded (masked out due to high trigger rate) and waveforms from channels participating in those L2s should be neglected during analysis like map recon.
 UInt_t pueo::Dataset::gimmePhisExlcudeBits(){
-  UInt_t theOrigL2Mask = fDaqH->l2_enable_mask;
+  UInt_t theOrigL2Mask = daqhsk()->l2_enable_mask;
   return 0x00FFFFFF & (~theOrigL2Mask);
 }
 
