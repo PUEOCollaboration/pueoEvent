@@ -682,7 +682,7 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
         fname = TString::Format("%s/attitude_postprocessed_wgs84.root", data_dir);
         fname2 = TString::Format("%s/attitude_postprocessed.root", data_dir);
         fname3 = TString::Format("%s/attitude.root", data_dir);
-        f = openIfAnyExist(3,fname.Data(), fname2.Data());
+        f = openIfAnyExist(3,fname.Data(), fname2.Data(), fname3.Data());
       }
 
       if (!f)
