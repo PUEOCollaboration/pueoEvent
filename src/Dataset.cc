@@ -248,7 +248,17 @@ pueo::daqhsk::DaqHsk * pueo::Dataset::daqhsk(bool force_load)
     {
       //try one that matches realtime
       //TODO use the correct values once they're available
-      int daqhEntry = fDaqHskTree->GetEntryNumberWithBestIndex(header()->corrected_trigger_time.GetSec(), header()->corrected_trigger_time.GetNanoSec());
+      int trigSec = header()->corrected_trigger_time.GetSec();
+      int trigNsec = header()->corrected_trigger_time.GetNanoSec();
+      if (!fDaqHskTree || !fDaqHskTree->GetTreeIndex()) {
+        fprintf(stderr, "  WARNING: daqhsk tree or index is null, returning stale data\n");
+        return fDaqH;
+      }
+      int daqhEntry = fDaqHskTree->GetEntryNumberWithBestIndex(trigSec, trigNsec);
+      if (daqhEntry < 0) {
+        fprintf(stderr, "  WARNING: no daqhsk entry found for time %d.%09d, returning stale data\n", trigSec, trigNsec);
+        return fDaqH;
+      }
       fDaqHskTree->GetEntry(daqhEntry);
       fGpsDirty = false;
     }
@@ -702,8 +712,9 @@ bool  pueo::Dataset::loadRun(int run, DataDirectory dir, bool dec)
 
   // try to load daq hsk (no simulation yet)
   fname = TString::Format("%s/daqhsk.root", data_dir);
-  if(TFile * f = openIfAnyExist(1, fname.Data())){
-    if(verbose) fprintf(stdout,"Loading daqhsk file for run %d, using global file\n",run);
+  TString fname_parent = TString::Format("%s/../daqhsk.root", data_dir);
+  if(TFile * f = openIfAnyExist(2, fname.Data(), fname_parent.Data())){
+    if(verbose) fprintf(stdout,"Loading daqhsk file: %s\n", f->GetName());
     filesToClose.push_back(f);
     fDaqHskTree = (TTree*) f->Get("daqhskTree"); 
     if (!fDaqHskTree->GetTreeIndex()) fDaqHskTree->BuildIndex("l2_readout_time","l2_readout_timeNsecs"); // this should not run now that we have built the index by default in the file and saved it in there.

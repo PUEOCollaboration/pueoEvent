@@ -122,6 +122,7 @@ public:
 
   uint32_t  flags = 0; /// @todo: not implemented yet (2026Apr2)
   uint8_t   L1_octants[k::NUM_SURF_SLOTS] ={0}; ///< @todo not implemented yet (2026Apr2)
+                                                ///< @note: only 24 SURFs use this, not all 28
   uint32_t  phiTrigMask[k::NUM_POLS] = {0}; ///< 24-bit phi mask (from TURF) 
                                             ///< @note: not quite the same as L2_mask
                                             ///< @todo: not implemented yet (2026Apr2)
